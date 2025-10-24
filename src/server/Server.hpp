@@ -10,6 +10,8 @@ class Server {
         Server(int port, std::string host, std::string name, std::string root, std::string index, std::string error_page, std::string cgi, std::string location);
         ~Server();
 
+        int setupServer();
+
     private:
         int _port;
         std::string _host;

@@ -24,5 +24,27 @@ Server::Server(int port, std::string host, std::string name, std::string root, s
     _location = location;
 }
 
+int Server::setupServer() {
+    // setup server
+    
+    // create socket
+    // fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    // bind socket
+    // bind(fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    
+    // listen for connections
+
+    // accept connections
+    //client_fd = accept(server_fd, NULL, NULL);
+
+    // read requests
+    // send responses
+    // close connections
+    // close socket
+    // return success
+    return 0;
+}
+
 Server::~Server() {
 }
