@@ -11,19 +11,7 @@ int main() {
         return 1;
     }
 
-    /**
-     * Allow address reuse with setsockopt() SO_REUSEADDR
-     * 
-     * When you stop your server and restart it immediately, 
-     * you might get "Address already in use" error.
-     * This happens because the port is in TIME_WAIT state
-     */
-    int	opt = 1;
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        std::cerr << "Failed to set SO_REUSEADDR" << std::endl;
-        close(server_fd);
-        return 1;
-    }
+
 
     std::cout << "Socket created successfully" << std::endl;
 
