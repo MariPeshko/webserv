@@ -10,13 +10,11 @@
 
 int	main() {
 
-	// Create a socket
-    int	server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd == -1) {
-        std::cerr << "Failed to create socket " << strerror(errno) << std::endl;
-        return 1;
-    }
-
+	int	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (server_fd == -1) {
+		std::cerr << "Failed to create socket " << strerror(errno) << std::endl;
+		return 1;
+	}
 	/**
      * Allow address reuse with setsockopt() SO_REUSEADDR
      * 
@@ -24,30 +22,33 @@ int	main() {
      * you might get "Address already in use" error.
      * This happens because the port is in TIME_WAIT state
      */
-    int	opt = 1;
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        std::cerr << "Failed to set SO_REUSEADDR" << std::endl;
-        close(server_fd);
-        return 1;
-    }
-
-    std::cout << "Socket created successfully" << std::endl;
+	int	opt = 1;
+	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+		std::cerr << "Failed to set SO_REUSEADDR" << std::endl;
+		close(server_fd);
+		return 1;
+	}
+	std::cout << "Socket created successfully" << std::endl;
 
     // Prepare the sockaddr_in structure
 	sockaddr_in	server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(8080);
+    server_addr.sin_family = AF_INET; // for IPv4 
+    server_addr.sin_addr.s_addr = INADDR_ANY; // IP, i.e. inet_addr("127.0.0.1");
+    server_addr.sin_port = htons(8080); // port number
 
     // Bind the socket to the specified IP and port
     if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         std::cerr << "Failed to bind socket " << strerror(errno) << std::endl;
         return 1;
     }
-
     std::cout << "Socket bound successfully" << std::endl;
 
-    // Listen for incoming connections
+	/**
+	 * Listen for incoming connections
+	 * 'backlog' is the maximum number of pending connections
+	 * if the backlog is exceeded, new connections will be refused
+	 * here we set it to 3, meaning up to 3 connections can be queued
+	 */
     if (listen(server_fd, 3) < 0) {
         std::cerr << "Failed to listen on socket " << strerror(errno) << std::endl;
         return 1;

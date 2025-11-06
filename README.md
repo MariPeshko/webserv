@@ -27,6 +27,8 @@ Escape character is '^]'.
 
 4. To exit telnet, press `Ctrl+]` then type `quit` and press Enter.
 
+
+
 ## SIGNALS
 
 **Properly terminate the suspended process:**
@@ -58,7 +60,17 @@ lsof -i :8080
 lsof -i -a -p [PID]
 ```
 
-2. **Using /proc filesystem:**
+2. **Using netstat (shows network connections and listening ports):**
+```bash
+# Check all connections on port 8080
+netstat -anp | grep 8080
+
+# -a: Show all connections (listening and established)
+# -n: Show numerical addresses (don't resolve hostnames)  
+# -p: Show process ID and name that owns each socket
+```
+
+3. **Using /proc filesystem:**
 ```bash
 # View all open file descriptors
 ls -la /proc/[PID]/fd/
@@ -68,7 +80,7 @@ ps aux | grep webserv    # find PID
 ls -la /proc/[PID]/fd/   # view open fd
 ```
 
-3. **Using strace to track system calls:**
+4. **Using strace to track system calls:**
 ```bash
 # Track all socket operations including close()
 strace -e trace=socket,bind,listen,accept,close ./webserv
