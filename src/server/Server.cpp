@@ -24,6 +24,8 @@ Server::Server(int port, std::string host, std::string name, std::string root, s
     _location = location;
 }
 
+// select() examines the file descriptor sets reading_set and writing_set to see if any of their descriptors are ready for I/O.
+
 int Server::setupServer() {
     // setup server
     
@@ -32,7 +34,7 @@ int Server::setupServer() {
 
     // bind socket
     // bind(fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    
+
     // listen for connections
 
     // accept connections
