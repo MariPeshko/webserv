@@ -1,10 +1,10 @@
-#include "Webserv.hpp"
+#include "server/Server.hpp"
 #include "parser/Config.hpp"
 #include <string>
 #include <iostream>
 #include <string.h>
 
-int main(int ac, char **argv) {
+int	main(int ac, char **argv) {
     Config config;
     if (ac == 1 || ac == 2) {
         // if no config file provided, use default config file

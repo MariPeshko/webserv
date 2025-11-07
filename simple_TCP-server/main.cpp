@@ -5,16 +5,24 @@
 #include <unistd.h>		// read, close
 #include <cstring>		// for strerror
 #include <cerrno>		// for errno
+#include <fcntl.h>		// fcntl
 
 /* it's simple TCP-server */
 
 int	main() {
 
+	// name: sockfd
 	int	server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd == -1) {
 		std::cerr << "Failed to create socket " << strerror(errno) << std::endl;
 		return 1;
 	}
+
+	// With this feature and without poll() or select()
+	// Server is listening...
+	// Failed to accept client connection Resource temporarily unavailable
+	// fcntl(server_fd, F_SETFL, O_NONBLOCK);
+	
 	/**
      * Allow address reuse with setsockopt() SO_REUSEADDR
      * 

@@ -7,6 +7,7 @@
 # include <vector>
 # include <fstream>
 # include <map>
+# include <sys/select.h> // select(), fd_set
 
 class Config {
     public:
@@ -15,8 +16,8 @@ class Config {
         void parse(const std::string& config_file);
 
     private:
-        std::string _config_file;
-        std::vector<std::string> _config_lines;
+        std::string					_config_file;
+        std::vector<std::string>	_config_lines;
         std::map<long, Server>		_servers;
 	    std::map<long, Server *>	_sockets;
 	    std::vector<int>			_ready;
@@ -24,4 +25,5 @@ class Config {
 	    unsigned int				_fd_size;
 	    long						_max_fd;
 };
+
 #endif

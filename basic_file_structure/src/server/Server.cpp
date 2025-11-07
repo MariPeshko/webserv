@@ -1,6 +1,5 @@
 #include "Server.hpp"
 
-
 // for now set up mock data
 Server::Server() {
     _port = 8080;

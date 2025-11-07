@@ -28,7 +28,6 @@ Escape character is '^]'.
 4. To exit telnet, press `Ctrl+]` then type `quit` and press Enter.
 
 
-
 ## SIGNALS
 
 **Properly terminate the suspended process:**
