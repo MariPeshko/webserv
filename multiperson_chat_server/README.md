@@ -1,3 +1,8 @@
-To compile:
+# Compile
+make
 
-cc -Wall -Wextra -Werror beej_multichat.c -o webserv
+# Run the server
+./chat_server_cpp
+
+# Test with multiple clients (in separate terminals)
+telnet localhost 9034
