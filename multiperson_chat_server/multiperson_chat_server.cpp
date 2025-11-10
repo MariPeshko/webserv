@@ -4,6 +4,7 @@
 */
 
 #include <iostream>
+#include <sstream>		// for std::ostringstream
 #include <vector>
 #include <cstdlib>
 #include <cstring>
@@ -11,10 +12,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <poll.h>	// poll, strcut pollfd
+#include <netdb.h>		// struct addrinfo, freeaddrinfo
+#include <arpa/inet.h>	// htons, htonl, ntohs, ntohl
+#include <poll.h>		// poll, strcut pollfd
 #include <signal.h>
 
 const char* PORT = "9034";   // Port we're listening on
@@ -35,13 +35,14 @@ void signal_handler(int sig) {
  * Convert socket to IP address string.
  * addr: struct sockaddr_in or struct sockaddr_in6
  */
-const char* inet_ntop2(void* addr, char* buf, size_t size) {
-    struct sockaddr_storage* sas = static_cast<struct sockaddr_storage*>(addr);
-    struct sockaddr_in* sa4;
-    struct sockaddr_in6* sa6;
-    void* src;
+const char*	inet_ntop2(void* addr, char* buf, size_t size) {
 
-    switch (sas->ss_family) {
+	struct sockaddr_storage*	sas = static_cast<struct sockaddr_storage*>(addr);
+	struct sockaddr_in*			sa4;
+	struct sockaddr_in6*		sa6;
+	void*						src;
+
+	switch (sas->ss_family) {
         case AF_INET:
             sa4 = static_cast<struct sockaddr_in*>(addr);
             src = &(sa4->sin_addr);
@@ -53,8 +54,7 @@ const char* inet_ntop2(void* addr, char* buf, size_t size) {
         default:
             return NULL;
     }
-
-    return inet_ntop(sas->ss_family, src, buf, size);
+	return inet_ntop(sas->ss_family, src, buf, size);
 }
 
 /** Return a listening socket. */
@@ -129,13 +129,22 @@ void	del_from_pfds(std::vector<pollfd>& pfds, size_t index) {
     }
 }
 
+/** Convert IPv4 address to string manually (C++98 compatible) */
+std::string ipv4_to_string(uint32_t ip) {
+    std::ostringstream oss;
+    oss << ((ip >> 24) & 0xFF) << "."
+        << ((ip >> 16) & 0xFF) << "."
+        << ((ip >> 8) & 0xFF) << "."
+        << (ip & 0xFF);
+    return oss.str();
+}
+
 /** Handle incoming connections. */
 void	handle_new_connection(int listener, std::vector<pollfd>& pfds) {
 	
-	struct sockaddr_storage	remoteaddr; // Client address
+	struct sockaddr_storage	remoteaddr;	// Client address
 	socklen_t				addrlen;
-	int						newfd;  // Newly accept()ed socket descriptor
-	char					remoteIP[INET6_ADDRSTRLEN];
+	int						newfd;		// Newly accept()ed socket descriptor
 	
 	addrlen = sizeof(remoteaddr);
 	newfd = accept(listener, reinterpret_cast<struct sockaddr*>(&remoteaddr), &addrlen);
@@ -145,9 +154,17 @@ void	handle_new_connection(int listener, std::vector<pollfd>& pfds) {
     } else {
         add_to_pfds(pfds, newfd);
 
-        std::cout << "pollserver: new connection from " 
-                  << inet_ntop2(&remoteaddr, remoteIP, sizeof(remoteIP))
-                  << " on socket " << newfd << std::endl;
+		// Get client info for IPv4 only
+        if (remoteaddr.ss_family == AF_INET) {
+            struct sockaddr_in* addr_in = reinterpret_cast<struct sockaddr_in*>(&remoteaddr);
+            uint32_t ip = ntohl(addr_in->sin_addr.s_addr);  // ntohl is allowed!
+            std::string ip_str = ipv4_to_string(ip);
+            
+            std::cout << "pollserver: new connection from " << ip_str 
+                      << " on socket " << newfd << std::endl;
+        } else {
+            std::cout << "pollserver: new connection on socket " << newfd << std::endl;
+        }
     }
 }
 
@@ -217,24 +234,21 @@ void	process_connections(int listener, std::vector<pollfd>& pfds) {
 
 /*
  * Main: create a listener and connection vector, loop forever
- * processing connections.
- */
-int main() {
-    // Set up signal handlers
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
-    signal(SIGPIPE, SIG_IGN);  // Ignore SIGPIPE
-
-    std::cout << "Server PID: " << getpid() << std::endl;
-
-    int                 listener;     // Listening socket descriptor
-    std::vector<pollfd> pfds;  // Vector of poll file descriptors
-    g_pfds = &pfds;  // For signal handler access
-
-    // Set up and get a listening socket
-    listener = get_listener_socket();
-
-    if (listener == -1) {
+ * processing connections. */
+int	main() {
+	signal(SIGINT, signal_handler);
+	signal(SIGTERM, signal_handler);
+	signal(SIGPIPE, SIG_IGN);  // Ignore SIGPIPE
+	
+	std::cout << "Server PID: " << getpid() << std::endl;
+	
+	int					listener;	// Listening socket descriptor
+	std::vector<pollfd>	pfds;		// Vector of poll file descriptors
+	g_pfds = &pfds;					// For signal handler access
+	
+	// Set up and get a listening socket
+	listener = get_listener_socket();
+	if (listener == -1) {
         std::cerr << "Error getting listening socket" << std::endl;
         return 1;
     }
@@ -245,27 +259,26 @@ int main() {
     std::cout << "pollserver: waiting for connections..." << std::endl;
 
     // Main loop
-    while (g_running) {
-        int poll_count = poll(&pfds[0], pfds.size(), 1000);  // 1 second timeout
-
-        if (poll_count == -1) {
-            if (!g_running) break;  // Signal received
-            std::cerr << "Poll error: " << strerror(errno) << std::endl;
-            break;
-        }
-
-        if (poll_count > 0) {
-            // Run through connections looking for data to read
-            process_connections(listener, pfds);
-        }
-    }
-
-    // Cleanup
+	while (g_running) {
+		int	poll_count = poll(&pfds[0], pfds.size(), 1000);  // 1 second timeout
+		
+		if (poll_count == -1) {
+			if (!g_running) break;  // Signal received
+			std::cerr << "Poll error: " << strerror(errno) << std::endl;
+			break;
+		}
+		
+		if (poll_count > 0) {
+			// Run through connections looking for data to read
+			process_connections(listener, pfds);
+		}
+	}
+	
+	// Cleanup
     std::cout << "Closing all connections..." << std::endl;
     for (size_t i = 0; i < pfds.size(); ++i) {
         close(pfds[i].fd);
     }
-
-    std::cout << "Server shut down cleanly" << std::endl;
-    return 0;
+	std::cout << "Server shut down cleanly" << std::endl;
+	return 0;
 }
