@@ -1,7 +1,6 @@
 #ifndef SERVER_CONFIG_HPP
 # define SERVER_CONFIG_HPP
 
-# include "ServerConfig.hpp"
 # include <iostream>
 # include <string>
 # include <vector>
@@ -10,10 +9,13 @@
 # include <netinet/in.h>
 # include "../parser/Location.hpp"
 
+
 class ServerConfig {
     public:
         ServerConfig();
         ~ServerConfig();
+        void setupServer();
+
 
     private:
 		uint16_t						_port;
@@ -27,5 +29,6 @@ class ServerConfig {
 		std::vector<Location> 			_locations;
         struct sockaddr_in 				_server_address;
         int     						_listen_fd;
+
 };
 #endif

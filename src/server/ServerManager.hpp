@@ -4,6 +4,7 @@
 # include "Server.hpp"
 # include <map>
 # include "ServerConfig.hpp"
+# include <poll.h>
 
 class ServerManager {
     public:
@@ -11,11 +12,9 @@ class ServerManager {
         ~ServerManager();
 
         void setupServers(std::vector<ServerConfig> server_configs);
-        void removeServer(int server_fd);
-        void start();
-        void stop();
+        void runServers();
 
     private:
-        std::map<int, Server > _servers;
+        std::vector<ServerConfig> _servers;
 };
 #endif

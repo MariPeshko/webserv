@@ -16,7 +16,7 @@ int main(int ac, char **argv) {
         config.parse(config_file);
         // set up servers
         server_manager.setupServers(config.getServerConfigs());
-        server_manager.start();
+        server_manager.runServers();
 
     } else {
         std::cout << "Error: wrong arguments" << std::endl;
