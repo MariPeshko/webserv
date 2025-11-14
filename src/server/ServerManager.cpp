@@ -21,6 +21,10 @@ void ServerManager::runServers() {
         //accept connections
         //read requests
         //send responses
+        
+        //if cgi
+        //if sendResponse
+        
         //close connections
     }
 }
