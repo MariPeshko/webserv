@@ -10,6 +10,7 @@ class Location {
 	public:
 		Location() : _autoindex(false) {};
 		~Location() {};
+		// We will add getters and other methods later
 
 	private:
 		std::string	_path;
@@ -23,7 +24,6 @@ class Location {
 class Server {
     public:
         Server();
-        Server(int port, std::string host, std::string name, std::string root, std::string index, std::string error_page, std::string cgi, std::string location);
         ~Server();
 
         int setupServer();
@@ -31,11 +31,10 @@ class Server {
     private:
         int _port;
         std::string _host;
-        std::string _name;
+        std::vector<std::string> _server_names;
         std::string _root;
         std::string _index;
-        std::string _error_page;
-        std::string _cgi;
-        std::string _location;
+        std::map<int, std::string> _error_pages;
+        std::vector<Location> _locations;
 };
 #endif
