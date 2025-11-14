@@ -9,6 +9,7 @@ Server::Server() {
     _root = "/var/www/html";
     _index = "index.html";
     _error_pages[404] = "/var/www/errors/404.html";
+	_client_max_body_size = "1m"; // default value
 }
 
 // select() examines the file descriptor sets reading_set and writing_set to see if any of their descriptors are ready for I/O.
