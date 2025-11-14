@@ -3,6 +3,22 @@
 
 # include <iostream>
 # include <string>
+# include <vector>
+# include <map>
+
+class Location {
+	public:
+		Location() : _autoindex(false) {};
+		~Location() {};
+
+	private:
+		std::string	_path;
+		std::string _root;
+		std::vector<std::string>	_allowed_nethods;
+		std::string	_index;
+		bool	_autoindex;
+
+};
 
 class Server {
     public:
