@@ -14,12 +14,12 @@ class Config {
         Config();
         ~Config();
         void parse(const std::string& config_file);
-        std::vector<ServerConfig> getServerConfigs();
+        std::vector<Server>	getServerConfigs();
 
     private:
         std::string _config_file;
         std::vector<std::string> _config_lines;
-        std::vector<Server>         _servers;
+        std::vector<Server>         _servers; // parsed servers
 	    std::map<long, Server *>	_sockets;
 	    std::vector<int>			_ready;
 	    fd_set						_fd_set;

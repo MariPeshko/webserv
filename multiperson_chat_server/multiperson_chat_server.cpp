@@ -44,8 +44,7 @@ int	get_listener_socket() {
         std::cerr << "Failed to set SO_REUSEADDR: " << strerror(errno) << std::endl;
     }
 	
-	struct sockaddr_in server_addr;
-    std::memset(&server_addr, 0, sizeof(server_addr));
+	struct sockaddr_in server_addr = {};
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all IPv4 addresses
     server_addr.sin_port = htons(9034);        // Convert port to network byte order

@@ -1,7 +1,10 @@
 NAME = webserv
 
 # - Source files
-SRCS = src/main.cpp src/parser/Config.cpp src/server/Server.cpp
+SRCS =	src/main.cpp \
+		src/parser/Config.cpp \
+		src/server/Server.cpp \
+		src/server/ServerManager.cpp
 
 # - Header files
 HEADERS	= inc/Webserv.hpp
