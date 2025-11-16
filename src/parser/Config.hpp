@@ -14,6 +14,7 @@ class Config {
         Config();
         ~Config();
         void parse(const std::string& config_file);
+        std::vector<ServerConfig> getServerConfigs();
 
     private:
         std::string _config_file;

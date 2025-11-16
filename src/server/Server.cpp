@@ -24,7 +24,16 @@ int Server::setupServer() {
 
     // listen for connections
 
+    // select() examines the file descriptor sets reading_set and writing_set to see if any of their descriptors are ready for I/O.
     // accept connections
+    // read 
+    /**
+ * - Reads data from client and feed it to the parser.
+ * Once parser is done or an error was found in the request,
+ * socket will be moved from _recv_fd_pool to _write_fd_pool
+ * and response will be sent on the next iteration of select().
+ */
+
     //client_fd = accept(server_fd, NULL, NULL);
 
     // read requests
