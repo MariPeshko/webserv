@@ -1,3 +1,6 @@
+# Custom ignores
+merge_no.md
+
 # Prerequisites
 *.d
 

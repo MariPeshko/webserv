@@ -112,17 +112,24 @@ void Config::parse(const std::string& config_file) {
             parseServerDirective(server, tokens, i);
         }
     }
-    
-    // Add  server to list
-    _servers.push_back(server);
-    
-    std::cout << "Parsed " << _servers.size() << " server(s)" << std::endl;
-    std::cout << "Server has " << _servers[0].getLocationCount() << " location(s)" << std::endl;
-    
-    // Print parsed configuration for verification
-    std::cout << "\n=== Parsed Configuration ===" << std::endl;
-    _servers[0].print();
-    std::cout << "============================\n" << std::endl;
+	
+	// Add  server to list
+	_servers.push_back(server);
+	
+	// Hard-coded server #2 (Maryna)
+	Server	server2(server);
+	server2.setPort(8081);
+	_servers.push_back(server2);
+	
+	std::cout << "Parsed " << _servers.size() << " server(s)" << std::endl;
+	std::cout << "Server has " << _servers[0].getLocationCount() << " location(s)" << std::endl;
+	
+	// Print parsed configuration for verification
+	std::cout << "\n=== Parsed Configuration ===" << std::endl;
+	_servers[0].print();
+	std::cout << "============================\n" << std::endl;
+	_servers[0].print();
+	std::cout << "============================\n" << std::endl;
 }
 
 // Helper: Parse array like [GET, POST]
