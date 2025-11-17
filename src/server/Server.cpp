@@ -23,6 +23,11 @@ int	Server::setupServer() {
         std::cerr << "Failed to create socket" << std::endl;
         return -1;
     }
+	
+	int	yes = 1;
+	if (setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
+		std::cerr << "Failed to set SO_REUSEADDR: " << strerror(errno) << std::endl;
+	}
 
     struct sockaddr_in server_address = {};
     server_address.sin_family = AF_INET;
@@ -44,6 +49,7 @@ int	Server::setupServer() {
         return -1;
     }
     std::cout << "Server is listening on port " << _port << std::endl;
+    std::cout << "IP(host): " << this->_host << std::endl;
 	
 	return 0;
 }
