@@ -54,6 +54,19 @@ int	Server::setupServer() {
 	return 0;
 }
 
+Server::Server(const Server& other)
+            : _port(other._port),
+              _host(other._host),
+              _server_names(other._server_names),
+              _root(other._root),
+              _index(other._index),
+              _error_pages(other._error_pages),
+              _locations(other._locations),
+              _client_max_body_size(other._client_max_body_size),
+              _server_address(other._server_address),
+              _listen_fd(other._listen_fd)
+{  }
+
 Server::~Server() {
     if (_listen_fd != -1) {
         close(_listen_fd);

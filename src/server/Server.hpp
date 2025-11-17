@@ -74,6 +74,7 @@ class	Server {
     public:
         Server();
         ~Server();
+		Server(const Server& other);
 		
 		int		setupServer();
         
@@ -107,7 +108,7 @@ class	Server {
 				}
 				std::cout << std::endl;
 			}
-			if (!_client_max_body_size.empty()) {
+			/* if (!_client_max_body_size.empty()) {
 				std::cout << "  Client max body size: " << _client_max_body_size << std::endl;
 			}
 			if (!_error_pages.empty()) {
@@ -121,7 +122,7 @@ class	Server {
 				for (size_t i = 0; i < _locations.size(); i++) {
 					_locations[i].print();
 				}
-			}
+			} */
 		}
 
     private:

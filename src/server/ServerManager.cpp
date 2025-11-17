@@ -22,8 +22,9 @@ void ServerManager::setupServers(std::vector<Server> server_configs) {
 		} else {
 			// Add listener to set of pollfd-s
 			add_to_pfds(_pfds, it->getListenFd());
+			_map_servers[it->getListenFd()] = &(*it);
 		}
-    }
+	}
 }
 
 // Adding both listeners and new clients to be monitored for reading.
@@ -72,13 +73,14 @@ void	ServerManager::handleNewConnection(int listener) {
 
 		uint32_t ip = ntohl(remoteaddr.sin_addr.s_addr);
 		std::string ip_str = ipv4_to_string(ip);
+		uint16_t port = ntohs(remoteaddr.sin_port);
 		
-		std::cout << "pollserver: new connection from " << ip_str 
-				<< " on socket " << newfd << std::endl;
+		std::cout << "pollserver: new connection from " << ip_str << ":" << port
+				<< " on socket " << newfd << " (accepted by listener " << listener << ")" << std::endl;
     }
 }
 
-void	ServerManager::handleClientData(int listener, size_t& i) {
+void	ServerManager::handleClientData(size_t& i) {
 	
 	char	buf[40000];    // Buffer for client data
 
@@ -102,23 +104,9 @@ void	ServerManager::handleClientData(int listener, size_t& i) {
 	
 	// We got some good data from a client (broadcast to other clients)
 	std::cout << "pollserver: recv from fd " << sender_fd << ": ";
-	std::cout.write(buf, nbytes);
-	
-	// Send to everyone!
-	for (size_t j = 0; j < _pfds.size(); ++j) {
-		int dest_fd = _pfds[j].fd;
+	std::cout.write(buf, 100); //nbytes
+	std::cout << std::endl;
 
-		// Except the listener and ourselves
-		if (dest_fd != listener && dest_fd != sender_fd) {
-			if (send(dest_fd, buf, nbytes, MSG_NOSIGNAL) == -1) {
-				if (errno == EPIPE || errno == ECONNRESET) { // ❌ FORBIDDEN!
-					std::cout << "Client " << dest_fd << " disconnected during send" << std::endl;
-				} else {
-					std::cerr << "Send error: " << strerror(errno) << std::endl;
-				}
-			}
-		}
-	}
 }
 
 /** Process all existing connections. */
@@ -136,17 +124,15 @@ void	ServerManager::processConnections() {
 
         // Check if someone's ready to read or client disconnected (or both)
         if (_pfds[i].revents & (POLLIN | POLLHUP)) {
-            //if (_pfds[i].fd == listener)
-			if (i == 0)
+			if (isListener(_pfds[i].fd))
 			{
-				std::cout << "it's a new connection for server 0" << std::endl;
                 // If we're the listener, it's a new connection
                 handleNewConnection(_pfds[i].fd);
             } else {
 				std::cout << "it's a regular client" << std::endl;
                 // Otherwise we're just a regular client
 				// So far only one listener - 0
-                handleClientData(_pfds[0].fd, i);
+                handleClientData(i);
             }
         }
     }
@@ -173,4 +159,8 @@ void	ServerManager::runServers() {
 	//	close(pfds[i].fd);
     //}
 	//std::cout << "Server shut down cleanly" << std::endl;
+}
+
+bool	ServerManager::isListener(int fd) {
+	return _map_servers.find(fd) != _map_servers.end();
 }
