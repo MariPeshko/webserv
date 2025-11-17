@@ -205,11 +205,9 @@ int	main() {
         std::cerr << "Error getting listening socket" << std::endl;
         return 1;
     }
-
-    // Add the listener to set
-    add_to_pfds(pfds, listener);
-
-    std::cout << "pollserver: waiting for connections..." << std::endl;
+	// Add the listener to set
+	add_to_pfds(pfds, listener);
+	std::cout << "pollserver: waiting for connections..." << std::endl;
 
     // Main loop
 	while (g_running) {

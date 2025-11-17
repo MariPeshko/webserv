@@ -70,29 +70,30 @@ class Location {
 		std::map<std::string, std::string> _cgi;
 };
 
-class Server {
+class	Server {
     public:
         Server();
         ~Server();
 		
-		int	setupServer();
+		int		setupServer();
         
         // Setters for parser
-        void setPort(int port) { _port = port; }
-        void setHost(const std::string& host) { _host = host; }
-        void addServerName(const std::string& name) { _server_names.push_back(name); }
-        void setRoot(const std::string& root) { _root = root; }
-        void setIndex(const std::string& index) { _index = index; }
-        void addErrorPage(int code, const std::string& page) { _error_pages[code] = page; }
-        void addLocation(const Location& location) { _locations.push_back(location); }
-        void setClientMaxBodySize(const std::string& size) { _client_max_body_size = size; }
+        void	setPort(int port) { _port = port; }
+        void	setHost(const std::string& host) { _host = host; }
+        void	addServerName(const std::string& name) { _server_names.push_back(name); }
+        void	setRoot(const std::string& root) { _root = root; }
+        void	setIndex(const std::string& index) { _index = index; }
+        void	addErrorPage(int code, const std::string& page) { _error_pages[code] = page; }
+        void	addLocation(const Location& location) { _locations.push_back(location); }
+        void	setClientMaxBodySize(const std::string& size) { _client_max_body_size = size; }
         
         // Getters for debugging/testing
         size_t								getLocationCount() const { return _locations.size(); }
         const std::vector<Location>&		getLocations() const { return _locations; }
         const std::vector<std::string>&		getServerNames() const { return _server_names; }
         const std::map<int, std::string>&	getErrorPages() const { return _error_pages; }
-        const std::string& getClientMaxBodySize() const { return _client_max_body_size; }
+        const std::string&					getClientMaxBodySize() const { return _client_max_body_size; }
+		int									getListenFd() const { return _listen_fd; }
         
         void print() const {
 			std::cout << "Server Configuration:" << std::endl;
