@@ -2,7 +2,13 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
-#include <stdexcept>
+#include <stdexcept> // runtime_error
+
+// new. Maryna
+// Return parsed servers
+std::vector<Server> Config::getServerConfigs() {
+    return _servers;
+}
 
 std::vector<std::string> Config::tokenize(const std::string& config_file)
 {
@@ -291,3 +297,4 @@ void Config::parseLocationDirective(Location& location, const std::vector<std::s
     }
     // Ignore unknown directives
 }
+

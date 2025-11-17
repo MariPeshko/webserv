@@ -5,6 +5,11 @@
 # include <string>
 # include <vector>
 # include <map>
+# include <sys/types.h>		// socket(), bind(), listen()
+# include <sys/socket.h>	// socket(), bind(), listen()
+# include <netinet/in.h>	// do we need it here?
+
+// Ivan -> Alberto
 
 class Location {
 	public:
@@ -69,8 +74,8 @@ class Server {
     public:
         Server();
         ~Server();
-
-        int setupServer();
+		
+		int	setupServer();
         
         // Setters for parser
         void setPort(int port) { _port = port; }
@@ -83,10 +88,10 @@ class Server {
         void setClientMaxBodySize(const std::string& size) { _client_max_body_size = size; }
         
         // Getters for debugging/testing
-        size_t getLocationCount() const { return _locations.size(); }
-        const std::vector<Location>& getLocations() const { return _locations; }
-        const std::vector<std::string>& getServerNames() const { return _server_names; }
-        const std::map<int, std::string>& getErrorPages() const { return _error_pages; }
+        size_t								getLocationCount() const { return _locations.size(); }
+        const std::vector<Location>&		getLocations() const { return _locations; }
+        const std::vector<std::string>&		getServerNames() const { return _server_names; }
+        const std::map<int, std::string>&	getErrorPages() const { return _error_pages; }
         const std::string& getClientMaxBodySize() const { return _client_max_body_size; }
         
         void print() const {
@@ -119,13 +124,17 @@ class Server {
 		}
 
     private:
-        int _port;
-        std::string _host;
-        std::vector<std::string> _server_names;
-        std::string _root;
-        std::string _index;
-        std::map<int, std::string> _error_pages;
-        std::vector<Location> _locations;
-        std::string _client_max_body_size;
+        int							_port; // ?uint16_t
+        std::string					_host; // ?in_addr_t
+        std::vector<std::string>	_server_names;
+        std::string					_root;
+        std::string					_index; // bool _autoindex;
+        std::map<int, std::string>	_error_pages;
+        std::vector<Location>		_locations;
+        std::string					_client_max_body_size; // unsigned long
+		// members of Ivan's class ServerConfig
+		struct sockaddr_in			_server_address;
+        int							_listen_fd;
 };
+
 #endif
