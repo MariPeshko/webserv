@@ -4,7 +4,10 @@ NAME = webserv
 SRCS =	src/main.cpp \
 		src/parser/Config.cpp \
 		src/server/Server.cpp \
-		src/server/ServerManager.cpp
+		src/server/ServerManager.cpp \
+		src/server/Client.cpp \
+		src/response/Response.cpp \
+		src/request/Request.cpp \
 
 # - Header files
 HEADERS	= inc/Webserv.hpp

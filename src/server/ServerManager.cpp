@@ -61,6 +61,7 @@ void	ServerManager::handleNewConnection(int listener) {
 	struct sockaddr_in		remoteaddr;  // IPv4 only
 	socklen_t				addrlen = sizeof(remoteaddr);;
 	int						newfd;		// Newly accept()ed socket descriptor
+	Client					newClient;
 	
 	// accept() fills remoteaddr with actual client address
 	newfd = accept(listener, reinterpret_cast<struct sockaddr*>(&remoteaddr), &addrlen);
@@ -69,7 +70,14 @@ void	ServerManager::handleNewConnection(int listener) {
 	if (newfd == -1) {
         std::cerr << "Accept failed: " << strerror(errno) << std::endl;
     } else {
-        add_to_pfds(_pfds, newfd);
+		add_to_pfds(_pfds, newfd);
+		newClient.setFd(newfd);
+		// Remove previous client if exists
+		if (_clients.count(newfd) != 0) {
+			_clients.erase(newfd);
+		}
+		_clients[newfd] = newClient;
+
 
 		uint32_t ip = ntohl(remoteaddr.sin_addr.s_addr);
 		std::string ip_str = ipv4_to_string(ip);
