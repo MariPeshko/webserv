@@ -17,13 +17,12 @@ class Client {
         ~Client();
 
         void setFd(int fd);
-
-   
+        
+        Response    response;
+        Request     request; 
 
     private:
         int _fd;
         struct sockaddr_in _client_address;
-        Response    response;
-        Request     request; 
 };
 #endif

@@ -35,6 +35,7 @@ class Request {
         std::map<std::string, std::string> getHeaders() const;
         std::string     getBody() const;
         void            setParsingState(ParsingState state);
+        void            parseRequest(char* raw_request, size_t length); 
        
     private:
         MethodType     _method;

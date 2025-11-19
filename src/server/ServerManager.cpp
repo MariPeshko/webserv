@@ -89,8 +89,14 @@ void	ServerManager::handleNewConnection(int listener) {
 }
 
 void	ServerManager::handleClientData(size_t& i) {
+	// read data 
+	// if not copletely read, wait for more data in a loop
+	// handle errors
+	// parse request when complete reading
+
 	
 	char	buf[40000];    // Buffer for client data
+	Client&	client = _clients[_pfds[i].fd];
 
 	// In case of POLLHUP - Client hung up (disconnected) recv() returns 0 (EOF)
 	int		nbytes = recv(_pfds[i].fd, buf, sizeof(buf), 0);
@@ -110,6 +116,9 @@ void	ServerManager::handleClientData(size_t& i) {
 		return;
     }
 	
+	// Parse request data
+	// todo: handle partial reads
+	client.request.parseRequest(buf, nbytes);
 	// We got some good data from a client (broadcast to other clients)
 	std::cout << "pollserver: recv from fd " << sender_fd << ": ";
 	std::cout.write(buf, 100); //nbytes

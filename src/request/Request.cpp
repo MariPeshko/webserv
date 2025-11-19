@@ -60,3 +60,7 @@ std::map<std::string, std::string> Request::getHeaders() const {
 std::string Request::getBody() const {
     return _body;
 }
+
+void Request::parseRequest(char* raw_request, size_t length) {
+    // Implementation for parsing raw_request and populating Request fields
+}
