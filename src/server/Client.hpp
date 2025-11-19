@@ -9,6 +9,8 @@
 # include <map>
 # include <sys/socket.h>
 # include <netinet/in.h>
+#include <sstream>
+
 
 class Client {
     public:
@@ -17,6 +19,9 @@ class Client {
         ~Client();
 
         void setFd(int fd);
+        void setClientAddress(const sockaddr_in& client_address);
+        std::string getResponseString();
+        int getFd();
         
         Response    response;
         Request     request; 

@@ -10,6 +10,7 @@
 #include <cerrno>
 #include <sstream>	// for std::ostringstream
 #include "Client.hpp"
+#include <iostream>
 
 
 class	ServerManager {
@@ -31,6 +32,7 @@ class	ServerManager {
 		void					handleNewConnection(int listener);
 		void					handleClientData(size_t& i);
 		bool					isListener(int fd);
+		void					sendResponse(Client& client);
 };
 
 #endif

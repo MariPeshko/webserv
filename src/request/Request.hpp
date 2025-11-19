@@ -1,8 +1,11 @@
 #ifndef REQUEST_HPP
 # define REQUEST_HPP
+
 # include <string>
 # include <map>
 # include <vector>
+#include <iostream>
+#include <sstream>
 
 class Request {
     public:
@@ -35,8 +38,9 @@ class Request {
         std::map<std::string, std::string> getHeaders() const;
         std::string     getBody() const;
         void            setParsingState(ParsingState state);
-        void            parseRequest(char* raw_request, size_t length); 
-       
+        void            parseRequest(char* raw_request); 
+        void            parseRequestLine(char* raw_request);
+
     private:
         MethodType     _method;
         std::string     _uri;

@@ -78,7 +78,6 @@ void	ServerManager::handleNewConnection(int listener) {
 		}
 		_clients[newfd] = newClient;
 
-
 		uint32_t ip = ntohl(remoteaddr.sin_addr.s_addr);
 		std::string ip_str = ipv4_to_string(ip);
 		uint16_t port = ntohs(remoteaddr.sin_port);
@@ -88,6 +87,12 @@ void	ServerManager::handleNewConnection(int listener) {
     }
 }
 
+void	ServerManager::sendResponse(Client& client) {
+	std::string response = client.getResponseString();
+
+	send(client.getFd(), response.c_str(), response.size(), 0);
+}	
+
 void	ServerManager::handleClientData(size_t& i) {
 	// read data 
 	// if not copletely read, wait for more data in a loop
@@ -96,7 +101,8 @@ void	ServerManager::handleClientData(size_t& i) {
 
 	
 	char	buf[40000];    // Buffer for client data
-	Client&	client = _clients[_pfds[i].fd];
+	std::map<int, Client>::iterator it = _clients.find(_pfds[i].fd);
+	Client&	client = it->second;
 
 	// In case of POLLHUP - Client hung up (disconnected) recv() returns 0 (EOF)
 	int		nbytes = recv(_pfds[i].fd, buf, sizeof(buf), 0);
@@ -111,6 +117,7 @@ void	ServerManager::handleClientData(size_t& i) {
             //std::cerr << "Recv error: " << strerror(errno) << std::endl;
         }
         close(_pfds[i].fd);
+		_clients.erase(_pfds[i].fd);
         delFromPfds(i);
         if (i > 0) --i; // reexamine the slot we just deleted
 		return;
@@ -118,7 +125,10 @@ void	ServerManager::handleClientData(size_t& i) {
 	
 	// Parse request data
 	// todo: handle partial reads
-	client.request.parseRequest(buf, nbytes);
+	client.request.parseRequest(buf);
+	client.response.generateResponse();
+
+	sendResponse(client);
 	// We got some good data from a client (broadcast to other clients)
 	std::cout << "pollserver: recv from fd " << sender_fd << ": ";
 	std::cout.write(buf, 100); //nbytes
@@ -134,6 +144,7 @@ void	ServerManager::processConnections() {
         if (_pfds[i].revents & POLLERR) {
             std::cerr << "Poll error on socket " << _pfds[i].fd << std::endl;
             close(_pfds[i].fd);
+			_clients.erase(_pfds[i].fd);
             delFromPfds(i);
             if (i > 0) --i;  // Reexamine this slot
             continue;
