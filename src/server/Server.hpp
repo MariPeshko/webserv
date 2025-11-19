@@ -41,8 +41,7 @@ class Location {
 			if (!_allowed_methods.empty()) {
 				std::cout << "      methods: ";
 				for (size_t i = 0; i < _allowed_methods.size(); i++) {
-					std::cout << _allowed_methods[i];
-					if (i < _allowed_methods.size() - 1) std::cout << ", ";
+					std::cout << _allowed_methods[i] << (i < _allowed_methods.size() - 1 ? ", " : "");
 				}
 				std::cout << std::endl;
 			}
@@ -103,12 +102,13 @@ class	Server {
 			if (!_server_names.empty()) {
 				std::cout << "  Server names: ";
 				for (size_t i = 0; i < _server_names.size(); i++) {
-					std::cout << _server_names[i];
-					if (i < _server_names.size() - 1) std::cout << ", ";
+					std::cout << _server_names[i] << (i < _server_names.size() - 1 ? ", " : "");
 				}
 				std::cout << std::endl;
 			}
-			/* if (!_client_max_body_size.empty()) {
+            if (!_root.empty()) std::cout << "  Root: " << _root << std::endl;
+            if (!_index.empty()) std::cout << "  Index: " << _index << std::endl;
+			if (!_client_max_body_size.empty()) {
 				std::cout << "  Client max body size: " << _client_max_body_size << std::endl;
 			}
 			if (!_error_pages.empty()) {
@@ -122,7 +122,7 @@ class	Server {
 				for (size_t i = 0; i < _locations.size(); i++) {
 					_locations[i].print();
 				}
-			} */
+			}
 		}
 
     private:
