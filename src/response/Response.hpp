@@ -17,7 +17,7 @@ class Response {
         size_t      getContentLength();
 
     private:
-        short   _statusCode;
+        std::string   _statusCode;
         size_t  _contentLength;
         std::string _responseBody;
 };
