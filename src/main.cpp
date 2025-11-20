@@ -3,9 +3,13 @@
 #include <string>
 #include <iostream>
 #include <string.h>
+#include <signal.h>
 #include "server/ServerManager.hpp"
 
 int	main(int ac, char **argv) {
+
+	// Ignore the SIGPIPE signal globally for this process
+    signal(SIGPIPE, SIG_IGN);
     
 	Config			config;
     ServerManager	server_manager;

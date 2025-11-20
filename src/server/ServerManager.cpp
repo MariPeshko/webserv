@@ -11,10 +11,10 @@ ServerManager::~ServerManager() {
  * it is immediately registered for polling.
  */
 void ServerManager::setupServers(std::vector<Server> server_configs) {
-    _servers = server_configs;
-    for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); it++) {
-        //socket setup
-        //bind socket
+	_servers = server_configs;
+	for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); it++) {
+		//socket setup
+		//bind socket
 		if (it->setupServer() == -1) {
 			// You can add error handling logic here.
 			// For example, stop all servers from running or just ignore this one.
@@ -42,19 +42,19 @@ void	ServerManager::addToPfds(std::vector<pollfd>& pfds, int newfd) {
 
 /** Remove a file descriptor at a given index from the vector. */
 void	ServerManager::delFromPfds(size_t index) {
-    if (index < _pfds.size()) {
-        _pfds.erase(_pfds.begin() + index);
-    }
+	if (index < _pfds.size()) {
+		_pfds.erase(_pfds.begin() + index);
+	}
 }
 
 /** Convert IPv4 address to string manually (C++98 compatible) */
 std::string ipv4_to_string(uint32_t ip) {
-    std::ostringstream oss;
-    oss << ((ip >> 24) & 0xFF) << "."
-        << ((ip >> 16) & 0xFF) << "."
-        << ((ip >> 8) & 0xFF) << "."
-        << (ip & 0xFF);
-    return oss.str();
+	std::ostringstream oss;
+	oss << ((ip >> 24) & 0xFF) << "."
+		<< ((ip >> 16) & 0xFF) << "."
+		<< ((ip >> 8) & 0xFF) << "."
+		<< (ip & 0xFF);
+	return oss.str();
 }
 
 /** Handle incoming connections. */
@@ -68,8 +68,8 @@ void	ServerManager::handleNewConnection(int listener) {
 	//                       ^^^^^^^^^^^^ Cast to base type for API
 
 	if (newfd == -1) {
-        std::cerr << "Accept failed: " << strerror(errno) << std::endl;
-    } else {
+		std::cerr << "Accept failed: " << strerror(errno) << std::endl;
+	} else {
 		Client	newClient;
 
 		addToPfds(_pfds, newfd);
@@ -86,27 +86,35 @@ void	ServerManager::handleNewConnection(int listener) {
 		
 		std::cout << "pollserver: new connection from " << ip_str << ":" << port
 				<< " on socket " << newfd << " (accepted by listener " << listener << ")" << std::endl;
-    }
+	}
 }
 
 void	ServerManager::sendResponse(Client& client) {
 	std::string response = client.getResponseString();
 
-	send(client.getFd(), response.c_str(), response.size(), 0);
+	ssize_t bytes_sent = send(client.getFd(), response.c_str(), response.size(), 0);
+	
+	if (bytes_sent == -1) {
+        // This will now happen on a broken pipe instead of a crash
+        std::cerr << "Send error on socket " << client.getFd() << std::endl;
+        // You might want to trigger client cleanup here, though the main loop
+        // will likely catch the POLLERR on the next iteration anyway.
+    }
+
 }
 
 void	ServerManager::handleClientError(Client& client, size_t i) {
 	std::cout << "pollserver: socket " << client.getFd() << " error after recv()" << std::endl;
 	close(client.getFd());
 	_clients.erase(client.getFd());
-     delFromPfds(i);
+	 delFromPfds(i);
 }
 
 void	ServerManager::handleClientHungup(Client& client, size_t i) {
 	std::cout << "pollserver: socket " << client.getFd() << " hung up" << std::endl;
 	close(client.getFd());
 	_clients.erase(client.getFd());
-    delFromPfds(i);
+	delFromPfds(i);
 }
 
 /**
@@ -140,17 +148,16 @@ void	ServerManager::handleClientData(size_t i) {
 
 	client.parseRequest();
 	// Only parse and respond if the request is complete
-    if (client.isRequestComplete()) {
-		
-        // The parseRequest method should now use the client's internal buffer
+	if (client.isRequestComplete()) {
+		// The parseRequest method should now use the client's internal buffer
 		// Generate response
-	client.response.setRequest(client.request);
-	client.response.generateResponse();
-        sendResponse(client);
+		client.response.setRequest(client.request);
+		client.response.generateResponse();
+		sendResponse(client);
 		// to do: clear buffer, reset client state to default
 		client.resetState();
-    }
-    // If request is not complete, we do nothing and wait for the next poll() event.
+	}
+	// If request is not complete, we do nothing and wait for the next poll() event.
 }
 
 void	ServerManager::handleErrorRevent(size_t i) {
@@ -216,7 +223,7 @@ void	ServerManager::runServers() {
 	// std::cout << "Closing all connections..." << std::endl;
 	//for (size_t i = 0; i < pfds.size(); ++i) {
 	//	close(pfds[i].fd);
-    //}
+	//}
 	//std::cout << "Server shut down cleanly" << std::endl;
 }
 

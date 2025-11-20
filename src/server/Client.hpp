@@ -29,9 +29,10 @@ class	Client {
 		ssize_t	receiveData();
 		void	parseRequest();
 		void	parseRequestLine(std::string request_line);
+		void	parseHeaders(std::string headers);
+		void	parseBody(std::string body);
 
 		bool	isRequestComplete();
-
 
 		void	setFd(int fd);
 		void	setClientAddress(const sockaddr_in& client_address);

@@ -1,6 +1,6 @@
 #include "Client.hpp"
 
-Client::Client() : _fd(-1) {
+Client::Client() : _fd(-1), _state(REQUEST_LINE) {
 }
 
 Client::~Client() {
@@ -27,7 +27,10 @@ ssize_t	Client::receiveData() {
 	std::cout << "pollserver: recv " << nbytes << " bytes from fd " << getFd() << std::endl;
 	//We got some good data from a client (broadcast to other clients)
 	std::cout << "message from " << getFd() << ": ";
-	std::cout.write(buf, 100);
+	int to_print;
+	if (nbytes < 100) to_print = nbytes;
+	else to_print = 100;
+	std::cout.write(buf, to_print);
 	std::cout << std::endl;
 	return nbytes;
 }
@@ -39,6 +42,7 @@ ssize_t	Client::receiveData() {
  * are both in the buffer).
  */
 void    Client::parseRequest() {
+	std::cout << "parseRequest " << std::endl;
     bool    can_parse = true;
 
     while (can_parse) {
@@ -58,7 +62,7 @@ void    Client::parseRequest() {
 				size_t pos = _request_buffer.find("\r\n\r\n");
 				if (pos != std::string::npos) {
 					// TODO: Parse all headers from the header block
-					// For example: request.parseHeaders(_request_buffer.substr(0, pos));
+					parseHeaders(_request_buffer.substr(0, pos));
                     // Remove headers from the buffer
                     _request_buffer.erase(0, pos + 4);
 
@@ -73,6 +77,18 @@ void    Client::parseRequest() {
 				break ;
 			}
 			case READING_BODY : {
+				// If using Content-Length:
+				//   - Check if client.request_buffer.size() >= content_length
+				//   - If yes: request is complete. client.state = REQUEST_COMPLETE; request_is_ready = true;
+				//   - request.parseBody()
+				//   - Remove body from the buffer
+				// If using chunked encoding:
+				//   - Parse chunks until the final "0\r\n\r\n" is found.
+				//   - request.parseBody()
+				//   - Remove body from the buffer
+				//   - If final chunk found: client.state = REQUEST_COMPLETE; request_is_ready = true;
+				// Else (body not fully received):
+				//   - break from the while loop
 				_state = REQUEST_COMPLETE;
 				break ;
 			}
@@ -98,6 +114,17 @@ void	Client::parseRequestLine(std::string request_line) {
 		this->request.setUri(uri);
 		this->request.setVersion(version);
 	}
+	std::cout << "Request Line is parsed" << std::endl;
+}
+
+void	Client::parseHeaders(std::string request_line) {
+	std::cout << "Parsing request headers" << std::endl;
+	std::cout << request_line.substr(0, 20) << std::endl;
+}
+
+void	Client::parseBody(std::string body) {
+	std::cout << "Parsing request body" << std::endl;
+	std::cout << body.substr(0, 20) << std::endl;
 }
 
 /**
