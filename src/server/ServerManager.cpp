@@ -130,6 +130,8 @@ void	ServerManager::handleClientData(size_t i) {
 	
 	// Parse request data
 	client.request.parseRequest(buf);
+	// Generate response
+	client.response.setRequest(client.request);
 	client.response.generateResponse();
 
 	sendResponse(client);
@@ -163,7 +165,6 @@ void	ServerManager::handleErrorRevent(size_t i) {
  * the current index.
 */
 void	ServerManager::processConnections() {
-	
 	for (size_t i = 0; i < _pfds.size(); ) {
 		
 		if (_pfds[i].revents & POLLERR) {
