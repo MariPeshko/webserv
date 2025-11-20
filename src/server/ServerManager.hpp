@@ -27,7 +27,7 @@ class	ServerManager {
 		std::vector<pollfd>			_pfds;	// Vector of poll file descriptors
 		std::map<int, Client>	_clients;
 		
-		void	add_to_pfds(std::vector<pollfd>& pfds, int newfd);
+		void	addToPfds(std::vector<pollfd>& pfds, int newfd);
 		void	delFromPfds(size_t index);
 		void	processConnections();
 		void	handleErrorRevent(size_t i);

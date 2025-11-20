@@ -4,21 +4,14 @@
 # include <string>
 # include <map>
 # include <vector>
-#include <iostream>
-#include <sstream>
+# include <iostream>
+# include <sstream>
 
-class Request {
-    public:
-        Request();
-        ~Request();
-
-         enum ParsingState {
-            REQUEST_LINE,
-            HEADERS,
-            BODY,
-            COMPLETE,
-            ERROR
-        };
+// Data object that holds parsed request
+class	Request {
+	public:
+		Request();
+		~Request();
 
         enum MethodType {
             GET,
@@ -37,9 +30,7 @@ class Request {
         std::string     getVersion() const;
         std::map<std::string, std::string> getHeaders() const;
         std::string     getBody() const;
-        void            setParsingState(ParsingState state);
-        void            parseRequest(std::string & raw_request); 
-        void            parseRequestLine(std::string & );
+
 
     private:
         MethodType     _method;
@@ -47,7 +38,6 @@ class Request {
         std::string     _version;
         std::map<std::string, std::string> _headers;
         std::string     _body;
-        ParsingState   _parsing_state;
 };
 
 #endif

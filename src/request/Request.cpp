@@ -1,10 +1,8 @@
 #include "Request.hpp"
 
-Request::Request() : _parsing_state(REQUEST_LINE) {
-}
+Request::Request() { }
 
-Request::~Request() {
-}
+Request::~Request() { }
 
 void Request::setMethod(const std::string &method) {
     if (method == "GET") {
@@ -32,10 +30,6 @@ void Request::setBody(const std::string &body) {
     _body = body;
 }
 
-void Request::setParsingState(ParsingState state) {
-    _parsing_state = state;
-}
-
 std::string Request::getMethod() const {
     switch (_method) {
         case GET: return "GET";
@@ -59,25 +53,4 @@ std::map<std::string, std::string> Request::getHeaders() const {
 
 std::string Request::getBody() const {
     return _body;
-}
-
-// Split raw_request by spaces into method, uri, version using string streams
-void Request::parseRequestLine(std::string & raw_request) {
-
-    if (raw_request.size() == 0) return;
-
-	std::string			line(raw_request);
-	std::istringstream	iss(line);
-	std::string			method, uri, version;
-	if (iss >> method >> uri >> version) {
-		setMethod(method);
-		setUri(uri);
-		setVersion(version);
-	}
-}
-
-void Request::parseRequest(std::string & raw_request) {
-    // For simplicity, just print the raw request for now
-    parseRequestLine(raw_request);
-
 }

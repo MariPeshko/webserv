@@ -12,21 +12,36 @@
 # include <sstream>
 
 class	Client {
+
 	public:
+		enum	e_parse_state {
+			REQUEST_LINE,
+			READING_HEADERS,
+			READING_BODY,
+			REQUEST_COMPLETE,
+			REQUEST_ERROR
+		};
+
 		Client();
 		Client(const Client &other);
 		~Client();
 		
-		ssize_t		receiveData();
-		bool		isRequestComplete();
+		ssize_t	receiveData();
+		void	parseRequest();
+		void	parseRequestLine(std::string request_line);
 
-		void		setFd(int fd);
-		void		setClientAddress(const sockaddr_in& client_address);
+		bool	isRequestComplete();
+
+
+		void	setFd(int fd);
+		void	setClientAddress(const sockaddr_in& client_address);
+		void	resetState();
 		
 		std::string		getResponseString();
 		int				getFd();
 		std::string &	getBuffer();
 		
+		// Data object that holds parsed request
 		Request		request; 
 		Response	response;
 	
@@ -34,7 +49,7 @@ class	Client {
 		int 				_fd;
 		struct sockaddr_in	_client_address;
 		std::string			_request_buffer;
-		//bool				_request_is_ready;
+		e_parse_state		_state;
 };
 
 #endif

@@ -1,6 +1,6 @@
 #include "Client.hpp"
 
-Client::Client() {
+Client::Client() : _fd(-1) {
 }
 
 Client::~Client() {
@@ -33,14 +33,87 @@ ssize_t	Client::receiveData() {
 }
 
 /**
+ * REQUEST PARSER STATE MACHINE. It processes the _request_buffer
+ * and transitions the client's state. It will loop as long as it can
+ * make progress (e.g., parsing both request line and headers if they
+ * are both in the buffer).
+ */
+void    Client::parseRequest() {
+    bool    can_parse = true;
+
+    while (can_parse) {
+		switch (_state) {
+			case REQUEST_LINE: {
+				size_t pos = _request_buffer.find("\r\n");
+				if (pos != std::string::npos) {
+					parseRequestLine(_request_buffer.substr(0, pos));
+					_request_buffer.erase(0, pos + 2);
+					_state = READING_HEADERS;
+				} else {
+					can_parse = false;
+				}
+				break ;
+			}
+			case READING_HEADERS : {
+				size_t pos = _request_buffer.find("\r\n\r\n");
+				if (pos != std::string::npos) {
+					// TODO: Parse all headers from the header block
+					// For example: request.parseHeaders(_request_buffer.substr(0, pos));
+                    // Remove headers from the buffer
+                    _request_buffer.erase(0, pos + 4);
+
+					// TODO: Check for Content-Length or Transfer-Encoding
+                    // If a body is expected:
+                    //   _state = READING_BODY;
+                    // Else (no body):
+					_state = REQUEST_COMPLETE;
+				} else {
+					can_parse = false;
+				}
+				break ;
+			}
+			case READING_BODY : {
+				_state = REQUEST_COMPLETE;
+				break ;
+			}
+			case REQUEST_COMPLETE :
+			case REQUEST_ERROR  : {
+				can_parse = false;
+                break;
+			}
+		}
+    }
+}
+
+// Split raw_request by spaces into method, uri, version using string streams
+void	Client::parseRequestLine(std::string request_line) {
+
+    if (request_line.size() == 0) return;
+
+	std::string			line(request_line);
+	std::istringstream	iss(line);
+	std::string			method, uri, version;
+	if (iss >> method >> uri >> version) {
+		this->request.setMethod(method);
+		this->request.setUri(uri);
+		this->request.setVersion(version);
+	}
+}
+
+/**
  * Checks if the received request is complete.
  * This is a basic implementation. A robust one would also check Content-Length.
  * @return true if the HTTP headers are complete, false otherwise.
  */
 bool	Client::isRequestComplete() {
-    // A complete request has at least the double CRLF.
-    // A more robust check is needed for requests with bodies (e.g., POST).
-    return _request_buffer.find("\r\n\r\n") != std::string::npos;
+	if (_state == REQUEST_COMPLETE)
+		return true;
+	else 
+		return false;
+}
+
+void	Client::resetState() {
+	_state = REQUEST_LINE;
 }
 
 std::string	Client::getResponseString() {

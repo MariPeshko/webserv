@@ -21,19 +21,20 @@ void ServerManager::setupServers(std::vector<Server> server_configs) {
 			std::cerr << "Error setting up a server. Skipping it." << std::endl;
 		} else {
 			// Add listener to set of pollfd-s
-			add_to_pfds(_pfds, it->getListenFd());
+			addToPfds(_pfds, it->getListenFd());
 			_map_servers[it->getListenFd()] = &(*it);
 		}
 	}
 }
 
 // Adding both listeners and new clients to be monitored for reading.
-void	ServerManager::add_to_pfds(std::vector<pollfd>& pfds, int newfd) {
+// POLLIN - Check ready-to-read
+void	ServerManager::addToPfds(std::vector<pollfd>& pfds, int newfd) {
 	
 	pollfd	pfd;
 
 	pfd.fd = newfd;
-	pfd.events = POLLIN; // Check ready-to-read
+	pfd.events = POLLIN;
 	pfd.revents = 0;
 	
 	pfds.push_back(pfd);
@@ -61,7 +62,6 @@ void	ServerManager::handleNewConnection(int listener) {
 	struct sockaddr_in		remoteaddr;  // IPv4 only
 	socklen_t				addrlen = sizeof(remoteaddr);;
 	int						newfd;		// Newly accept()ed socket descriptor
-	Client					newClient;
 	
 	// accept() fills remoteaddr with actual client address
 	newfd = accept(listener, reinterpret_cast<struct sockaddr*>(&remoteaddr), &addrlen);
@@ -70,7 +70,9 @@ void	ServerManager::handleNewConnection(int listener) {
 	if (newfd == -1) {
         std::cerr << "Accept failed: " << strerror(errno) << std::endl;
     } else {
-		add_to_pfds(_pfds, newfd);
+		Client	newClient;
+
+		addToPfds(_pfds, newfd);
 		newClient.setFd(newfd);
 		// Remove previous client if exists
 		if (_clients.count(newfd) != 0) {
@@ -135,14 +137,16 @@ void	ServerManager::handleClientData(size_t i) {
 		handleClientError(client, i);
 		return ;
 	}
+
+	client.parseRequest();
 	// Only parse and respond if the request is complete
     if (client.isRequestComplete()) {
+		
         // The parseRequest method should now use the client's internal buffer
-        // e.g., client.request.parse(client.getBuffer());
-        client.request.parseRequest(client.getBuffer());
 		client.response.generateResponse();
         sendResponse(client);
-        // Optional: clear buffer for keep-alive or close connection
+		// to do: clear buffer, reset client state to default
+		client.resetState();
     }
     // If request is not complete, we do nothing and wait for the next poll() event.
 }
@@ -177,8 +181,7 @@ void	ServerManager::processConnections() {
 		}
 		if (_pfds[i].revents & (POLLIN | POLLHUP)) {
 			size_t	pfd_size_before = _pfds.size();
-			if (isListener(_pfds[i].fd))
-			{
+			if (isListener(_pfds[i].fd)) {
 				handleNewConnection(_pfds[i].fd);
 			} else {
 				handleClientData(i);
@@ -205,7 +208,6 @@ void	ServerManager::runServers() {
 			break;
 		}
 		if (poll_count > 0) {
-			// Run through connections
 			processConnections();
 		}
 	}
