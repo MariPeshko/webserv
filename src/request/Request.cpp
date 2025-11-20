@@ -60,20 +60,23 @@ std::map<std::string, std::string> Request::getHeaders() const {
 std::string Request::getBody() const {
     return _body;
 }
-void Request::parseRequestLine(char* raw_request) {
-    // Split raw_request by spaces into method, uri, version using string streams
-    if (!raw_request) return;
-    std::string line(raw_request);
-    std::istringstream iss(line);
-    std::string method, uri, version;
-    if (iss >> method >> uri >> version) {
-        setMethod(method);
-        setUri(uri);
-        setVersion(version);
-    }
+
+// Split raw_request by spaces into method, uri, version using string streams
+void Request::parseRequestLine(std::string & raw_request) {
+
+    if (raw_request.size() == 0) return;
+
+	std::string			line(raw_request);
+	std::istringstream	iss(line);
+	std::string			method, uri, version;
+	if (iss >> method >> uri >> version) {
+		setMethod(method);
+		setUri(uri);
+		setVersion(version);
+	}
 }
 
-void Request::parseRequest(char* raw_request) {
+void Request::parseRequest(std::string & raw_request) {
     // For simplicity, just print the raw request for now
     parseRequestLine(raw_request);
 

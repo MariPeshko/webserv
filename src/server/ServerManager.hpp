@@ -26,14 +26,17 @@ class	ServerManager {
 		std::map<int, Server*>	_map_servers; // Map listener fd to Server
 		std::vector<pollfd>			_pfds;	// Vector of poll file descriptors
 		std::map<int, Client>	_clients;
-		void					add_to_pfds(std::vector<pollfd>& pfds, int newfd);
-		void					delFromPfds(size_t index);
-		void					processConnections();
-		void					handleErrorRevent(size_t i);
-		void					handleNewConnection(int listener);
-		void					handleClientData(size_t i);
-		bool					isListener(int fd);
-		void					sendResponse(Client& client);
+		
+		void	add_to_pfds(std::vector<pollfd>& pfds, int newfd);
+		void	delFromPfds(size_t index);
+		void	processConnections();
+		void	handleErrorRevent(size_t i);
+		void	handleNewConnection(int listener);
+		void	handleClientData(size_t i);
+		void	handleClientHungup(Client& client, size_t i);
+		void	handleClientError(Client& client, size_t i);
+		bool	isListener(int fd);
+		void	sendResponse(Client& client);
 };
 
 #endif

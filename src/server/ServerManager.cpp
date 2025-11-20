@@ -91,7 +91,21 @@ void	ServerManager::sendResponse(Client& client) {
 	std::string response = client.getResponseString();
 
 	send(client.getFd(), response.c_str(), response.size(), 0);
-}	
+}
+
+void	ServerManager::handleClientError(Client& client, size_t i) {
+	std::cout << "pollserver: socket " << client.getFd() << " error after recv()" << std::endl;
+	close(client.getFd());
+	_clients.erase(client.getFd());
+     delFromPfds(i);
+}
+
+void	ServerManager::handleClientHungup(Client& client, size_t i) {
+	std::cout << "pollserver: socket " << client.getFd() << " hung up" << std::endl;
+	close(client.getFd());
+	_clients.erase(client.getFd());
+    delFromPfds(i);
+}
 
 /**
  * In case of POLLHUP client hung up (disconnected) and
@@ -103,43 +117,34 @@ void	ServerManager::sendResponse(Client& client) {
  */
 void	ServerManager::handleClientData(size_t i) {
 	
-	char	buf[40000];    // Buffer for client data
-	
 	std::map<int, Client>::iterator it = _clients.find(_pfds[i].fd);
 	if (it == _clients.end()) {
 		std::cerr << "Error: No client found for fd " << _pfds[i].fd << std::endl;
+		close(_pfds[i].fd);
 		delFromPfds(i);
 		return ;
 	}
 	Client&	client = it->second;
 
-	int		nbytes = recv(_pfds[i].fd, buf, sizeof(buf), 0);
-	int		sender_fd = _pfds[i].fd;
-	
-	if (nbytes <= 0) {
-        if (nbytes == 0) {
-            std::cout << "pollserver: socket " << sender_fd << " hung up" << std::endl;
-        } else {
-			std::cout << "pollserver: socket " << sender_fd << " error" << std::endl;
-        }
-        close(_pfds[i].fd);
-		_clients.erase(_pfds[i].fd);
-        delFromPfds(i);
-		return;
+	ssize_t nbytes = client.receiveData();
+	if (nbytes == 0) {
+		handleClientHungup(client, i);
+		return ;
+	}
+	if (nbytes < 0) {
+		handleClientError(client, i);
+		return ;
+	}
+	// Only parse and respond if the request is complete
+    if (client.isRequestComplete()) {
+        // The parseRequest method should now use the client's internal buffer
+        // e.g., client.request.parse(client.getBuffer());
+        client.request.parseRequest(client.getBuffer());
+		client.response.generateResponse();
+        sendResponse(client);
+        // Optional: clear buffer for keep-alive or close connection
     }
-	
-	// Parse request data
-	client.request.parseRequest(buf);
-	client.response.generateResponse();
-
-	sendResponse(client);
-
-	std::cout << "pollserver: recv " << nbytes << " bytes from fd " << client.getFd() << std::endl;
-	// We got some good data from a client (broadcast to other clients)
-	std::cout << "pollserver: recv from fd " << sender_fd << ": ";
-	std::cout.write(buf, 100); //nbytes
-	std::cout << std::endl;
-
+    // If request is not complete, we do nothing and wait for the next poll() event.
 }
 
 void	ServerManager::handleErrorRevent(size_t i) {

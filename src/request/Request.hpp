@@ -38,8 +38,8 @@ class Request {
         std::map<std::string, std::string> getHeaders() const;
         std::string     getBody() const;
         void            setParsingState(ParsingState state);
-        void            parseRequest(char* raw_request); 
-        void            parseRequestLine(char* raw_request);
+        void            parseRequest(std::string & raw_request); 
+        void            parseRequestLine(std::string & );
 
     private:
         MethodType     _method;
