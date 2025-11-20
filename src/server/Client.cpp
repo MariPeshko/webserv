@@ -118,7 +118,7 @@ void	Client::resetState() {
 
 std::string	Client::getResponseString() {
     std::string body = response.getResponseBody();
-    std::string status_code = response.getStatusCode();
+    short status_code = response.getStatusCode();
     size_t content_length = response.getContentLength();
     
     std::ostringstream oss;

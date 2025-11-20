@@ -6,14 +6,22 @@ Response::Response() {
 Response::~Response() {
 }
 
+void Response::setRequest( Request& req) {
+    request = req;
+}
+
+void Response::setServerConfig(Server& server) {
+    _server_config = server;
+}
+
 void Response::generateResponse() {
-    _statusCode = "200"; // default
+    _statusCode = 200;
 
     const std::string path = "www/index.html";
     std::ifstream file(path.c_str());
     if (!file.is_open()) {
-        _statusCode = "404";
-        _responseBody = "404 Not Found";
+        _statusCode = 404;
+        _responseBody = "Not Found";
         std::cout << "Failed to open file: " << path << std::endl;
         return;
     }
@@ -25,7 +33,7 @@ void Response::generateResponse() {
     _contentLength = _responseBody.size();
 }
 
-std::string Response::getStatusCode() {
+short Response::getStatusCode() {
     return _statusCode;
 }
 

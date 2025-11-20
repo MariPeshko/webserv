@@ -19,7 +19,7 @@ void Request::setUri(const std::string &uri) {
 }
 
 void Request::setVersion(const std::string &version) {
-    _version = version;
+    _httpVersion = version;
 }
 
 void Request::addHeader(const std::string &key, const std::string &value) {
@@ -44,7 +44,7 @@ std::string Request::getUri() const {
 }
 
 std::string Request::getVersion() const {
-    return _version;
+    return _httpVersion;
 }
 
 std::map<std::string, std::string> Request::getHeaders() const {
