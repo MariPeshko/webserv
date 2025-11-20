@@ -93,42 +93,48 @@ void	ServerManager::sendResponse(Client& client) {
 	send(client.getFd(), response.c_str(), response.size(), 0);
 }	
 
-void	ServerManager::handleClientData(size_t& i) {
-	// read data 
-	// if not copletely read, wait for more data in a loop
-	// handle errors
-	// parse request when complete reading
-
+/**
+ * In case of POLLHUP client hung up (disconnected) and
+ * recv() returns 0 (EOF).
+ * 
+ * Reads the available chunk of data (which might be an incomplete 
+ * request). Stores that chunk in the corresponding Client object's 
+ * internal buffer.
+ */
+void	ServerManager::handleClientData(size_t i) {
 	
 	char	buf[40000];    // Buffer for client data
+	
 	std::map<int, Client>::iterator it = _clients.find(_pfds[i].fd);
+	if (it == _clients.end()) {
+		std::cerr << "Error: No client found for fd " << _pfds[i].fd << std::endl;
+		delFromPfds(i);
+		return ;
+	}
 	Client&	client = it->second;
 
-	// In case of POLLHUP - Client hung up (disconnected) recv() returns 0 (EOF)
 	int		nbytes = recv(_pfds[i].fd, buf, sizeof(buf), 0);
 	int		sender_fd = _pfds[i].fd;
 	
-	if (nbytes <= 0) { // Got error or connection closed by client
+	if (nbytes <= 0) {
         if (nbytes == 0) {
-            // Connection closed
             std::cout << "pollserver: socket " << sender_fd << " hung up" << std::endl;
         } else {
-			std::cout << "pollserver: socket " << sender_fd << " error" << std::endl;  // ✅ No errno
-            //std::cerr << "Recv error: " << strerror(errno) << std::endl;
+			std::cout << "pollserver: socket " << sender_fd << " error" << std::endl;
         }
         close(_pfds[i].fd);
 		_clients.erase(_pfds[i].fd);
         delFromPfds(i);
-        if (i > 0) --i; // reexamine the slot we just deleted
 		return;
     }
 	
 	// Parse request data
-	// todo: handle partial reads
 	client.request.parseRequest(buf);
 	client.response.generateResponse();
 
 	sendResponse(client);
+
+	std::cout << "pollserver: recv " << nbytes << " bytes from fd " << client.getFd() << std::endl;
 	// We got some good data from a client (broadcast to other clients)
 	std::cout << "pollserver: recv from fd " << sender_fd << ": ";
 	std::cout.write(buf, 100); //nbytes
@@ -136,36 +142,53 @@ void	ServerManager::handleClientData(size_t& i) {
 
 }
 
-/** Process all existing connections. */
-void	ServerManager::processConnections() {
-    for (size_t i = 0; i < _pfds.size(); ++i) {
-
-		// Handle errors first - don't try to read
-        if (_pfds[i].revents & POLLERR) {
-            std::cerr << "Poll error on socket " << _pfds[i].fd << std::endl;
-            close(_pfds[i].fd);
-			_clients.erase(_pfds[i].fd);
-            delFromPfds(i);
-            if (i > 0) --i;  // Reexamine this slot
-            continue;
-        }
-
-        // Check if someone's ready to read or client disconnected (or both)
-        if (_pfds[i].revents & (POLLIN | POLLHUP)) {
-			if (isListener(_pfds[i].fd))
-			{
-                // If we're the listener, it's a new connection
-                handleNewConnection(_pfds[i].fd);
-            } else {
-				std::cout << "it's a regular client" << std::endl;
-                // Otherwise we're just a regular client
-				// So far only one listener - 0
-                handleClientData(i);
-            }
-        }
-    }
+void	ServerManager::handleErrorRevent(size_t i) {
+	
+	std::cerr << "Poll error on socket " << _pfds[i].fd << std::endl;
+	close(_pfds[i].fd);
+	_clients.erase(_pfds[i].fd);
+	delFromPfds(i);
 }
 
+/** 
+ * Process all existing connections
+ * 
+ * The revents field is a bitmask.
+ * 
+ * Check if there is error of if someone's ready to read or 
+ * lient disconnected (or both).
+ * 
+ * It doesn't increment i, if the element was deleted from Pfds 
+ * and map of clients. In this case, the next element is now at 
+ * the current index.
+*/
+void	ServerManager::processConnections() {
+	
+	for (size_t i = 0; i < _pfds.size(); ) {
+		
+		if (_pfds[i].revents & POLLERR) {
+			handleErrorRevent(i);
+			continue;
+		}
+		if (_pfds[i].revents & (POLLIN | POLLHUP)) {
+			size_t	pfd_size_before = _pfds.size();
+			if (isListener(_pfds[i].fd))
+			{
+				handleNewConnection(_pfds[i].fd);
+			} else {
+				handleClientData(i);
+				if (_pfds.size() < pfd_size_before) {
+					continue;
+				}
+			}
+		}
+		i++;
+	}
+}
+
+/**
+ *  poll() reports revent(s).
+ */
 void	ServerManager::runServers() {
 	while (1) { // Later: signal handling
 		// poll() returns the number of elements in the pfds
