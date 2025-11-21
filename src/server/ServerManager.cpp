@@ -10,9 +10,9 @@ ServerManager::~ServerManager() {
  * After each server's listening socket is successfully created, 
  * it is immediately registered for polling.
  */
-void ServerManager::setupServers(std::vector<Server> server_configs) {
-	_servers = server_configs;
-	for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); it++) {
+void ServerManager::setupServers(std::vector<Server> & server_configs) {
+	//_servers = server_configs;
+	for (std::vector<Server>::iterator it = server_configs.begin(); it != server_configs.end(); it++) {
 		//socket setup
 		//bind socket
 		if (it->setupServer() == -1) {
@@ -221,12 +221,12 @@ void	ServerManager::runServers() {
 			processConnections();
 		}
 	}
-	// Loop is broken. Cleanup
-	// std::cout << "Closing all connections..." << std::endl;
-	//for (size_t i = 0; i < pfds.size(); ++i) {
-	//	close(pfds[i].fd);
-	//}
-	//std::cout << "Server shut down cleanly" << std::endl;
+	//Loop is broken. Cleanup
+	std::cout << "Closing all connections..." << std::endl;
+	for (size_t i = 0; i < _pfds.size(); ++i) {
+		close(_pfds[i].fd);
+	}
+	std::cout << "Server shut down cleanly" << std::endl;
 }
 
 bool	ServerManager::isListener(int fd) {

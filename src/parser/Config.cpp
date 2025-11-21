@@ -4,9 +4,8 @@
 #include <cctype>
 #include <stdexcept> // runtime_error
 
-// new. Maryna
 // Return parsed servers
-std::vector<Server> Config::getServerConfigs() {
+std::vector<Server> & Config::getServerConfigs() {
     return _servers;
 }
 

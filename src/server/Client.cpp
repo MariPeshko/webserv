@@ -1,21 +1,29 @@
 #include "Client.hpp"
 
-Client::Client() : _fd(-1), _state(REQUEST_LINE) {
-}
+Client::Client() :
+	_fd(-1), _state(REQUEST_LINE)
+	{ }
 
-Client::~Client() {
-}
-
-Client::Client(Server &server) {
-	_fd = -1;
+// Parametic constructor
+// Maryna: small update for good practice
+Client::Client(Server &server)
+	: server_config(server), _fd(-1), _state(REQUEST_LINE)
+	{
+	//_fd = -1;
 	response.setServerConfig(server);
-	_state = REQUEST_LINE;
+	//_state = REQUEST_LINE;
 }
 
-Client::Client(const Client &other) {
-    _fd = other._fd;
-    _client_address = other._client_address;
+// Copy constructor
+Client::Client(const Client &other) :
+	response(other.response)
+{
+	_fd = other._fd;
+	_client_address = other._client_address;
+	_state = other.getParserState();
 }
+
+Client::~Client() { }
 
 /**
  * Receives data from the client's socket and appends it to the internal request buffer.
@@ -48,9 +56,10 @@ ssize_t	Client::receiveData() {
  * are both in the buffer).
  */
 void    Client::parseRequest() {
-    bool    can_parse = true;
+	std::cout << "parseRequest " << std::endl;
+	bool    can_parse = true;
 
-    while (can_parse) {
+	while (can_parse) {
 		switch (_state) {
 			case REQUEST_LINE: {
 				size_t pos = _request_buffer.find("\r\n");
@@ -68,13 +77,13 @@ void    Client::parseRequest() {
 				if (pos != std::string::npos) {
 					// TODO: Parse all headers from the header block
 					parseHeaders(_request_buffer.substr(0, pos));
-                    // Remove headers from the buffer
-                    _request_buffer.erase(0, pos + 4);
+					// Remove headers from the buffer
+					_request_buffer.erase(0, pos + 4);
 
 					// TODO: Check for Content-Length or Transfer-Encoding
-                    // If a body is expected:
-                    //   _state = READING_BODY;
-                    // Else (no body):
+					// If a body is expected:
+					//   _state = READING_BODY;
+					// Else (no body):
 					_state = REQUEST_COMPLETE;
 				} else {
 					can_parse = false;
@@ -100,22 +109,22 @@ void    Client::parseRequest() {
 			case REQUEST_COMPLETE :
 			case REQUEST_ERROR  : {
 				can_parse = false;
-                break;
+				break;
 			}
 			default : {
-				std::cerr << "Unknown parsing state!" << std::endl;
+				std::cerr << "Client class message: Unknown state of requst parsing" << std::endl;
 				_state = REQUEST_ERROR;
 				can_parse = false;
 				break;
 			}
 		}
-    }
+	}
 }
 
 // Split raw_request by spaces into method, uri, version using string streams
 void	Client::parseRequestLine(std::string request_line) {
 
-    if (request_line.size() == 0) return;
+	if (request_line.size() == 0) return;
 
 	std::string			line(request_line);
 	std::istringstream	iss(line);
@@ -155,25 +164,25 @@ void	Client::resetState() {
 }
 
 std::string	Client::getResponseString() {
-    std::string body = response.getResponseBody();
-    short status_code = response.getStatusCode();
-    size_t content_length = response.getContentLength();
-    
-    std::ostringstream oss;
+	std::string body = response.getResponseBody();
+	short status_code = response.getStatusCode();
+	size_t content_length = response.getContentLength();
+	
+	std::ostringstream oss;
 
-    // 1. Status Line
-    oss << "HTTP/1.1 " << status_code << " OK\r\n";
+	// 1. Status Line
+	oss << "HTTP/1.1 " << status_code << " OK\r\n";
 
-    // 2. Headers
-    oss << "Content-Type: text/html\r\n";
-    oss << "Content-Length: " << content_length << "\r\n";
-    oss << "Connection: keep-alive\r\n"; // Optional
+	// 2. Headers
+	oss << "Content-Type: text/html\r\n";
+	oss << "Content-Length: " << content_length << "\r\n";
+	oss << "Connection: keep-alive\r\n"; // Optional
 
-    // 3. Empty Line (End of headers)
-    oss << "\r\n";
-    oss << body;
+	// 3. Empty Line (End of headers)
+	oss << "\r\n";
+	oss << body;
 
-    return oss.str();
+	return oss.str();
 }
 
 void	Client::setFd(int fd) { _fd = fd; }
@@ -181,7 +190,7 @@ void	Client::setFd(int fd) { _fd = fd; }
 int		Client::getFd() { return _fd; }
 
 void	Client::setClientAddress(const sockaddr_in& client_address) {
-    _client_address = client_address;
+	_client_address = client_address;
 }
 
 std::string &	Client::getBuffer() {
@@ -193,5 +202,9 @@ void	Client::setServerConfig(const Server& server) {
 }
 
 Client::e_parse_state	Client::getParserState() {
+	return _state;
+}
+
+Client::e_parse_state	Client::getParserState() const {
 	return _state;
 }

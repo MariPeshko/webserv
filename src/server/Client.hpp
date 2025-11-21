@@ -35,17 +35,19 @@ class	Client {
 		void	parseBody(std::string body);
 
 		bool	isRequestComplete();
-		e_parse_state	getParserState();
 
+		// setters
 		void	setFd(int fd);
 		void	setClientAddress(const sockaddr_in& client_address);
 		void	resetState();
-
 		void	setServerConfig(const Server& server);
 		
+		// getters
 		std::string		getResponseString();
 		int				getFd();
 		std::string &	getBuffer();
+		e_parse_state	getParserState();
+		e_parse_state	getParserState() const;
 		
 		// Data object that holds parsed request
 		Request		request; 

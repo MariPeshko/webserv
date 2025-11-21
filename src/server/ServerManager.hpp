@@ -18,13 +18,15 @@ class	ServerManager {
 		ServerManager();
 		~ServerManager();
 		
-		void	setupServers(std::vector<Server> server_configs);
+		void	setupServers(std::vector<Server> & server_configs);
 		void	runServers();
 		
 	private:
-		std::vector<Server>			_servers;
-		std::map<int, Server*>	_map_servers; // Map listener fd to Server
-		std::vector<pollfd>			_pfds;	// Vector of poll file descriptors
+		// Vector of poll file descriptors
+		std::vector<pollfd>		_pfds;
+		// Map of Server's pointers (listener fd)
+		std::map<int, Server*>	_map_servers;
+		// 
 		std::map<int, Client>	_clients;
 		
 		void	addToPfds(std::vector<pollfd>& pfds, int newfd);
