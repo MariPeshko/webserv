@@ -76,11 +76,12 @@ void	ServerManager::handleNewConnection(int listener) {
 
 		addToPfds(_pfds, newfd);
 		newClient.setFd(newfd);
+		newClient.setClientAddress(remoteaddr);
 		// Remove previous client if exists
 		if (_clients.count(newfd) != 0) {
 			_clients.erase(newfd);
 		}
-		_clients[newfd] = newClient;
+		_clients.insert(std::make_pair(newfd, newClient));
 
 		uint32_t ip = ntohl(remoteaddr.sin_addr.s_addr);
 		std::string ip_str = ipv4_to_string(ip);

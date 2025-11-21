@@ -1,27 +1,23 @@
 #include "Client.hpp"
 
-Client::Client() :
-	_fd(-1), _state(REQUEST_LINE)
-	{ }
-
 // Parametic constructor
 // Maryna: small update for good practice
-Client::Client(Server &server)
-	: server_config(server), _fd(-1), _state(REQUEST_LINE)
-	{
-	//_fd = -1;
-	response.setServerConfig(server);
-	//_state = REQUEST_LINE;
-}
+Client::Client(Server &server) :
+	server_config(server),
+	_fd(-1),
+	_state(REQUEST_LINE)
+	{ }
 
 // Copy constructor
 Client::Client(const Client &other) :
-	response(other.response)
-{
-	_fd = other._fd;
-	_client_address = other._client_address;
-	_state = other.getParserState();
-}
+	request(other.request),
+	response(other.response),
+	server_config(other.server_config),
+	_fd(other._fd),
+	_client_address(other._client_address),
+	_request_buffer(other._request_buffer),
+	_state(other._state)
+	{ }
 
 Client::~Client() { }
 
@@ -39,13 +35,16 @@ ssize_t	Client::receiveData() {
 	}
 	// debugging
 	std::cout << "pollserver: recv " << nbytes << " bytes from fd " << getFd() << std::endl;
-	//We got some good data from a client (broadcast to other clients)
-	std::cout << "message from " << getFd() << ": ";
-	int to_print;
-	if (nbytes < 100) to_print = nbytes;
-	else to_print = 100;
-	std::cout.write(buf, to_print);
-	std::cout << std::endl;
+	if (nbytes > 0) {
+		//We got some good data from a client (broadcast to other clients)
+		std::cout << "message from " << getFd() << ": ";
+		int	to_print;
+		if (nbytes < 100) to_print = nbytes;
+		else to_print = 100;
+		std::cout.write(buf, to_print);
+		std::cout << std::endl;
+	}
+	
 	return nbytes;
 }
 
@@ -137,9 +136,9 @@ void	Client::parseRequestLine(std::string request_line) {
 	std::cout << "Request Line is parsed" << std::endl;
 }
 
-void	Client::parseHeaders(std::string request_line) {
+void	Client::parseHeaders(std::string headers) {
 	std::cout << "Parsing request headers" << std::endl;
-	std::cout << request_line.substr(0, 20) << std::endl;
+	std::cout << headers.substr(0, 20) << std::endl;
 }
 
 void	Client::parseBody(std::string body) {
@@ -152,7 +151,7 @@ void	Client::parseBody(std::string body) {
  * This is a basic implementation. A robust one would also check Content-Length.
  * @return true if the HTTP headers are complete, false otherwise.
  */
-bool	Client::isRequestComplete() {
+bool	Client::isRequestComplete() const {
 	if (_state == REQUEST_COMPLETE)
 		return true;
 	else 
@@ -187,7 +186,7 @@ std::string	Client::getResponseString() {
 
 void	Client::setFd(int fd) { _fd = fd; }
 
-int		Client::getFd() { return _fd; }
+int		Client::getFd() const { return _fd; }
 
 void	Client::setClientAddress(const sockaddr_in& client_address) {
 	_client_address = client_address;
@@ -197,14 +196,12 @@ std::string &	Client::getBuffer() {
 	return _request_buffer;
 }
 
-void	Client::setServerConfig(const Server& server) {
-	server_config = server;
-}
-
-Client::e_parse_state	Client::getParserState() {
-	return _state;
-}
-
 Client::e_parse_state	Client::getParserState() const {
 	return _state;
+}
+
+// disabled operator, it is in private
+Client& Client::operator=(const Client& other) {
+	(void)other;
+	return *this;
 }

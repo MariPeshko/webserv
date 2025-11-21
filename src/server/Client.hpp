@@ -23,7 +23,6 @@ class	Client {
 			REQUEST_ERROR
 		};
 
-		Client();
 		Client(const Client &other);
 		Client(Server &server);
 		~Client();
@@ -34,27 +33,27 @@ class	Client {
 		void	parseHeaders(std::string headers);
 		void	parseBody(std::string body);
 
-		bool	isRequestComplete();
+		bool	isRequestComplete() const;
 
 		// setters
 		void	setFd(int fd);
 		void	setClientAddress(const sockaddr_in& client_address);
 		void	resetState();
-		void	setServerConfig(const Server& server);
 		
 		// getters
 		std::string		getResponseString();
-		int				getFd();
+		int				getFd() const;
 		std::string &	getBuffer();
-		e_parse_state	getParserState();
 		e_parse_state	getParserState() const;
 		
-		// Data object that holds parsed request
-		Request		request; 
+		Request		request; // Data object that holds parsed request
 		Response	response;
-		Server		server_config;
-	
+		Server&		server_config;
+
 	private:
+		Client();	// no default construction
+		Client& operator=(const Client& other);  // no assignment
+
 		int 				_fd;
 		struct sockaddr_in	_client_address;
 		std::string			_request_buffer;
