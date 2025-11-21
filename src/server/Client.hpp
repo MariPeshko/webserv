@@ -23,8 +23,8 @@ class	Client {
 			REQUEST_ERROR
 		};
 
-		Client(const Client &other);
 		Client(Server &server);
+		Client(const Client &other);
 		~Client();
 		
 		ssize_t	receiveData();

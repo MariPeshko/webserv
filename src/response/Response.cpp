@@ -1,23 +1,24 @@
 #include "Response.hpp"
 
-Response::Response() {
-}
+// Parametric constructor
+Response::Response(Server& server)
+    : _server_config(server),
+      _request(0),
+      _statusCode(200),
+      _reasonPhrase("OK"),
+      _contentLength(0)
+{ }
 
-Response::~Response() {
-}
+Response::~Response() { }
 
-void Response::setRequest( Request& req) {
-    request = req;
-}
-
-void Response::setServerConfig(Server& server) {
-    _server_config = server;
+// call after parsing
+void Response::bindRequest(const Request& req) {
+    _request = &req;
 }
 
 void Response::generatePath() {
 	std::cout << " test: " << _server_config.getLocations().begin()->_path << std::endl;
 
-	
 }
 
 void Response::generateResponse() {
@@ -40,14 +41,10 @@ void Response::generateResponse() {
     _contentLength = _responseBody.size();
 }
 
-short Response::getStatusCode() {
-    return _statusCode;
-}
+short Response::getStatusCode() const { return _statusCode; }
 
-size_t Response::getContentLength() {
-    return _contentLength;
-}
+size_t Response::getContentLength() const { return _contentLength; }
 
-std::string Response::getResponseBody() {
+std::string Response::getResponseBody() const {
     return _responseBody;
 }

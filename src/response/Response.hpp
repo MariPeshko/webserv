@@ -16,42 +16,43 @@
 // - set headers (just append important headers to map<string, string> _headers)
 // - add body content
 
-
-class Response {
-    public:
-        Response();
-        ~Response();
-
-        void   generateResponse(); 
-        std::string getResponseBody();
-        short getStatusCode();
-        size_t      getContentLength();
-
-        void setRequest(Request& req);
-        void setServerConfig(Server& server);
-
-        Request request;
-        std::string finalResponseContent;
-
-    private:
-        // we should check what to store here
-        // most of the data will be stored in Request object
-        // Status Line
-        short   _statusCode;
-        std::string   _reasonPhrase;
-        // Headers
-        //not sure if need a map of headers
-        std::map<std::string, std::string> _headers;
-        size_t  _contentLength;
-        std::string _responseBody;
-        Server         _server_config;
-
-		void generatePath();
+class	Response {
+	public:
 		
+		Response(Server& server);
+		~Response();
+
+		void		bindRequest(const Request& req); // new feat: Maryna. call after parsing
+		void		generateResponse();
+
+		short		getStatusCode() const;
+		size_t		getContentLength() const;
+		std::string	getResponseBody() const;
+		
+		std::string		finalResponseContent;
+
+	private:
+		Response(); // no default construction
+	
+		// we should check what to store here
+		// most of the data will be stored in Request object
+		// Status Line
+		Server&			_server_config; // reference
+		const Request*	_request;		// pointer
+
+		short			_statusCode;
+		std::string		_reasonPhrase;
+		// Headers
+		//not sure if need a map of headers
+		std::map<std::string, std::string>	_headers;
+		size_t			_contentLength;
+		std::string		_responseBody;
+
+		void			generatePath();
 
 
-        //?? for image or binary data response
-        // std::vector<uint8_t> _responseBody;
+		//?? for image or binary data response
+		// std::vector<uint8_t> _responseBody;
 };
 
 #endif

@@ -3,6 +3,7 @@
 // Parametic constructor
 // Maryna: small update for good practice
 Client::Client(Server &server) :
+	response(server),
 	server_config(server),
 	_fd(-1),
 	_state(REQUEST_LINE)

@@ -72,9 +72,9 @@ class Location {
 
 class	Server {
     public:
+		Server(const Server& other);
         Server();
         ~Server();
-		Server(const Server& other);
 		
 		int		setupServer();
         
