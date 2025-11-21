@@ -46,6 +46,9 @@ class Response {
         std::string _responseBody;
         Server         _server_config;
 
+		void generatePath();
+		
+
 
         //?? for image or binary data response
         // std::vector<uint8_t> _responseBody;

@@ -3,6 +3,7 @@
 
 # include "../response/Response.hpp"
 # include "../request/Request.hpp"
+# include "../server/Server.hpp"
 # include <iostream>
 # include <string>
 # include <vector>
@@ -24,6 +25,7 @@ class	Client {
 
 		Client();
 		Client(const Client &other);
+		Client(Server &server);
 		~Client();
 		
 		ssize_t	receiveData();
@@ -33,10 +35,13 @@ class	Client {
 		void	parseBody(std::string body);
 
 		bool	isRequestComplete();
+		e_parse_state	getParserState();
 
 		void	setFd(int fd);
 		void	setClientAddress(const sockaddr_in& client_address);
 		void	resetState();
+
+		void	setServerConfig(const Server& server);
 		
 		std::string		getResponseString();
 		int				getFd();
@@ -45,6 +50,7 @@ class	Client {
 		// Data object that holds parsed request
 		Request		request; 
 		Response	response;
+		Server		server_config;
 	
 	private:
 		int 				_fd;

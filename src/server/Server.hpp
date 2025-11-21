@@ -59,8 +59,8 @@ class Location {
 			}
 		}
 
-	private:
 		std::string	_path;
+	private:
 		std::string _root;
 		std::vector<std::string>	_allowed_methods;
 		std::string	_index;

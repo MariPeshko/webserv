@@ -14,8 +14,15 @@ void Response::setServerConfig(Server& server) {
     _server_config = server;
 }
 
+void Response::generatePath() {
+	std::cout << " test: " << _server_config.getLocations().begin()->_path << std::endl;
+
+	
+}
+
 void Response::generateResponse() {
     _statusCode = 200;
+	generatePath();
 
     const std::string path = "www/index.html";
     std::ifstream file(path.c_str());

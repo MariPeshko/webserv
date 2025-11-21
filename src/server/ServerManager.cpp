@@ -70,7 +70,9 @@ void	ServerManager::handleNewConnection(int listener) {
 	if (newfd == -1) {
 		std::cerr << "Accept failed: " << strerror(errno) << std::endl;
 	} else {
-		Client	newClient;
+		Server* server = _map_servers[listener];
+		// add server reference to client
+		Client	newClient(*server);
 
 		addToPfds(_pfds, newfd);
 		newClient.setFd(newfd);

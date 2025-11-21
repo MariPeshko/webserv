@@ -6,6 +6,12 @@ Client::Client() : _fd(-1), _state(REQUEST_LINE) {
 Client::~Client() {
 }
 
+Client::Client(Server &server) {
+	_fd = -1;
+	response.setServerConfig(server);
+	_state = REQUEST_LINE;
+}
+
 Client::Client(const Client &other) {
     _fd = other._fd;
     _client_address = other._client_address;
@@ -42,7 +48,6 @@ ssize_t	Client::receiveData() {
  * are both in the buffer).
  */
 void    Client::parseRequest() {
-	std::cout << "parseRequest " << std::endl;
     bool    can_parse = true;
 
     while (can_parse) {
@@ -96,6 +101,12 @@ void    Client::parseRequest() {
 			case REQUEST_ERROR  : {
 				can_parse = false;
                 break;
+			}
+			default : {
+				std::cerr << "Unknown parsing state!" << std::endl;
+				_state = REQUEST_ERROR;
+				can_parse = false;
+				break;
 			}
 		}
     }
@@ -175,4 +186,12 @@ void	Client::setClientAddress(const sockaddr_in& client_address) {
 
 std::string &	Client::getBuffer() {
 	return _request_buffer;
+}
+
+void	Client::setServerConfig(const Server& server) {
+	server_config = server;
+}
+
+Client::e_parse_state	Client::getParserState() {
+	return _state;
 }
