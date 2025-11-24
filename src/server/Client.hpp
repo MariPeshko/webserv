@@ -2,6 +2,7 @@
 # define CLIENT_HPP
 
 # include "../response/Response.hpp"
+# include "../request/HttpParser.hpp"
 # include "../request/Request.hpp"
 # include "../server/Server.hpp"
 # include <iostream>
@@ -19,7 +20,8 @@ class	Client {
 		Client(const Client &other);
 		~Client();
 
-		Request		request; // Data object that holds parsed request
+		HttpParser&		parser();
+		Request&		request(); // Data object that holds parsed request
 		enum	e_parse_state {
 			REQUEST_LINE,
 			READING_HEADERS,
@@ -38,6 +40,7 @@ class	Client {
 		void	parseBody(std::string body);
 
 		bool	isRequestComplete() const;
+		bool	isRequestError() const;
 
 		// setters
 		void	setFd(int fd);
@@ -53,6 +56,9 @@ class	Client {
 	private:
 		Client();	// no default construction
 		Client& operator=(const Client& other);  // no assignment
+
+		HttpParser 			_parser;
+		Request				_request;
 
 		int 				_fd;
 		struct sockaddr_in	_client_address;

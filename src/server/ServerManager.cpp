@@ -154,7 +154,7 @@ void	ServerManager::handleClientData(size_t i) {
 	if (client.isRequestComplete()) {
 		// The parseRequest method should now use the client's internal buffer
 		// Generate response
-		client.response.bindRequest(client.request);
+		client.response.bindRequest(client.request());
 		client.response.generateResponse();
 		sendResponse(client);
 		// to do: clear buffer, reset client state to default
