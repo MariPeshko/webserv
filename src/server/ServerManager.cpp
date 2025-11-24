@@ -206,12 +206,13 @@ void	ServerManager::processConnections() {
 }
 
 /**
- *  poll() reports revent(s).
+ * poll() reports revent(s).
+ * 
+ * poll() returns the number of elements in the pfds array 
+ * for which events have occurred.
  */
 void	ServerManager::runServers() {
 	while (1) { // Later: signal handling
-		// poll() returns the number of elements in the pfds
-		// array for which events have occurred
 		int	poll_count = poll(&_pfds[0], _pfds.size(), 1000);  // 1 second maximum time to wait
 		if (poll_count == -1) {
 			// if (!g_running) break;  // Signal received

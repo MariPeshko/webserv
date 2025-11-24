@@ -1,17 +1,26 @@
 #include "Request.hpp"
 
-Request::Request() { }
+Request::Request() :
+	_validFormatReqLine(false),
+	_method(INVALID)
+{ }
 
 Request::~Request() { }
 
 void Request::setMethod(const std::string &method) {
+	if (method.size() == 0) {
+		_method = INVALID;
+		return;
+	}
     if (method == "GET") {
         _method = GET;
     } else if (method == "POST") {
         _method = POST;
     } else if (method == "DELETE") {
         _method = DELETE;
-    }
+    } else {
+		_method = INVALID;
+	}
 }
 
 void Request::setUri(const std::string &uri) {
@@ -30,7 +39,20 @@ void Request::setBody(const std::string &body) {
     _body = body;
 }
 
-std::string Request::getMethod() const {
+void	Request::setRequestLineFormatValid(bool value) {
+	_validFormatReqLine = value;
+}
+
+/**
+ * When a request line fromat is invalid it returns false.
+ * For example, a request line is empty, method is INVALID,
+ * the number of words aren't 3.
+ */
+bool		Request::getRequestLineFormatValid() const {
+	return _validFormatReqLine;
+}
+
+std::string	Request::getMethod() const {
     switch (_method) {
         case GET: return "GET";
         case POST: return "POST";

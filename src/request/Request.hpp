@@ -16,10 +16,12 @@ class	Request {
 		enum MethodType {
 			GET,
 			POST,
-			DELETE
+			DELETE,
+			INVALID
 		};
 
 		// setters
+		void	setRequestLineFormatValid(bool valid);
 		void	setMethod(const std::string &method);
 		void	setUri(const std::string &uri);
 		void	setVersion(const std::string &version);
@@ -27,6 +29,7 @@ class	Request {
 		void	setBody(const std::string &body);
 
 		// getters
+		bool				getRequestLineFormatValid() const;
 		std::string			getMethod() const;
 		std::string			getUri() const;
 		std::string			getVersion() const;
@@ -34,6 +37,7 @@ class	Request {
 		std::string			getBody() const;
 
 	private:
+		bool						_validFormatReqLine;
 		MethodType					_method;
 		std::string					_uri;
 		std::string					_httpVersion;

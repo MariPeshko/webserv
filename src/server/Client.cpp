@@ -56,16 +56,19 @@ ssize_t	Client::receiveData() {
  * are both in the buffer).
  */
 void    Client::parseRequest() {
-	std::cout << "parseRequest " << std::endl;
+	//std::cout << "parseRequest " << std::endl;
 	bool    can_parse = true;
 
 	while (can_parse) {
 		switch (_state) {
 			case REQUEST_LINE: {
-				size_t pos = _request_buffer.find("\r\n");
+				size_t	pos = _request_buffer.find("\r\n");
 				if (pos != std::string::npos) {
 					parseRequestLine(_request_buffer.substr(0, pos));
 					_request_buffer.erase(0, pos + 2);
+					if (request.getRequestLineFormatValid())
+						std::cout << "Request. A request line format is valid" << std::endl;
+					else std::cout << "Request. A request line format is NOT valid" << std::endl;
 					_state = READING_HEADERS;
 				} else {
 					can_parse = false;
@@ -121,20 +124,39 @@ void    Client::parseRequest() {
 	}
 }
 
-// Split raw_request by spaces into method, uri, version using string streams
+/**
+ * Split by spaces into method, uri, version using string streams
+ * 
+ * Bind iss to the request_line string.
+ */
 void	Client::parseRequestLine(std::string request_line) {
 
-	if (request_line.size() == 0) return;
-
-	std::string			line(request_line);
-	std::istringstream	iss(line);
-	std::string			method, uri, version;
-	if (iss >> method >> uri >> version) {
-		this->request.setMethod(method);
-		this->request.setUri(uri);
-		this->request.setVersion(version);
+	if (request_line.size() == 0)
+	{
+		this->request.setRequestLineFormatValid(false);
+		this->request.setMethod("");
+		return ;
 	}
-	std::cout << "Request Line is parsed" << std::endl;
+
+	std::istringstream			iss(request_line); 
+	std::vector<std::string>	words;
+	std::string					word;
+
+	while (iss >> word) {
+		words.push_back(word);
+	}
+
+	if (words.size() == 3) {
+		this->request.setMethod(words[0]);
+		this->request.setUri(words[1]);
+		this->request.setVersion(words[2]);
+		this->request.setRequestLineFormatValid(true);
+	} else {
+		this->request.setRequestLineFormatValid(false);
+		this->request.setMethod("");
+	}
+	
+	//std::cout << "Request Line is parsed" << std::endl;
 }
 
 void	Client::parseHeaders(std::string headers) {

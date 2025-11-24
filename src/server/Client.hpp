@@ -15,6 +15,11 @@
 class	Client {
 
 	public:
+		Client(Server &server);
+		Client(const Client &other);
+		~Client();
+
+		Request		request; // Data object that holds parsed request
 		enum	e_parse_state {
 			REQUEST_LINE,
 			READING_HEADERS,
@@ -23,9 +28,8 @@ class	Client {
 			REQUEST_ERROR
 		};
 
-		Client(Server &server);
-		Client(const Client &other);
-		~Client();
+		Response	response;
+		Server&		server_config;
 		
 		ssize_t	receiveData();
 		void	parseRequest();
@@ -45,10 +49,6 @@ class	Client {
 		int				getFd() const;
 		std::string &	getBuffer();
 		e_parse_state	getParserState() const;
-		
-		Request		request; // Data object that holds parsed request
-		Response	response;
-		Server&		server_config;
 
 	private:
 		Client();	// no default construction
