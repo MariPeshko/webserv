@@ -20,6 +20,7 @@ class	Response {
 	public:
 		
 		Response(Server& server);
+		Response&	operator= (const Response & other);
 		~Response();
 
 		void		bindRequest(const Request& req); // new feat: Maryna. call after parsing

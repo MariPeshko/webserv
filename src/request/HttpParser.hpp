@@ -1,17 +1,24 @@
 #ifndef HTTPPARSER_HPP
 # define HTTPPARSER_HPP
 
+# include "Request.hpp"
 # include <string>
 # include <map>
 # include <vector>
 # include <iostream>
 # include <sstream>
 
-// Data object that holds parsed request
+/**
+ *  Stateless syntax helpers for HTTP request.
+ */
 class	HttpParser {
+
 	public:
 		HttpParser();
 		~HttpParser();
+
+	static bool parseRequestLine(const std::string& line, Request& req);
+    static bool parseHeaderLine(const std::string& line, Request& req);
 
 	static const size_t MAX_REQUEST_LINE  = 8192;      // 8 KB
     static const size_t MAX_HEADER_BLOCK  = 16384;     // 16 KB
@@ -19,5 +26,9 @@ class	HttpParser {
 
 	private:
 };
+
+
+
+	
 
 #endif

@@ -9,6 +9,17 @@ Response::Response(Server& server)
       _contentLength(0)
 { }
 
+Response&	Response::operator= (const Response & other) {
+	if (this != &other) {
+		_server_config = other._server_config;
+		_request = other._request;
+		_statusCode = other.getStatusCode();
+		_reasonPhrase = other._reasonPhrase;
+		_contentLength = other.getContentLength();
+	}
+	return *this;
+}
+
 Response::~Response() { }
 
 // call after parsing
