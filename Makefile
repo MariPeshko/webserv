@@ -8,7 +8,6 @@ SRCS =	src/main.cpp \
 		src/server/Client.cpp \
 		src/response/Response.cpp \
 		src/request/Request.cpp \
-		src/response/utils.cpp
 
 # - Header files
 HEADERS	= inc/Webserv.hpp

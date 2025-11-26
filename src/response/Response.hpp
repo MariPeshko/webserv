@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <sys/stat.h>
 
 //TODO:
 // - if error - build error response
@@ -28,8 +29,12 @@ class	Response {
 		short		getStatusCode() const;
 		size_t		getContentLength() const;
 		std::string	getResponseBody() const;
-		
-		std::string		finalResponseContent;
+		std::string getReasonPhrase() const; 
+		Server&		getServerConfig();
+
+		const Location*	matchPathToLocation();
+
+        std::string finalResponseContent;
 
 	private:
 		Response(); // no default construction
@@ -47,6 +52,7 @@ class	Response {
 		std::map<std::string, std::string>	_headers;
 		size_t			_contentLength;
 		std::string		_responseBody;
+		std::string		_resourcePath;
 
 		void			generatePath();
 

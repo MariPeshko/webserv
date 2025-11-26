@@ -95,6 +95,8 @@ class	Server {
         const std::map<int, std::string>&	getErrorPages() const { return _error_pages; }
         const std::string&					getClientMaxBodySize() const { return _client_max_body_size; }
 		int									getListenFd() const { return _listen_fd; }
+		std::string							getRoot() const { return _root; }
+		const std::string&					getIndex() const { return _index; }
         
         void print() const {
 			std::cout << "Server Configuration:" << std::endl;
@@ -116,13 +118,13 @@ class	Server {
 				for (std::map<int, std::string>::const_iterator it = _error_pages.begin(); it != _error_pages.end(); ++it) {
 					std::cout << "    " << it->first << " -> " << it->second << std::endl;
 				}
-			}
+			}*/
 			if (!_locations.empty()) {
 				std::cout << "  Locations:" << std::endl;
 				for (size_t i = 0; i < _locations.size(); i++) {
 					_locations[i].print();
 				}
-			} */
+			} 
 		}
 
     private:

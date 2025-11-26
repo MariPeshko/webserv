@@ -189,11 +189,12 @@ std::string	Client::getResponseString() {
 	std::string body = response.getResponseBody();
 	short status_code = response.getStatusCode();
 	size_t content_length = response.getContentLength();
+	std::string reason_phrase = response.getReasonPhrase();
 	
 	std::ostringstream oss;
 
 	// 1. Status Line
-	oss << "HTTP/1.1 " << status_code << " OK\r\n";
+	oss << "HTTP/1.1 " << status_code << " " << reason_phrase << "\r\n";
 
 	// 2. Headers
 	oss << "Content-Type: text/html\r\n";
