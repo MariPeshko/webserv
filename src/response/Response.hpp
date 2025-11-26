@@ -20,7 +20,6 @@ class	Response {
 	public:
 		
 		Response(Server& server);
-		Response&	operator= (const Response & other);
 		~Response();
 
 		void		bindRequest(const Request& req); // new feat: Maryna. call after parsing
@@ -29,11 +28,16 @@ class	Response {
 		short		getStatusCode() const;
 		size_t		getContentLength() const;
 		std::string	getResponseBody() const;
+
+		void        reset(); // Maryna's suggestion
 		
 		std::string		finalResponseContent;
 
 	private:
 		Response(); // no default construction
+		// Maryna's suggestion. No copyable, for safety.
+		Response(const Response&);
+		Response&	operator= (const Response & other);
 	
 		// we should check what to store here
 		// most of the data will be stored in Request object

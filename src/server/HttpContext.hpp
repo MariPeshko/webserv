@@ -25,7 +25,7 @@ class	HttpContext {
 
 	public:
 		HttpContext(Connection& conn, Server& server);
-		//HttpContext(const HttpContext &other);
+		HttpContext(const HttpContext &other);
 		~HttpContext();
 
 		Connection&		connection();

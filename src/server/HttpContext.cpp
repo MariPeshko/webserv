@@ -9,16 +9,14 @@ HttpContext::HttpContext(Connection& conn, Server& server) :
 	_state(REQUEST_LINE)
 	{ }
 
-/* // Copy constructor
+// Copy constructor
 HttpContext::HttpContext(const HttpContext &other) :
-	_response(other._server_config),
+	_conn(other._conn),
 	_server_config(other._server_config),
 	_request(other._request),
-	_fd(other._fd),
-	_client_address(other._client_address),
-	_request_buffer(other._request_buffer),
+	_response(other._server_config),
 	_state(other._state)
-{ } */
+{ }
 
 HttpContext::~HttpContext() { }
 
@@ -247,7 +245,9 @@ bool	HttpContext::isRequestError() const {
 
 void	HttpContext::resetState() {
 	_request = Request();
-    _response = Response(server());
+	// Maryna's suggestion: response.reset()
+	// Ivan: "Я думаю обнулити поінтер достатньо"
+	response().reset();
 	_state = REQUEST_LINE;
 }
 

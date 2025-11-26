@@ -59,3 +59,8 @@ size_t Response::getContentLength() const { return _contentLength; }
 std::string Response::getResponseBody() const {
     return _responseBody;
 }
+
+/** nulls the Request* before new HTTP request-response cycle */
+void Response::reset() { // Maryna's suggestion. Ivan: "Я думаю обнулити поінтер достатньо"
+    _request = 0;
+}
