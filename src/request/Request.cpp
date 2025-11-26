@@ -44,7 +44,7 @@ void	Request::setRequestLineFormatValid(bool value) {
 }
 
 /**
- * When a request line fromat is invalid it returns false.
+ * When a request line format is invalid it returns false.
  * For example, a request line is empty, method is INVALID,
  * the number of words aren't 3.
  */
@@ -69,8 +69,21 @@ std::string Request::getVersion() const {
     return _httpVersion;
 }
 
-std::map<std::string, std::string> Request::getHeaders() const {
+std::map<std::string, std::string>	Request::getHeaders() const {
     return _headers;
+}
+
+const std::string &		Request::getHeaderValue(std::string header_name) const {
+    
+	static const std::string	empty = "";
+    std::map<std::string, std::string>::const_iterator it;
+
+	it = _headers.find(header_name);
+    if (it == _headers.end()) {
+        return empty;
+    } else {
+        return it->second;
+    }
 }
 
 std::string Request::getBody() const {
