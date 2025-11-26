@@ -8,6 +8,7 @@ SRCS =	src/main.cpp \
 		src/server/Client.cpp \
 		src/request/HttpParser.cpp \
 		src/response/Response.cpp \
+		src/response/utils.cpp \
 		src/request/Request.cpp \
 
 # - Header files
