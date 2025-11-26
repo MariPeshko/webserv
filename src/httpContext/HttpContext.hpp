@@ -2,7 +2,7 @@
 # define HTTPCONTEXT_HPP
 
 # include "../response/Response.hpp"
-# include "../request/HttpParser.hpp"
+# include "HttpParser.hpp"
 # include "../request/Request.hpp"
 # include "../server/Server.hpp"
 #include "../httpContext/Connection.hpp"
@@ -43,7 +43,6 @@ class	HttpContext {
 		};		
 		
 		void	parseRequest();
-		void	parseRequestLine(std::string request_line);
 		void	parseHeaders(std::string headers);
 		void	parseBody(std::string body);
 
@@ -66,6 +65,7 @@ class	HttpContext {
 		Response	_response;
 
 		e_parse_state	_state;
+		size_t			_expectedBodyLen;
 };
 
 #endif

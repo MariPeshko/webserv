@@ -6,7 +6,8 @@ HttpContext::HttpContext(Connection& conn, Server& server) :
 	_server_config(server),
 	_request(),
 	_response(server),
-	_state(REQUEST_LINE)
+	_state(REQUEST_LINE),
+	_expectedBodyLen(0)
 	{ }
 
 // Copy constructor
@@ -15,7 +16,8 @@ HttpContext::HttpContext(const HttpContext &other) :
 	_server_config(other._server_config),
 	_request(other._request),
 	_response(other._server_config),
-	_state(other._state)
+	_state(other._state),
+	_expectedBodyLen(other._expectedBodyLen)
 { }
 
 HttpContext::~HttpContext() { }
@@ -31,56 +33,71 @@ Response&   HttpContext::response()   { return _response; }
  * make progress (e.g., parsing both request line and headers if they
  * are both in the buffer).
  */
-void    HttpContext::parseRequest() {
-
-	if (HttpParser::parseHeaderLine(connection().getBuffer(), request()) == true)
-		std::cout << "<<<< _____HttpParser::parseHeaderLine()_____ >>>>" 
-			<< std::endl;
-
-	//std::cout << "parseRequest " << std::endl;
+void	HttpContext::parseRequest() {
 	
-	bool    can_parse = true;
+	std::string	&buf = connection().getBuffer();
+	bool		can_parse = true;
 
 	while (can_parse) {
 		switch (_state) {
 			case REQUEST_LINE: {
-				size_t	pos =connection().getBuffer().find("\r\n");
-				if (pos != std::string::npos) {
-					parseRequestLine(connection().getBuffer().substr(0, pos));
-					connection().getBuffer().erase(0, pos + 2);
-					if (request().getRequestLineFormatValid())
-						_state = READING_HEADERS;
-					else
-						_state = REQUEST_ERROR;
-				} else {
-					can_parse = false;
+				size_t	pos = buf.find("\r\n");
+				if (pos == std::string::npos) {
+					can_parse = false; break;
 				}
-				break ;
+				std::string	line = buf.substr(0, pos);
+				buf.erase(0, pos + 2);
+				if (HttpParser::parseRequestLine(line, request()) == true) {
+					_state = READING_HEADERS;
+					continue;
+				} else {
+					_state = REQUEST_ERROR;
+					can_parse = false; break;
+				}
 			}
 			case READING_HEADERS : {
-				size_t pos = connection().getBuffer().find("\r\n\r\n");
-				if (pos != std::string::npos) {
-					// TODO: Parse all headers from the header block
-					parseHeaders(connection().getBuffer().substr(0, pos));
-					// Remove headers from the buffer
-					connection().getBuffer().erase(0, pos + 4);
-
-					// // TODO: Check for Content-Length or Transfer-Encoding
-					// First step(it will be complicated):
-					// check for Content-Length
-					const std::string&	cl = request().getHeaderValue("Content-Length");
-					if (cl.empty()) {
-						//std::cout << "Request. Content-Length is missing.\n";
-						//std::cout << "REQUEST_COMPLETE" << std::endl;
-						_state = REQUEST_COMPLETE;
-						can_parse = false;
-					} else { // If a body is expected:
-						_state = READING_BODY;
-					}
-				} else {
-					can_parse = false;
+				size_t pos = buf.find("\r\n\r\n");
+				if (pos == std::string::npos) {
+					can_parse = false; break;
 				}
-				break ;
+				// TODO: Parse all headers from the header block
+				std::string	rawHeaders = buf.substr(0, pos);
+				buf.erase(0, pos + 4);
+				if (HttpParser::parseHeaders(rawHeaders, request()) == false) {
+					_state = REQUEST_ERROR;
+					can_parse = false; break;
+				}
+
+				const std::string& cl = request().getHeaderValue("Content-Length");
+				if (cl.empty()) {
+					_state = REQUEST_COMPLETE;
+					can_parse = false; break;
+				}
+
+				// Reject non-digit characters early and Manual accumulation
+				size_t	need = 0;
+				bool	ok = true;
+				for (size_t i = 0; i < cl.size(); ++i) {
+					char c = cl[i];
+					if (c < '0' || c > '9') {
+						ok = false; break;
+					}
+					need = need * 10 + static_cast<size_t>(c - '0');
+					// TODO (пізніше): перевірити верхню межу й ліміти
+				}
+				if (!ok) {
+					_state = REQUEST_ERROR;
+					can_parse = false;
+					break;
+				}
+
+				_expectedBodyLen = need;
+				_state = READING_BODY;
+				continue;
+
+				// // TODO: Check for Content-Length or Transfer-Encoding
+				// First step(it will be complicated):
+				// check for Content-Length
 			}
 			case READING_BODY : {
 				// If using Content-Length:
@@ -88,34 +105,15 @@ void    HttpContext::parseRequest() {
 				//   - If yes: request is complete. client.state = REQUEST_COMPLETE; request_is_ready = true;
 				//   - request.parseBody()
 				//   - Remove body from the buffer
-				const std::string& cl = request().getHeaderValue("Content-Length");
-				if (cl.empty()) {
-					_state = REQUEST_ERROR;
-					connection().getBuffer().clear();
+				if (buf.size() < _expectedBodyLen) {
 					can_parse = false;
 					break;
 				}
-
-				long need = 0;
-				// Reject non-digit characters early
-				for (size_t di = 0; di < cl.size(); ++di) {
-					if (cl[di] < '0' || cl[di] > '9') {
-						_state = REQUEST_ERROR;
-						need = -1;
-						break;
-					}
-				}
-				// Manual accumulation
-				for (size_t di = 0; di < cl.size(); ++di) {
-					need = need * 10 + (cl[di] - '0');
-				}
-				if (connection().getBuffer().size() >= static_cast<size_t>(need)) {
-					parseBody(connection().getBuffer().substr(0, need));
-					connection().getBuffer().erase(0, need);
-					_state = REQUEST_COMPLETE;
-				} else { // body not fully received
-					can_parse = false;
-				}
+				std::string body = buf.substr(0, _expectedBodyLen);
+				buf.erase(0, _expectedBodyLen);
+				parseBody(body);
+				_state = REQUEST_COMPLETE;
+				can_parse = false;
 				// If using chunked encoding:
 				//   - Parse chunks until the final "0\r\n\r\n" is found.
 				//   - request.parseBody()
@@ -123,13 +121,8 @@ void    HttpContext::parseRequest() {
 				//   - If final chunk found: client.state = REQUEST_COMPLETE; request_is_ready = true;
 				break ;
 			}
-			case REQUEST_COMPLETE : {
-				connection().getBuffer().clear();
-				can_parse = false;
-				break;
-			}
+			case REQUEST_COMPLETE :
 			case REQUEST_ERROR  : {
-				connection().getBuffer().clear();
 				can_parse = false;
 				break;
 			}
@@ -141,51 +134,6 @@ void    HttpContext::parseRequest() {
 			}
 		}
 	}
-}
-
-/**
- * Split by spaces into method, uri, version using string streams
- * 
- * Bind iss to the request_line string.
- */
-void	HttpContext::parseRequestLine(std::string request_line) {
-
-	if (request_line.empty())
-	{
-		this->request().setRequestLineFormatValid(false);
-		this->request().setMethod("");
-		return ;
-	}
-
-	std::istringstream			iss(request_line); 
-	std::string					method, uri, version;
-
-	if (!(iss >> method >> uri >> version) || !iss.eof()) {
-		request().setRequestLineFormatValid(false);
-		request().setMethod("");
-		return;
-	}
-	request().setRequestLineFormatValid(true);
-
-	if (method != "GET" && method != "POST" && method != "DELETE") {
-		request().setRequestLineFormatValid(false);
-		request().setMethod("");
-	}
-
-	if (version != "HTTP/1.1" && version != "HTTP/1.0") {
-		request().setRequestLineFormatValid(false);
-	}
-
-	// Rudimentary URI check
-	if (uri.empty() || uri[0] != '/' || uri.find("..") != std::string::npos) {
-		request().setRequestLineFormatValid(false);
-	}
-
-	request().setMethod(method);
-	request().setUri(uri);
-	request().setVersion(version);
-
-	//std::cout << "Request Line is parsed" << std::endl;
 }
 
 void	HttpContext::parseHeaders(std::string headers) {
@@ -224,6 +172,7 @@ void	HttpContext::resetState() {
 	// Maryna's suggestion: response.reset()
 	// Ivan: "Я думаю обнулити поінтер достатньо"
 	response().reset();
+	connection().getBuffer().clear();
 	_state = REQUEST_LINE;
 }
 

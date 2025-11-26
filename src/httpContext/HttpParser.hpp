@@ -1,7 +1,7 @@
 #ifndef HTTPPARSER_HPP
 # define HTTPPARSER_HPP
 
-# include "Request.hpp"
+# include "../request/Request.hpp"
 # include <string>
 # include <map>
 # include <vector>
@@ -18,7 +18,7 @@ class	HttpParser {
 		~HttpParser();
 
 	static bool parseRequestLine(const std::string& line, Request& req);
-    static bool parseHeaderLine(const std::string& line, Request& req);
+    static bool parseHeaders(const std::string& line, Request& req);
 
 	private:
 };
