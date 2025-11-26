@@ -112,18 +112,16 @@ void	ServerManager::handleNewConnection(int listener) {
 		std::cerr << "Accept failed: " << strerror(errno) << std::endl;
 		return;
 	}
-	Server* server = _map_servers[listener];
-
+	addToPfds(_pfds, newfd);
+	
 	// Create Connection
 	Connection	conn;
 	conn.setFd(newfd);
 	conn.setClientAddress(remoteaddr);
-	_connections[newfd] = conn;
-
-	addToPfds(_pfds, newfd);
+	Server* server = _map_servers[listener];
 	
 	// Create HttpContext bound to this connection+server
-	_contexts.insert(std::make_pair(newfd, HttpContext(_connections[newfd], *server)));
+	_contexts.insert(std::make_pair(newfd, HttpContext(conn, *server)));
 
 	uint32_t ip = ntohl(remoteaddr.sin_addr.s_addr);
 	std::string ip_str = ipv4_to_string(ip);
@@ -150,27 +148,26 @@ void	ServerManager::sendResponse(int fd, HttpContext& ctx) {
 void	ServerManager::handleErrorRevent(int fd, size_t i) {
 	
 	std::cerr << "Poll error on socket " << fd << std::endl;
-	close(fd);
-	_contexts.erase(fd);
-	_connections.erase(fd);
-	delFromPfds(i);
+	removeClient(fd,i);
 }
 
 /** Client socket error. Error message and cleanup */
 void	ServerManager::handleClientError(int fd, size_t i) {
 	std::cout << "pollserver: socket " << fd << " error after recv()" << std::endl;
-	close(fd);
-	_contexts.erase(fd);
-	_connections.erase(fd);
-	delFromPfds(i);
+	removeClient(fd,i);
+	
 }
 
 /** Client socket is closed. Error message and cleanup */
 void	ServerManager::handleClientHungup(int fd, size_t i) {
 	std::cout << "pollserver: socket " << fd << " hung up" << std::endl;
+	removeClient(fd,i);
+}
+
+/** close/erase logic */
+void	ServerManager::removeClient(int fd, size_t i) {
 	close(fd);
 	_contexts.erase(fd);
-	_connections.erase(fd);
 	delFromPfds(i);
 }
 
@@ -185,26 +182,17 @@ void	ServerManager::handleClientHungup(int fd, size_t i) {
 void	ServerManager::handleClientData(size_t i) {
 	const int fd = _pfds[i].fd;
 
-	// Find connection
-	std::map<int, Connection>::iterator it = _connections.find(fd);
-	if (it == _connections.end()) {
+	// Find HttpContext
+	std::map<int, HttpContext>::iterator it = _contexts.find(fd);
+	if (it == _contexts.end()) {
 		std::cerr << "Error: No contexts found for fd " << fd << std::endl;
 		close(fd);
 		delFromPfds(i);
 		return ;
 	}
-	Connection&	conn = it->second;
+	HttpContext&	ctx = it->second;
 
-	// Find/Create context
-	std::map<int, HttpContext>::iterator xit = _contexts.find(fd);
-	if (xit == _contexts.end()) {
-		std::cerr << "Eroor: Inconsistent state: missing HttpContext for fd " << fd << std::endl;
-		handleClientError(fd, i);
-		return;
-	}
-	HttpContext& ctx = xit->second;
-
-	ssize_t nbytes = conn.receiveData();
+	ssize_t nbytes = ctx.connection().receiveData();
 	if (nbytes == 0) {
 		handleClientHungup(fd, i);
 		return ;

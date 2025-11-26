@@ -60,7 +60,7 @@ class	HttpContext {
 		HttpContext();	// no default construction
 		HttpContext& operator=(const HttpContext& other);  // no assignment
 
-		Connection&	_conn;
+		Connection	_conn;
 		Server&		_server_config;
 		Request		_request;
 		Response	_response;

@@ -21,13 +21,15 @@ class	ServerManager {
 		
 		void	setupServers(std::vector<Server> & server_configs);
 		void	runServers();
+
+		void	removeClient(int fd, size_t i);
 		
 	private:
 		std::vector<pollfd>		_pfds;
 		std::map<int, Server*>	_map_servers;
 
-		// REFACTORED: replace _clients with connections + contexts
-		std::map<int, Connection>	_connections;
+		// REFACTORED: consolidation of two maps HttpContext and Connection. 
+		// Now HttpContext owns Connection by value.
 		std::map<int, HttpContext>	_contexts;
 		
 		void	addToPfds(std::vector<pollfd>& pfds, int newfd);
