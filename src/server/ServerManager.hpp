@@ -12,7 +12,7 @@
 #include <cerrno>
 #include <sstream>	// for std::ostringstream
 #include <iostream>
-
+#include <fcntl.h>
 
 class	ServerManager {
 	public:

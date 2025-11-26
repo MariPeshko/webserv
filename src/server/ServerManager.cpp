@@ -112,6 +112,12 @@ void	ServerManager::handleNewConnection(int listener) {
 		std::cerr << "Accept failed: " << strerror(errno) << std::endl;
 		return;
 	}
+
+	// Make the accepted socket non-blocking
+	int	flags = fcntl(newfd, F_GETFL, 0);
+	if (flags != -1)
+		fcntl(newfd, F_SETFL, flags | O_NONBLOCK);
+
 	addToPfds(_pfds, newfd);
 	
 	// Create Connection

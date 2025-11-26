@@ -24,6 +24,10 @@ int	Server::setupServer() {
 		return -1;
 	}
 
+	int	lflags = fcntl(_listen_fd, F_GETFL, 0);
+	if (lflags != -1)
+		fcntl(_listen_fd, F_SETFL, lflags | O_NONBLOCK);
+
 	int	yes = 1;
 	if (setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
 		std::cerr << "Failed to set SO_REUSEADDR: " << strerror(errno) << std::endl;

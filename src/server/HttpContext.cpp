@@ -38,13 +38,6 @@ void    HttpContext::parseRequest() {
 			<< std::endl;
 
 	//std::cout << "parseRequest " << std::endl;
-	if (connection().getBuffer().size() > HttpParser::MAX_BUFFER_TOTAL) {
-		_state = REQUEST_ERROR;
-		connection().getBuffer().clear();
-		std::cerr << "_request_buffer is larger than MAX_BUFFER_TOTAL";
-		std::cerr << std::endl;
-		return;
-	}
 	
 	bool    can_parse = true;
 
@@ -60,10 +53,6 @@ void    HttpContext::parseRequest() {
 					else
 						_state = REQUEST_ERROR;
 				} else {
-					if (connection().getBuffer().size() > HttpParser::MAX_REQUEST_LINE) {
-						_state = REQUEST_ERROR;
-						connection().getBuffer().clear();
-					}
 					can_parse = false;
 				}
 				break ;
@@ -89,10 +78,6 @@ void    HttpContext::parseRequest() {
 						_state = READING_BODY;
 					}
 				} else {
-					if (connection().getBuffer().size() > HttpParser::MAX_HEADER_BLOCK) {
-						_state = REQUEST_ERROR;
-						connection().getBuffer().clear();
-					}
 					can_parse = false;
 				}
 				break ;
@@ -123,21 +108,12 @@ void    HttpContext::parseRequest() {
 				// Manual accumulation
 				for (size_t di = 0; di < cl.size(); ++di) {
 					need = need * 10 + (cl[di] - '0');
-					if (need > (long)HttpParser::MAX_BUFFER_TOTAL) {
-						_state = REQUEST_ERROR;
-						break;
-					}
 				}
 				if (connection().getBuffer().size() >= static_cast<size_t>(need)) {
 					parseBody(connection().getBuffer().substr(0, need));
 					connection().getBuffer().erase(0, need);
 					_state = REQUEST_COMPLETE;
 				} else { // body not fully received
-					if (connection().getBuffer().size() > HttpParser::MAX_BUFFER_TOTAL) {
-						std::cerr << "Request is larger than MAX_BUFFER_TOTAL\n";
-						std::cerr << std::endl;
-						_state = REQUEST_ERROR;
-					}
 					can_parse = false;
 				}
 				// If using chunked encoding:
