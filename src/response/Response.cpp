@@ -81,6 +81,16 @@ void Response::generateResponse() {
         return;
     }
 
+    // Check for redirection
+    if (loc->getReturnCode() != 0) {
+        _statusCode = loc->getReturnCode();
+        _reasonPhrase = generateStatusMessage(_statusCode);
+        _headers["Location"] = loc->getReturnUrl();
+        _responseBody = "<html><body><h1>" + toString(_statusCode) + " " + _reasonPhrase + "</h1></body></html>";
+        _contentLength = _responseBody.size();
+        return;
+    }
+
     // Construct Path
     std::string root = !loc->getRoot().empty() ? loc->getRoot() : _server_config.getRoot();
 	if (DEBUG) std::cout << YELLOW << "Using root: " << root << RESET << std::endl;
@@ -170,4 +180,8 @@ Server& Response::getServerConfig() {
 
 std::string Response::getReasonPhrase() const {
 	return _reasonPhrase;
+}
+
+const std::map<std::string, std::string>& Response::getHeaders() const {
+    return _headers;
 }

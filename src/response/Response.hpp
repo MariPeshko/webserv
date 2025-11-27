@@ -44,6 +44,7 @@ class	Response {
 		std::string	getResponseBody() const;
 		std::string getReasonPhrase() const; 
 		Server&		getServerConfig();
+		const std::map<std::string, std::string>& getHeaders() const;
 
 		const Location*	matchPathToLocation();
 
