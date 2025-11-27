@@ -112,13 +112,13 @@ class	Server {
 			}
 			/* if (!_client_max_body_size.empty()) {
 				std::cout << "  Client max body size: " << _client_max_body_size << std::endl;
-			}
+			}*/
 			if (!_error_pages.empty()) {
 				std::cout << "  Error pages:" << std::endl;
 				for (std::map<int, std::string>::const_iterator it = _error_pages.begin(); it != _error_pages.end(); ++it) {
 					std::cout << "    " << it->first << " -> " << it->second << std::endl;
 				}
-			}*/
+			}
 			if (!_locations.empty()) {
 				std::cout << "  Locations:" << std::endl;
 				for (size_t i = 0; i < _locations.size(); i++) {
