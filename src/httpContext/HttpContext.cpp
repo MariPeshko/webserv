@@ -169,8 +169,6 @@ bool	HttpContext::isRequestError() const {
 
 void	HttpContext::resetState() {
 	_request = Request();
-	// Maryna's suggestion: response.reset()
-	// Ivan: "Я думаю обнулити поінтер достатньо"
 	response().reset();
 	connection().getBuffer().clear();
 	_state = REQUEST_LINE;
@@ -190,6 +188,12 @@ std::string	HttpContext::getResponseString() {
 	oss << "Content-Type: text/html\r\n";
 	oss << "Content-Length: " << content_length << "\r\n";
 	oss << "Connection: keep-alive\r\n"; // Optional
+
+	 // Add custom headers (like Location for redirects)
+    const std::map<std::string, std::string>& headers = response().getHeaders();
+    for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
+        oss << it->first << ": " << it->second << "\r\n";
+    }
 
 	// 3. Empty Line (End of headers)
 	oss << "\r\n";

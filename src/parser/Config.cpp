@@ -1,306 +1,271 @@
 #include "Config.hpp"
-#include <sstream>
+#include <iostream>
 #include <algorithm>
-#include <cctype>
-#include <stdexcept> // runtime_error
+#include <set>
 
-// Return parsed servers
-std::vector<Server> & Config::getServerConfigs() {
+Config::Config() {}
+Config::~Config() {}
+
+std::vector<Server>& Config::getServerConfigs() {
     return _servers;
 }
 
-std::vector<std::string> Config::tokenize(const std::string& config_file)
-{
-	std::vector<std::string> tokens;
-	std::ifstream file(config_file.c_str()); 
-
-	if (!file.is_open()) {
-		throw std::runtime_error("Error: Could not open config file: " + config_file);
-	}
-
-	std::string line;
-	while (std::getline(file, line)) {
-		// Remove comments
-		size_t comment_pos = line.find('#');
-		if (comment_pos != std::string::npos) {
-			line = line.substr(0, comment_pos);
-		}
-		
-		// Trim whitespace from both ends
-		while (!line.empty() && std::isspace(line[0])) {
-			line.erase(0, 1);
-		}
-		while (!line.empty() && std::isspace(line[line.length() - 1])) {
-			line.erase(line.length() - 1, 1);
-		}
-		
-		// Skip empty lines
-		if (line.empty()) {
-			continue;
-		}
-		
-		// Split the line into tokens
-		std::string current_token;
-		for (size_t i = 0; i < line.length(); i++) {
-			char c = line[i];
-			
-			// If special character
-			if (c == '{' || c == '}' || c == ';' || c == '[' || c == ']' || c == ',') {
-				if (!current_token.empty()) {
-					tokens.push_back(current_token);
-					current_token.clear();
-				}
-				// Add special character as its own token
-				tokens.push_back(std::string(1, c));
-			}
-			// If whitespace
-			else if (std::isspace(c)) {
-				// Save current token if it exists
-				if (!current_token.empty()) {
-					tokens.push_back(current_token);
-					current_token.clear();
-				}
-				// Skip the whitespace
-			}
-			// Regular character - add to current token
-			else {
-				current_token += c;
-			}
-		}
-		
-		// last token if line doesn't end with special char
-		if (!current_token.empty()) {
-			tokens.push_back(current_token);
-		}
-	}
-	
-	file.close();
-	return tokens;
+// Tokenizer: Converts the raw configuration string into a vector of tokens.
+std::vector<std::string> Config::tokenize(const std::string& content) {
+    std::vector<std::string> tokens;
+    for (size_t i = 0; i < content.length(); ) {
+        // Skip whitespace
+        if (std::isspace(content[i])) {
+            i++;
+            continue;
+        }
+        // Skip comments
+        if (content[i] == '#') {
+            while (i < content.length() && content[i] != '\n') i++;
+            continue;
+        }
+        // Handle special characters as separate tokens
+        if (std::string("{};").find(content[i]) != std::string::npos) {
+            tokens.push_back(std::string(1, content[i]));
+            i++;
+            continue;
+        }
+        // Parse words/values
+        size_t start = i;
+        while (i < content.length() && !std::isspace(content[i]) &&
+               std::string("{};").find(content[i]) == std::string::npos) {
+            i++;
+        }
+        tokens.push_back(content.substr(start, i - start));
+    }
+    return tokens;
 }
 
-
-// for now set up mock data
-Config::Config() {
-    _config_file = "configs/default.conf";
-    _config_lines = std::vector<std::string>();
-    _ready = std::vector<int>();
-    _fd_set = fd_set();
-    _fd_size = 0;
-    _max_fd = 0;
-}
-
-Config::~Config() {
-}
-
+// Main parse function: orchestrates the tokenizing and parsing.
 void Config::parse(const std::string& config_file) {
-    _config_file = config_file;
-    
-    // Tokenize  config file
-    std::vector<std::string> tokens = tokenize(config_file);
-    
-    // Create a default server
-    Server server;
-    
-    // Parse tokens
-    for (size_t i = 0; i < tokens.size(); i++) {
-        if (tokens[i] == "location") {
-            // Parse location block
-            parseLocationBlock(server, tokens, i);
+    std::ifstream file(config_file.c_str());
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open config file: " + config_file);
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    file.close();
+
+    std::vector<std::string> tokens = tokenize(buffer.str());
+    std::reverse(tokens.begin(), tokens.end());
+
+    while (!tokens.empty()) {
+        if (tokens.back() == "server") {
+            tokens.pop_back(); // Consume "server"
+            Server server;
+            parseServer(server, tokens);
+            _servers.push_back(server);
         } else {
-            // Parse server-level directive
-            parseServerDirective(server, tokens, i);
+            throw std::runtime_error("Unexpected token outside server block: " + tokens.back());
         }
     }
-	
-	// Add  server to list
-	_servers.push_back(server);
-	
-	// Hard-coded server #2 (Maryna)
-	Server	server2(server);
-	server2.setPort(8081);
-	_servers.push_back(server2);
-	
-	std::cout << "Parsed " << _servers.size() << " server(s)" << std::endl;
-	std::cout << "Server has " << _servers[0].getLocationCount() << " location(s)" << std::endl;
-	
-	// Print parsed configuration for verification
-	std::cout << "\n=== Parsed Configuration ===" << std::endl;
-	_servers[0].print();
-	std::cout << "============================\n" << std::endl;
-	_servers[0].print();
-	std::cout << "============================\n" << std::endl;
+    if (_servers.empty()) {
+        throw std::runtime_error("No server blocks found in configuration file.");
+    }
+	std::cout << "Configuration '" << config_file << "' parsed successfully." << std::endl;
+    for (size_t i = 0; i < _servers.size(); ++i) {
+        std::cout << "\n=== Server " << i + 1 << " Configuration ===" << std::endl;
+        _servers[i].print();
+        std::cout << "=================================\n" << std::endl;
+    }
 }
 
-// Helper: Parse array like [GET, POST]
-std::vector<std::string> Config::parseArray(const std::vector<std::string>& tokens, size_t& i) {
-    std::vector<std::string> result;
-    
-    if (i >= tokens.size() || tokens[i] != "[") {
-        throw std::runtime_error("Expected '[' for array");
+// Helper to check if a token is a known directive (to handle missing semicolons)
+static bool isDirective(const std::string& token) {
+    static const char* directives[] = {
+        "listen", "host", "server_name", "root", "error_page", "client_max_body_size", 
+        "client_body_buffer_size", "location", "methods", "allow_methods", "index", 
+        "autoindex", "return", "cgi", "cgi_pass", "alias", "}"
+    };
+    for (size_t i = 0; i < 17; ++i) {
+        if (token == directives[i]) return true;
     }
-    i++; // Skip '['
-    
-    while (i < tokens.size() && tokens[i] != "]") {
-        if (tokens[i] != ",") {
-            result.push_back(tokens[i]);
-        }
-        i++;
-    }
-    
-    if (i >= tokens.size() || tokens[i] != "]") {
-        throw std::runtime_error("Expected ']' to close array");
-    }
-    i++; // Skip ']'
-    
-    return result;
+    return false;
 }
 
-// Helper: Parse server-level directives
-void Config::parseServerDirective(Server& server, const std::vector<std::string>& tokens, size_t& i) {
-    if (i >= tokens.size()) return;
+// Helper to consume optional semicolon
+static void consumeSemiColon(std::vector<std::string>& tokens) {
+    if (!tokens.empty() && tokens.back() == ";") {
+        tokens.pop_back();
+    }
+}
+
+// Helper to parse array-like values e.g. [GET, POST, HEAD] or simple list GET POST
+static std::vector<std::string> parseValues(std::vector<std::string>& tokens) {
+    std::vector<std::string> values;
     
-    std::string directive = tokens[i];
-    
-    if (directive == "server_name") {
-        i++; // Skip directive name
-        while (i < tokens.size() && tokens[i] != ";") {
-            if (tokens[i] != ",") {
-                server.addServerName(tokens[i]);
+    if (tokens.empty()) return values;
+
+    // Handle bracket format [ GET, POST ]
+    if (tokens.back() == "[") {
+        tokens.pop_back(); // consume '['
+        while (!tokens.empty() && tokens.back() != "]") {
+            if (tokens.back() != ",") {
+                values.push_back(tokens.back());
             }
-            i++;
+            tokens.pop_back();
         }
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
+        if (tokens.empty() || tokens.back() != "]") throw std::runtime_error("Expected ']'");
+        tokens.pop_back(); // consume ']'
+    } else {
+        // Handle space separated format until semicolon or next directive
+        while (!tokens.empty() && tokens.back() != ";" && !isDirective(tokens.back())) {
+            values.push_back(tokens.back());
+            tokens.pop_back();
+        }
     }
-    else if (directive == "error_page") {
-        i++; // Skip directive name
-        if (i >= tokens.size()) {
-            throw std::runtime_error("error_page: missing error code");
-        }
-        int error_code = atoi(tokens[i].c_str());
-        i++;
-        if (i >= tokens.size()) {
-            throw std::runtime_error("error_page: missing error page path");
-        }
-        std::string error_path = tokens[i];
-        server.addErrorPage(error_code, error_path);
-        i++;
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
-    }
-    else if (directive == "client_max_body_size") {
-        i++; // Skip directive name
-        if (i >= tokens.size()) {
-            throw std::runtime_error("client_max_body_size: missing value");
-        }
-        server.setClientMaxBodySize(tokens[i]);
-        i++;
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
-    }
+    return values;
 }
 
-// Helper: Parse a location block
-void Config::parseLocationBlock(Server& server, const std::vector<std::string>& tokens, size_t& i) {
-    Location location;
-    
-    i++; // Skip "location"
-    if (i >= tokens.size()) {
-        throw std::runtime_error("location: missing path");
+// Parses a server block from the token stream.
+void Config::parseServer(Server& server, std::vector<std::string>& tokens) {
+    if (tokens.empty() || tokens.back() != "{") {
+        throw std::runtime_error("Expected '{' after 'server'");
     }
-    location.setPath(tokens[i]);
-    i++;
-    
-    if (i >= tokens.size() || tokens[i] != "{") {
-        throw std::runtime_error("location: expected '{'");
+    tokens.pop_back(); // Consume "{"
+
+    while (!tokens.empty() && tokens.back() != "}") {
+        std::string directive = tokens.back();
+        tokens.pop_back();
+
+        if (directive == "listen") {
+            std::string val = tokens.back();
+            tokens.pop_back();
+            size_t colonPos = val.find(':');
+            if (colonPos != std::string::npos) {
+                server.setHost(val.substr(0, colonPos));
+                server.setPort(atoi(val.substr(colonPos + 1).c_str()));
+            } else {
+                server.setPort(atoi(val.c_str()));
+            }
+        } else if (directive == "host") {
+            server.setHost(tokens.back());
+            tokens.pop_back();
+        } else if (directive == "server_name") {
+            std::vector<std::string> names = parseValues(tokens);
+            for (size_t i = 0; i < names.size(); ++i) {
+                server.addServerName(names[i]);
+            }
+        } else if (directive == "root") {
+            server.setRoot(tokens.back());
+            tokens.pop_back();
+        } else if (directive == "index") {
+             std::vector<std::string> indices = parseValues(tokens);
+             if (!indices.empty()) server.setIndex(indices[0]); 
+        } else if (directive == "methods" || directive == "allow_methods") {
+            std::vector<std::string> methods = parseValues(tokens);
+            for(size_t i = 0; i < methods.size(); ++i) {
+                server.addAllowedMethod(methods[i]);
+            }
+        } else if (directive == "error_page") {
+             std::vector<std::string> values = parseValues(tokens);
+            if (values.size() < 2) throw std::runtime_error("Invalid error_page directive");
+            std::string page = values.back();
+            values.pop_back();
+            for (size_t i = 0; i < values.size(); ++i) {
+                server.addErrorPage(atoi(values[i].c_str()), page);
+            }
+        } else if (directive == "client_max_body_size" || directive == "client_body_buffer_size") {
+            server.setClientMaxBodySize(tokens.back());
+            tokens.pop_back();
+        } else if (directive == "location") {
+            Location location;
+            location.setPath(tokens.back());
+            tokens.pop_back();
+            parseLocation(location, tokens);
+            server.addLocation(location);
+            continue; // location blocks don't have a trailing semicolon
+        } else {
+            throw std::runtime_error("Unknown server directive: " + directive);
+        }
+        consumeSemiColon(tokens);
     }
-    i++; // Skip '{'
-    
-    // Parse location directives until '}'
-    while (i < tokens.size() && tokens[i] != "}") {
-        parseLocationDirective(location, tokens, i);
+
+    if (tokens.empty() || tokens.back() != "}") {
+        throw std::runtime_error("Expected '}' to close server block");
     }
-    
-    if (i >= tokens.size() || tokens[i] != "}") {
-        throw std::runtime_error("location: expected '}'");
-    }
-    i++; // Skip '}'
-    
-    server.addLocation(location);
+    tokens.pop_back(); // Consume "}"
 }
 
-// Helper: Parse location-level directives
-void Config::parseLocationDirective(Location& location, const std::vector<std::string>& tokens, size_t& i) {
-    if (i >= tokens.size()) return;
-    
-    std::string directive = tokens[i];
-    
-    if (directive == "methods") {
-        i++; // Skip directive name
-        std::vector<std::string> methods = parseArray(tokens, i);
-        for (size_t j = 0; j < methods.size(); j++) {
-            location.addAllowedMethod(methods[j]);
-        }
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
+// Parses a location block from the token stream.
+void Config::parseLocation(Location& location, std::vector<std::string>& tokens) {
+    if (tokens.empty() || tokens.back() != "{") {
+        throw std::runtime_error("Expected '{' after location path");
     }
-    else if (directive == "root") {
-        i++; // Skip directive name
-        if (i >= tokens.size()) {
-            throw std::runtime_error("root: missing path");
+    tokens.pop_back(); // Consume "{"
+
+    while (!tokens.empty() && tokens.back() != "}") {
+        std::string directive = tokens.back();
+        tokens.pop_back();
+
+        if (directive == "root") {
+            location.setRoot(tokens.back());
+            tokens.pop_back();
+        } else if (directive == "methods" || directive == "allow_methods") {
+            std::vector<std::string> methods = parseValues(tokens);
+            for(size_t i = 0; i < methods.size(); ++i) {
+                location.addAllowedMethod(methods[i]);
+            }
+        } else if (directive == "index") {
+             std::vector<std::string> indices = parseValues(tokens);
+             if (!indices.empty()) location.setIndex(indices[0]); // Taking the first one for now, or join them?
+        } else if (directive == "autoindex") {
+            location.setAutoindex(tokens.back() == "on");
+            tokens.pop_back();
+        } else if (directive == "return") {
+            int code = atoi(tokens.back().c_str());
+            tokens.pop_back();
+            location.setReturn(code, tokens.back());
+            tokens.pop_back();
+        } else if (directive == "cgi") {
+            std::string ext = tokens.back();
+            tokens.pop_back();
+            location.addCgi(ext, tokens.back());
+            tokens.pop_back();
+        } else if (directive == "cgi_pass") {
+            // Assume path extension derived from location path or generic
+            std::string path = tokens.back();
+            tokens.pop_back();
+            // If location path is an extension (e.g. *.php), use it
+            std::string locPath = location.getPath();
+            if (locPath.size() > 1 && locPath[0] == '*' && locPath[1] == '.') {
+                location.addCgi(locPath.substr(1), path); // Remove *
+            } else {
+                 location.addCgi("*", path); // Generic CGI
+            }
+        } else if (directive == "alias") {
+             // Alias might be empty in mac.conf (just 'alias'?) or have a path
+             if (!tokens.empty() && !isDirective(tokens.back()) && tokens.back() != "}") {
+                 location.setAlias(tokens.back());
+                 tokens.pop_back();
+             } else {
+                 location.setAlias("on"); // Treat as flag if no value?
+             }
+        } else if (directive == "client_max_body_size" || directive == "client_body_buffer_size") {
+             location.setClientMaxBodySize(tokens.back());
+             tokens.pop_back();
+        } else if (directive == "location") {
+            // Nested location
+            Location nestedLoc;
+            nestedLoc.setPath(tokens.back());
+            tokens.pop_back();
+            parseLocation(nestedLoc, tokens);
+            location.addLocation(nestedLoc);
+            continue;
+        } else {
+            throw std::runtime_error("Unknown location directive: " + directive);
         }
-        location.setRoot(tokens[i]);
-        i++;
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
+        consumeSemiColon(tokens);
     }
-    else if (directive == "index") {
-        i++; // Skip directive name
-        if (i >= tokens.size()) {
-            throw std::runtime_error("index: missing value");
-        }
-        // Take first index value
-        location.setIndex(tokens[i]);
-        i++;
-        // Skip remaining index values until ';'
-        while (i < tokens.size() && tokens[i] != ";") {
-            i++;
-        }
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
+
+    if (tokens.empty() || tokens.back() != "}") {
+        throw std::runtime_error("Expected '}' to close location block");
     }
-    else if (directive == "autoindex") {
-        i++; // Skip directive name
-        if (i >= tokens.size()) {
-            throw std::runtime_error("autoindex: missing value");
-        }
-        bool autoindex = (tokens[i] == "on");
-        location.setAutoindex(autoindex);
-        i++;
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
-    }
-    else if (directive == "return") {
-        i++; // Skip directive name
-        if (i >= tokens.size()) {
-            throw std::runtime_error("return: missing code");
-        }
-        int code = atoi(tokens[i].c_str());
-        i++;
-        if (i >= tokens.size()) {
-            throw std::runtime_error("return: missing URL");
-        }
-        location.setReturn(code, tokens[i]);
-        i++;
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
-    }
-    else if (directive == "cgi") {
-        i++; // Skip directive name
-        if (i >= tokens.size()) {
-            throw std::runtime_error("cgi: missing extension");
-        }
-        std::string ext = tokens[i];
-        i++;
-        if (i >= tokens.size()) {
-            throw std::runtime_error("cgi: missing executable path");
-        }
-        location.addCgi(ext, tokens[i]);
-        i++;
-        if (i < tokens.size() && tokens[i] == ";") i++; // Skip ';'
-    }
-    // Ignore unknown directives
+    tokens.pop_back(); // Consume "}"
 }
 

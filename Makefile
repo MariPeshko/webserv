@@ -9,8 +9,8 @@ SRCS =	src/main.cpp \
 		src/httpContext/HttpContext.cpp \
 		src/httpContext/HttpParser.cpp \
 		src/response/Response.cpp \
+		src/response/utils.cpp \
 		src/request/Request.cpp \
-		src/response/utils.cpp
 
 # - Header files
 HEADERS	= inc/Webserv.hpp

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Additional - MySite</title>
+	<style>
+		:root {
+			--bg: #f7fafc;
+			--card: #ffffff;
+			--accent: #2563eb;
+			--text: #0f172a;
+		}
+
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+			background: var(--bg);
+			color: var(--text);
+		}
+
+		.container {
+			max-width: 900px;
+			margin: 3rem auto;
+			padding: 1.5rem;
+		}
+
+		header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+		}
+
+		nav a {
+			margin-left: 0.75rem;
+			text-decoration: none;
+			color: var(--accent);
+			font-weight: 600;
+		}
+
+		.hero {
+			background: linear-gradient(180deg, rgba(37, 99, 235, 0.06), transparent);
+			border-radius: 12px;
+			padding: 2rem;
+			box-shadow: 0 6px 18px rgba(2, 6, 23, 0.06);
+		}
+
+		.hero h1 {
+			margin: 0 0 .5rem 0;
+			font-size: 1.6rem;
+		}
+
+		.hero p {
+			margin: 0 0 1rem 0;
+			color: #334155;
+		}
+
+		.btn {
+			display: inline-block;
+			background: var(--accent);
+			color: white;
+			padding: .6rem 1rem;
+			border-radius: 8px;
+			text-decoration: none;
+			font-weight: 600;
+		}
+
+		section {
+			margin-top: 1.25rem;
+			background: var(--card);
+			padding: 1rem;
+			border-radius: 8px;
+		}
+
+		footer {
+			margin-top: 2rem;
+			text-align: center;
+			color: #64748b;
+			font-size: 0.9rem;
+		}
+
+		@media (max-width:560px) {
+			.container {
+				margin: 1.5rem;
+				padding: .75rem;
+			}
+
+			header {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: .5rem;
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<header>
+			<div>
+				<strong>MySite</strong>
+				<div style="color:#475569;font-size:.9rem">A minimal starter page</div>
+			</div>
+			<nav aria-label="Main navigation">
+				<a href="/">Home</a>
+				<a href="/about">About</a>
+				<a href="/additional">Additional</a>
+			</nav>
+		</header>
+
+		<main>
+			<section class="hero" aria-labelledby="hero-title">
+				<h1 id="hero-title">Additional Resources</h1>
+				<p>Explore extra content, documentation, and useful links.</p>
+			</section>
+
+			<section aria-labelledby="resources-title">
+				<h3 id="resources-title">Documentation</h3>
+				<p>Check out our comprehensive guides to get the most out of our platform.</p>
+				<p><a href="#" class="btn">Read Docs</a></p>
+			</section>
+
+			<section aria-labelledby="faq-title">
+				<h3 id="faq-title">Frequently Asked Questions</h3>
+				<dl>
+					<dt><strong>Is this free?</strong></dt>
+					<dd>Yes, this template is completely free to use.</dd>
+					<br>
+					<dt><strong>Can I customize it?</strong></dt>
+					<dd>Absolutely! Feel free to modify the HTML and CSS to suit your needs.</dd>
+				</dl>
+			</section>
+		</main>
+
+		<footer>
+			© <span id="year"></span> MySite — Built with plain HTML
+		</footer>
+	</div>
+
+	<script>
+		// small script to update the year
+		document.getElementById('year').textContent = new Date().getFullYear();
+	</script>
+</body>
+
+</html>

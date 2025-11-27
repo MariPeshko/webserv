@@ -20,7 +20,7 @@ std::string ipv4_to_string(uint32_t ip) {
  * After each server's listening socket is successfully created, 
  * it is immediately registered for polling.
  */
-void ServerManager::setupServers(std::vector<Server> & server_configs) {
+void ServerManager::setupServers(std::vector<Server> & server_configs ) {
 	//_servers = server_configs;
 	for (std::vector<Server>::iterator it = server_configs.begin(); it != server_configs.end(); it++) {
 		//socket setup

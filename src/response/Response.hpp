@@ -1,13 +1,27 @@
 #ifndef RESPONSE_HPP
 #define RESPONSE_HPP
 
+#define DEBUG 0
+#define GREEN "\033[32m"
+#define RESET "\033[0m"
+#define BLUE "\033[34m"
+#define RED "\033[31m"
+#define YELLOW "\033[33m"
+#define ORANGE "\033[38;5;208m"
+
 #include "../request/Request.hpp"
 #include "../server/Server.hpp"
+#include "utils.hpp"
 #include <string>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <ctime>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
 
 //TODO:
 // - if error - build error response
@@ -28,10 +42,15 @@ class	Response {
 		short		getStatusCode() const;
 		size_t		getContentLength() const;
 		std::string	getResponseBody() const;
+		std::string getReasonPhrase() const; 
+		Server&		getServerConfig();
+		const std::map<std::string, std::string>& getHeaders() const;
 
-		void        reset(); // Maryna's suggestion
-		
-		std::string		finalResponseContent;
+		const Location*	matchPathToLocation();
+
+        std::string finalResponseContent;
+
+		void        reset();
 
 	private:
 		Response(); // no default construction
@@ -52,12 +71,14 @@ class	Response {
 		std::map<std::string, std::string>	_headers;
 		size_t			_contentLength;
 		std::string		_responseBody;
+		std::string		_resourcePath;
 
-		void			generatePath();
+		std::string			getIndexFromLocation();
 
 
 		//?? for image or binary data response
 		// std::vector<uint8_t> _responseBody;
 };
+
 
 #endif
