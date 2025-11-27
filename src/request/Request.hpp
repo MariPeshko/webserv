@@ -21,7 +21,8 @@ class	Request {
 		};
 
 		// setters
-		void	setRequestLineFormatValid(bool valid);
+		void	setRequestLineFormatValid(bool value);
+		void	setHeadersFormatValid(bool value);
 		void	setMethod(const std::string &method);
 		void	setUri(const std::string &uri);
 		void	setVersion(const std::string &version);
@@ -30,6 +31,7 @@ class	Request {
 
 		// getters
 		bool				getRequestLineFormatValid() const;
+		bool				getHeadersFormatValid() const;
 		std::string			getMethod() const;
 		std::string			getUri() const;
 		std::string			getVersion() const;
@@ -39,6 +41,7 @@ class	Request {
 
 	private:
 		bool						_validFormatReqLine;
+		bool						_validFormatHeaders;
 		MethodType					_method;
 		std::string					_uri;
 		std::string					_httpVersion;
