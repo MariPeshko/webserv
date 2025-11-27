@@ -6,7 +6,7 @@
 Config::Config() {}
 Config::~Config() {}
 
-const std::vector<Server>& Config::getServerConfigs() const {
+std::vector<Server>& Config::getServerConfigs() {
     return _servers;
 }
 

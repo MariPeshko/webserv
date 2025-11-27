@@ -74,8 +74,8 @@ class Location {
             }
 		}
 
-	private:
 		std::string	_path;
+	private:
 		std::string _root;
         std::string _alias;
 		std::vector<std::string>	_allowed_methods;
@@ -90,9 +90,9 @@ class Location {
 
 class	Server {
     public:
+		Server(const Server& other);
         Server();
         ~Server();
-		Server(const Server& other);
 		
 		int		setupServer();
         
@@ -115,6 +115,8 @@ class	Server {
         const std::string&					getClientMaxBodySize() const { return _client_max_body_size; }
         const std::vector<std::string>&		getAllowedMethods() const { return _allowed_methods; }
 		int									getListenFd() const { return _listen_fd; }
+		std::string							getRoot() const { return _root; }
+		const std::string&					getIndex() const { return _index; }
         
         void print() const {
 			std::cout << "Server Configuration:" << std::endl;
