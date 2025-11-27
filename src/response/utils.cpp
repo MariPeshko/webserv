@@ -5,23 +5,29 @@ const char *generateStatusMessage(short status_code) {
     switch (status_code) {
         case 200:
             return "OK";
+		case 201:
+            return "Created";
+		case 204:
+            return "No Content";
         case 300:
             return "Multiple Choices";
+		case 301:
+            return "Moved Permanently";
         case 400:
             return "Bad Request";
+        case 401:
+            return "Unauthorized";
+        case 403:
+            return "Forbidden";
+        case 404:
+            return "Not Found";
+        case 405:
+            return "Method Not Allowed";
         case 500:
             return "Internal Server Error";
         default:
             return "Unknown Error";
     }
-}
-
-template <typename T>
-std::string toString(const T val)
-{
-    std::stringstream stream;
-    stream << val;
-    return stream.str();
 }
 
 int buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_len)

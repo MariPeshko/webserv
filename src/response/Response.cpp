@@ -5,7 +5,7 @@ Response::Response(Server& server)
     : _server_config(server),
       _request(0),
       _statusCode(200),
-      _reasonPhrase("OK"),
+      _reasonPhrase(generateStatusMessage(200)),
       _contentLength(0)
 { }
 
@@ -67,7 +67,7 @@ void Response::generateResponse() {
     if (!_request) return;
 
     _statusCode = 200;
-    _reasonPhrase = "OK";
+    _reasonPhrase = generateStatusMessage(_statusCode);
     _responseBody.clear();
     _contentLength = 0;
 
@@ -75,8 +75,38 @@ void Response::generateResponse() {
     if (!loc) {
         if (DEBUG) std::cout << RED << "No location matched." << RESET << std::endl;
         _statusCode = 404;
-        _reasonPhrase = "Not Found";
+        _reasonPhrase = generateStatusMessage(_statusCode);
         _responseBody = "<html><body><h1>404 Not Found</h1><p>No matching location found.</p></body></html>";
+        _contentLength = _responseBody.size();
+        return;
+    }
+
+    // Check for allowed methods
+    const std::vector<std::string>& allowed = loc->getAllowedMethods();
+    if (!allowed.empty()) {
+        bool methodAllowed = false;
+        for (size_t i = 0; i < allowed.size(); ++i) {
+            if (allowed[i] == _request->getMethod()) {
+                methodAllowed = true;
+                break;
+            }
+        }
+        if (!methodAllowed) {
+            if (DEBUG) std::cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << std::endl;
+            _statusCode = 405;
+            _reasonPhrase = generateStatusMessage(_statusCode);
+            _responseBody = "<html><body><h1>405 Method Not Allowed</h1></body></html>";
+            _contentLength = _responseBody.size();
+            return;
+        }
+    }
+
+    // Check for redirection
+    if (loc->getReturnCode() != 0) {
+        _statusCode = loc->getReturnCode();
+        _reasonPhrase = generateStatusMessage(_statusCode);
+        _headers["Location"] = loc->getReturnUrl();
+        _responseBody = "<html><body><h1>" + toString(_statusCode) + " " + _reasonPhrase + "</h1></body></html>";
         _contentLength = _responseBody.size();
         return;
     }
@@ -114,14 +144,14 @@ void Response::generateResponse() {
                 size_t bodyLen = 0;
                 if (buildHtmlIndexTable(path, body, bodyLen) == 0) {
                     _statusCode = 200;
-                    _reasonPhrase = "OK";
+                    _reasonPhrase = generateStatusMessage(_statusCode);
                     _responseBody = body;
                     _contentLength = bodyLen;
                     return;
                 }
                 if (DEBUG) std::cout << RED << "Autoindex generation failed." << RESET << std::endl;
                 _statusCode = 500;
-                _reasonPhrase = "Internal Server Error";
+                _reasonPhrase = generateStatusMessage(_statusCode);
                 _responseBody = "<html><body><h1>500 Internal Server Error</h1><p>Autoindex generation failed.</p></body></html>";
                 _contentLength = _responseBody.size();
                 return;
@@ -129,7 +159,7 @@ void Response::generateResponse() {
                 // Directory, no index, no autoindex -> Not Found (or Forbidden)
                 if (DEBUG) std::cout << RED << "Directory access forbidden (no index, autoindex off)" << RESET << std::endl;
                 _statusCode = 404;
-                _reasonPhrase = "Not Found";
+                _reasonPhrase = generateStatusMessage(_statusCode);
                 _responseBody = "<html><body><h1>404 Not Found</h1></body></html>";
                 _contentLength = _responseBody.size();
                 return;
@@ -143,7 +173,7 @@ void Response::generateResponse() {
     if (!file.is_open()) {
         if (DEBUG) std::cout << RED << "File not found: " << path << RESET << std::endl;
         _statusCode = 404;
-        _reasonPhrase = "Not Found";
+        _reasonPhrase = generateStatusMessage(_statusCode);
         _responseBody = "<html><body><h1>404 Not Found</h1></body></html>";
         _contentLength = _responseBody.size();
         return;
@@ -170,4 +200,8 @@ Server& Response::getServerConfig() {
 
 std::string Response::getReasonPhrase() const {
 	return _reasonPhrase;
+}
+
+const std::map<std::string, std::string>& Response::getHeaders() const {
+    return _headers;
 }

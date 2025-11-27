@@ -140,7 +140,7 @@ class	Server {
 			}
 			if (!_client_max_body_size.empty()) {
 				std::cout << "  Client max body size: " << _client_max_body_size << std::endl;
-			}
+			}*/
 			if (!_error_pages.empty()) {
 				std::cout << "  Error pages:" << std::endl;
 				for (std::map<int, std::string>::const_iterator it = _error_pages.begin(); it != _error_pages.end(); ++it) {
