@@ -211,6 +211,13 @@ void	ServerManager::handleClientData(size_t i) {
 	ctx.parseRequest();
 	// Only parse and respond if the request is complete
 	if (ctx.isRequestComplete() || ctx.isRequestError()) {
+		// Check if it is cgi
+		// HttpContext method for checking if server
+		// has a /cgi-bin
+		// If it's a CGI request: You trigger your CGI execution logic. 
+		// If it's NOT a CGI request: You proceed with 
+		// the normal static file handling logic
+
 		// The parseRequest method should now use the client's internal buffer
 		// Generate response
 		ctx.response().bindRequest(ctx.request());
