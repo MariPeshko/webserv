@@ -81,6 +81,26 @@ void Response::generateResponse() {
         return;
     }
 
+    // Check for allowed methods
+    const std::vector<std::string>& allowed = loc->getAllowedMethods();
+    if (!allowed.empty()) {
+        bool methodAllowed = false;
+        for (size_t i = 0; i < allowed.size(); ++i) {
+            if (allowed[i] == _request->getMethod()) {
+                methodAllowed = true;
+                break;
+            }
+        }
+        if (!methodAllowed) {
+            if (DEBUG) std::cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << std::endl;
+            _statusCode = 405;
+            _reasonPhrase = generateStatusMessage(_statusCode);
+            _responseBody = "<html><body><h1>405 Method Not Allowed</h1></body></html>";
+            _contentLength = _responseBody.size();
+            return;
+        }
+    }
+
     // Check for redirection
     if (loc->getReturnCode() != 0) {
         _statusCode = loc->getReturnCode();
