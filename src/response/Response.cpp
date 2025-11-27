@@ -5,7 +5,7 @@ Response::Response(Server& server)
     : _server_config(server),
       _request(0),
       _statusCode(200),
-      _reasonPhrase("OK"),
+      _reasonPhrase(generateStatusMessage(200)),
       _contentLength(0)
 { }
 
@@ -67,7 +67,7 @@ void Response::generateResponse() {
     if (!_request) return;
 
     _statusCode = 200;
-    _reasonPhrase = "OK";
+    _reasonPhrase = generateStatusMessage(_statusCode);
     _responseBody.clear();
     _contentLength = 0;
 
@@ -75,7 +75,7 @@ void Response::generateResponse() {
     if (!loc) {
         if (DEBUG) std::cout << RED << "No location matched." << RESET << std::endl;
         _statusCode = 404;
-        _reasonPhrase = "Not Found";
+        _reasonPhrase = generateStatusMessage(_statusCode);
         _responseBody = "<html><body><h1>404 Not Found</h1><p>No matching location found.</p></body></html>";
         _contentLength = _responseBody.size();
         return;
@@ -114,14 +114,14 @@ void Response::generateResponse() {
                 size_t bodyLen = 0;
                 if (buildHtmlIndexTable(path, body, bodyLen) == 0) {
                     _statusCode = 200;
-                    _reasonPhrase = "OK";
+                    _reasonPhrase = generateStatusMessage(_statusCode);
                     _responseBody = body;
                     _contentLength = bodyLen;
                     return;
                 }
                 if (DEBUG) std::cout << RED << "Autoindex generation failed." << RESET << std::endl;
                 _statusCode = 500;
-                _reasonPhrase = "Internal Server Error";
+                _reasonPhrase = generateStatusMessage(_statusCode);
                 _responseBody = "<html><body><h1>500 Internal Server Error</h1><p>Autoindex generation failed.</p></body></html>";
                 _contentLength = _responseBody.size();
                 return;
@@ -129,7 +129,7 @@ void Response::generateResponse() {
                 // Directory, no index, no autoindex -> Not Found (or Forbidden)
                 if (DEBUG) std::cout << RED << "Directory access forbidden (no index, autoindex off)" << RESET << std::endl;
                 _statusCode = 404;
-                _reasonPhrase = "Not Found";
+                _reasonPhrase = generateStatusMessage(_statusCode);
                 _responseBody = "<html><body><h1>404 Not Found</h1></body></html>";
                 _contentLength = _responseBody.size();
                 return;
@@ -143,7 +143,7 @@ void Response::generateResponse() {
     if (!file.is_open()) {
         if (DEBUG) std::cout << RED << "File not found: " << path << RESET << std::endl;
         _statusCode = 404;
-        _reasonPhrase = "Not Found";
+        _reasonPhrase = generateStatusMessage(_statusCode);
         _responseBody = "<html><body><h1>404 Not Found</h1></body></html>";
         _contentLength = _responseBody.size();
         return;
