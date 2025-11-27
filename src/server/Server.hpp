@@ -25,19 +25,28 @@ class Location {
 		void setReturn(int code, const std::string& url) { _return_code = code; _return_url = url; }
 		void addCgi(const std::string& ext, const std::string& path) { _cgi[ext] = path; }
 		
+        // New: Support for nested locations and alias
+        void addLocation(const Location& location) { _locations.push_back(location); }
+        void setAlias(const std::string& alias) { _alias = alias; }
+        void setClientMaxBodySize(const std::string& size) { _client_max_body_size = size; }
+
 		// Getters for debugging
 		const std::string& getPath() const { return _path; }
 		const std::string& getRoot() const { return _root; }
+        const std::string& getAlias() const { return _alias; }
 		const std::vector<std::string>& getAllowedMethods() const { return _allowed_methods; }
 		const std::string& getIndex() const { return _index; }
 		bool getAutoindex() const { return _autoindex; }
 		int getReturnCode() const { return _return_code; }
 		const std::string& getReturnUrl() const { return _return_url; }
 		const std::map<std::string, std::string>& getCgi() const { return _cgi; }
+        const std::vector<Location>& getLocations() const { return _locations; }
+        const std::string& getClientMaxBodySize() const { return _client_max_body_size; }
 		
 		void print() const {
 			std::cout << "    Location: " << _path << std::endl;
 			if (!_root.empty()) std::cout << "      root: " << _root << std::endl;
+            if (!_alias.empty()) std::cout << "      alias: " << _alias << std::endl;
 			if (!_allowed_methods.empty()) {
 				std::cout << "      methods: ";
 				for (size_t i = 0; i < _allowed_methods.size(); i++) {
@@ -46,6 +55,7 @@ class Location {
 				std::cout << std::endl;
 			}
 			if (!_index.empty()) std::cout << "      index: " << _index << std::endl;
+            if (!_client_max_body_size.empty()) std::cout << "      client_max_body_size: " << _client_max_body_size << std::endl;
 			std::cout << "      autoindex: " << (_autoindex ? "on" : "off") << std::endl;
 			if (_return_code != 0) {
 				std::cout << "      return: " << _return_code << " " << _return_url << std::endl;
@@ -56,17 +66,26 @@ class Location {
 					std::cout << "        " << it->first << " -> " << it->second << std::endl;
 				}
 			}
+            if (!_locations.empty()) {
+                std::cout << "      Nested Locations:" << std::endl;
+                for (size_t i = 0; i < _locations.size(); ++i) {
+                    _locations[i].print();
+                }
+            }
 		}
 
 	private:
 		std::string	_path;
 		std::string _root;
+        std::string _alias;
 		std::vector<std::string>	_allowed_methods;
 		std::string	_index;
 		bool	_autoindex;
 		int		_return_code;
 		std::string _return_url;
 		std::map<std::string, std::string> _cgi;
+        std::vector<Location> _locations;
+        std::string _client_max_body_size;
 };
 
 class	Server {
@@ -86,6 +105,7 @@ class	Server {
         void	addErrorPage(int code, const std::string& page) { _error_pages[code] = page; }
         void	addLocation(const Location& location) { _locations.push_back(location); }
         void	setClientMaxBodySize(const std::string& size) { _client_max_body_size = size; }
+        void	addAllowedMethod(const std::string& method) { _allowed_methods.push_back(method); }
         
         // Getters for debugging/testing
         size_t								getLocationCount() const { return _locations.size(); }
@@ -93,6 +113,7 @@ class	Server {
         const std::vector<std::string>&		getServerNames() const { return _server_names; }
         const std::map<int, std::string>&	getErrorPages() const { return _error_pages; }
         const std::string&					getClientMaxBodySize() const { return _client_max_body_size; }
+        const std::vector<std::string>&		getAllowedMethods() const { return _allowed_methods; }
 		int									getListenFd() const { return _listen_fd; }
         
         void print() const {
@@ -108,6 +129,13 @@ class	Server {
 			}
             if (!_root.empty()) std::cout << "  Root: " << _root << std::endl;
             if (!_index.empty()) std::cout << "  Index: " << _index << std::endl;
+            if (!_allowed_methods.empty()) {
+				std::cout << "  Methods: ";
+				for (size_t i = 0; i < _allowed_methods.size(); i++) {
+					std::cout << _allowed_methods[i] << (i < _allowed_methods.size() - 1 ? ", " : "");
+				}
+				std::cout << std::endl;
+			}
 			if (!_client_max_body_size.empty()) {
 				std::cout << "  Client max body size: " << _client_max_body_size << std::endl;
 			}
@@ -134,6 +162,7 @@ class	Server {
         std::map<int, std::string>	_error_pages;
         std::vector<Location>		_locations;
         std::string					_client_max_body_size; // unsigned long
+        std::vector<std::string>	_allowed_methods;
 		// members of Ivan's class ServerConfig
 		struct sockaddr_in			_server_address;
         int							_listen_fd;

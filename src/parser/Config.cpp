@@ -1,6 +1,7 @@
 #include "Config.hpp"
 #include <iostream>
 #include <algorithm>
+#include <set>
 
 Config::Config() {}
 Config::~Config() {}
@@ -13,22 +14,26 @@ const std::vector<Server>& Config::getServerConfigs() const {
 std::vector<std::string> Config::tokenize(const std::string& content) {
     std::vector<std::string> tokens;
     for (size_t i = 0; i < content.length(); ) {
+        // Skip whitespace
         if (std::isspace(content[i])) {
             i++;
             continue;
         }
+        // Skip comments
         if (content[i] == '#') {
             while (i < content.length() && content[i] != '\n') i++;
             continue;
         }
-        if (std::string("{};[],").find(content[i]) != std::string::npos) {
+        // Handle special characters as separate tokens
+        if (std::string("{};").find(content[i]) != std::string::npos) {
             tokens.push_back(std::string(1, content[i]));
             i++;
             continue;
         }
+        // Parse words/values
         size_t start = i;
         while (i < content.length() && !std::isspace(content[i]) &&
-               std::string("{};[],").find(content[i]) == std::string::npos) {
+               std::string("{};").find(content[i]) == std::string::npos) {
             i++;
         }
         tokens.push_back(content.substr(start, i - start));
@@ -70,23 +75,52 @@ void Config::parse(const std::string& config_file) {
     }
 }
 
-// Helper to parse array-like values e.g. [GET, POST, HEAD]
-static std::vector<std::string> parseArray(std::vector<std::string>& tokens) {
-    std::vector<std::string> values;
-    if (tokens.empty() || tokens.back() != "[") throw std::runtime_error("Expected '[' for methods array");
-    tokens.pop_back(); // consume '['
-
-    while (!tokens.empty() && tokens.back() != "]") {
-        if (tokens.back() != ",") {
-            values.push_back(tokens.back());
-        }
-        tokens.pop_back();
+// Helper to check if a token is a known directive (to handle missing semicolons)
+static bool isDirective(const std::string& token) {
+    static const char* directives[] = {
+        "listen", "host", "server_name", "root", "error_page", "client_max_body_size", 
+        "client_body_buffer_size", "location", "methods", "allow_methods", "index", 
+        "autoindex", "return", "cgi", "cgi_pass", "alias", "}"
+    };
+    for (size_t i = 0; i < 17; ++i) {
+        if (token == directives[i]) return true;
     }
-    if (tokens.empty() || tokens.back() != "]") throw std::runtime_error("Expected ']' to close methods array");
-    tokens.pop_back(); // consume ']'
-    return values;
+    return false;
 }
 
+// Helper to consume optional semicolon
+static void consumeSemiColon(std::vector<std::string>& tokens) {
+    if (!tokens.empty() && tokens.back() == ";") {
+        tokens.pop_back();
+    }
+}
+
+// Helper to parse array-like values e.g. [GET, POST, HEAD] or simple list GET POST
+static std::vector<std::string> parseValues(std::vector<std::string>& tokens) {
+    std::vector<std::string> values;
+    
+    if (tokens.empty()) return values;
+
+    // Handle bracket format [ GET, POST ]
+    if (tokens.back() == "[") {
+        tokens.pop_back(); // consume '['
+        while (!tokens.empty() && tokens.back() != "]") {
+            if (tokens.back() != ",") {
+                values.push_back(tokens.back());
+            }
+            tokens.pop_back();
+        }
+        if (tokens.empty() || tokens.back() != "]") throw std::runtime_error("Expected ']'");
+        tokens.pop_back(); // consume ']'
+    } else {
+        // Handle space separated format until semicolon or next directive
+        while (!tokens.empty() && tokens.back() != ";" && !isDirective(tokens.back())) {
+            values.push_back(tokens.back());
+            tokens.pop_back();
+        }
+    }
+    return values;
+}
 
 // Parses a server block from the token stream.
 void Config::parseServer(Server& server, std::vector<std::string>& tokens) {
@@ -100,32 +134,43 @@ void Config::parseServer(Server& server, std::vector<std::string>& tokens) {
         tokens.pop_back();
 
         if (directive == "listen") {
-            server.setPort(atoi(tokens.back().c_str()));
+            std::string val = tokens.back();
             tokens.pop_back();
+            size_t colonPos = val.find(':');
+            if (colonPos != std::string::npos) {
+                server.setHost(val.substr(0, colonPos));
+                server.setPort(atoi(val.substr(colonPos + 1).c_str()));
+            } else {
+                server.setPort(atoi(val.c_str()));
+            }
         } else if (directive == "host") {
             server.setHost(tokens.back());
             tokens.pop_back();
         } else if (directive == "server_name") {
-            while (!tokens.empty() && tokens.back() != ";") {
-                server.addServerName(tokens.back());
-                tokens.pop_back();
+            std::vector<std::string> names = parseValues(tokens);
+            for (size_t i = 0; i < names.size(); ++i) {
+                server.addServerName(names[i]);
             }
         } else if (directive == "root") {
             server.setRoot(tokens.back());
             tokens.pop_back();
-        } else if (directive == "error_page") {
-            std::vector<std::string> values;
-            while (!tokens.empty() && tokens.back() != ";") {
-                values.push_back(tokens.back());
-                tokens.pop_back();
+        } else if (directive == "index") {
+             std::vector<std::string> indices = parseValues(tokens);
+             if (!indices.empty()) server.setIndex(indices[0]); 
+        } else if (directive == "methods" || directive == "allow_methods") {
+            std::vector<std::string> methods = parseValues(tokens);
+            for(size_t i = 0; i < methods.size(); ++i) {
+                server.addAllowedMethod(methods[i]);
             }
+        } else if (directive == "error_page") {
+             std::vector<std::string> values = parseValues(tokens);
             if (values.size() < 2) throw std::runtime_error("Invalid error_page directive");
             std::string page = values.back();
             values.pop_back();
             for (size_t i = 0; i < values.size(); ++i) {
                 server.addErrorPage(atoi(values[i].c_str()), page);
             }
-        } else if (directive == "client_max_body_size") {
+        } else if (directive == "client_max_body_size" || directive == "client_body_buffer_size") {
             server.setClientMaxBodySize(tokens.back());
             tokens.pop_back();
         } else if (directive == "location") {
@@ -138,11 +183,7 @@ void Config::parseServer(Server& server, std::vector<std::string>& tokens) {
         } else {
             throw std::runtime_error("Unknown server directive: " + directive);
         }
-
-        if (tokens.empty() || tokens.back() != ";") {
-            throw std::runtime_error("Expected ';' after directive value for " + directive);
-        }
-        tokens.pop_back(); // Consume ";"
+        consumeSemiColon(tokens);
     }
 
     if (tokens.empty() || tokens.back() != "}") {
@@ -165,18 +206,14 @@ void Config::parseLocation(Location& location, std::vector<std::string>& tokens)
         if (directive == "root") {
             location.setRoot(tokens.back());
             tokens.pop_back();
-        } else if (directive == "methods") {
-            std::vector<std::string> methods = parseArray(tokens);
+        } else if (directive == "methods" || directive == "allow_methods") {
+            std::vector<std::string> methods = parseValues(tokens);
             for(size_t i = 0; i < methods.size(); ++i) {
                 location.addAllowedMethod(methods[i]);
             }
         } else if (directive == "index") {
-            location.setIndex(tokens.back());
-            tokens.pop_back();
-            // Also consume other potential index files
-            while (!tokens.empty() && tokens.back() != ";") {
-                tokens.pop_back();
-            }
+             std::vector<std::string> indices = parseValues(tokens);
+             if (!indices.empty()) location.setIndex(indices[0]); // Taking the first one for now, or join them?
         } else if (directive == "autoindex") {
             location.setAutoindex(tokens.back() == "on");
             tokens.pop_back();
@@ -190,14 +227,40 @@ void Config::parseLocation(Location& location, std::vector<std::string>& tokens)
             tokens.pop_back();
             location.addCgi(ext, tokens.back());
             tokens.pop_back();
+        } else if (directive == "cgi_pass") {
+            // Assume path extension derived from location path or generic
+            std::string path = tokens.back();
+            tokens.pop_back();
+            // If location path is an extension (e.g. *.php), use it
+            std::string locPath = location.getPath();
+            if (locPath.size() > 1 && locPath[0] == '*' && locPath[1] == '.') {
+                location.addCgi(locPath.substr(1), path); // Remove *
+            } else {
+                 location.addCgi("*", path); // Generic CGI
+            }
+        } else if (directive == "alias") {
+             // Alias might be empty in mac.conf (just 'alias'?) or have a path
+             if (!tokens.empty() && !isDirective(tokens.back()) && tokens.back() != "}") {
+                 location.setAlias(tokens.back());
+                 tokens.pop_back();
+             } else {
+                 location.setAlias("on"); // Treat as flag if no value?
+             }
+        } else if (directive == "client_max_body_size" || directive == "client_body_buffer_size") {
+             location.setClientMaxBodySize(tokens.back());
+             tokens.pop_back();
+        } else if (directive == "location") {
+            // Nested location
+            Location nestedLoc;
+            nestedLoc.setPath(tokens.back());
+            tokens.pop_back();
+            parseLocation(nestedLoc, tokens);
+            location.addLocation(nestedLoc);
+            continue;
         } else {
             throw std::runtime_error("Unknown location directive: " + directive);
         }
-
-        if (tokens.empty() || tokens.back() != ";") {
-            throw std::runtime_error("Expected ';' after location directive value for " + directive);
-        }
-        tokens.pop_back(); // Consume ";"
+        consumeSemiColon(tokens);
     }
 
     if (tokens.empty() || tokens.back() != "}") {
