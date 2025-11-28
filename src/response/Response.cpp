@@ -167,11 +167,11 @@ void Response::generateResponse() {
                 _contentLength = _responseBody.size();
                 return;
             } else {
-                // Directory, no index, no autoindex -> Not Found (or Forbidden)
+                // Directory, no index, no autoindex -> Forbidden
                 if (DEBUG) std::cout << RED << "Directory access forbidden (no index, autoindex off)" << RESET << std::endl;
-                _statusCode = 404;
+                _statusCode = 403;
                 _reasonPhrase = generateStatusMessage(_statusCode);
-                _responseBody = "<html><body><h1>404 Not Found</h1></body></html>";
+                _responseBody = "<html><body><h1>403 Forbidden</h1><p>Directory listing denied.</p></body></html>";
                 _contentLength = _responseBody.size();
                 return;
             }
