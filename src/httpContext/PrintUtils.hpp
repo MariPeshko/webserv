@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <map>
+#include "../request/Request.hpp"
 
 // ANSI color codes
 #define BLUE "\033[34m"
@@ -13,16 +14,40 @@ class PrintUtils {
 
 	public:
 
-	/**
-	 * @brief Prints the key-value pairs of a std::map<std::string, std::string> to std::cout.
-	 * 
-	 * @param map The map to be printed.
-	 */
 	static void printStringMap(const std::map<std::string, std::string>& map) {
 		for (std::map<std::string, std::string>::const_iterator it = map.begin(); it != map.end(); ++it) {
 			std::cout << BLUE << "'" << it->first << "': '";
 			std::cout << it->second << "'" << RESET << std::endl;
 		}
+	}
+
+	static void printRequestHeaders(const Request& req) {
+		std::cout << "--- Request Headers ---" << std::endl;
+		// Directly accesses the private _headers member of the Request class
+		for (std::map<std::string, std::string>::const_iterator it = req._headers.begin(); it != req._headers.end(); ++it) {
+			std::cout << BLUE << "'" << it->first << "': '";
+			std::cout << it->second << "'" << RESET << std::endl;
+		}
+		std::cout << "-----------------------" << std::endl;
+	}
+
+	static void printRequestLineInfo(const Request& req) {
+		std::cout << "--- Request Line Info ---" << std::endl;
+
+		// Convert method enum to string for printing
+		std::string methodStr;
+		switch (req._method) {
+			case Request::GET:    methodStr = "GET"; break;
+			case Request::POST:   methodStr = "POST"; break;
+			case Request::DELETE: methodStr = "DELETE"; break;
+			default:              methodStr = "INVALID"; break;
+		}
+
+		std::cout << BLUE << "Method enum: '" << methodStr << "'" << RESET << std::endl;
+		std::cout << BLUE << "Method str '" << req.getMethod() << "'" << RESET << std::endl;
+		std::cout << BLUE << "URI: '" << req._uri << "'" << RESET << std::endl;
+		std::cout << BLUE << "Version: '" << req._httpVersion << "'" << RESET << std::endl;
+		std::cout << "-------------------------" << std::endl;
 	}
 
 };

@@ -82,7 +82,15 @@ std::map<std::string, std::string>	Request::getHeaders() const {
 	return _headers;
 }
 
-const std::string &		Request::getHeaderValue(std::string header_name) const {
+// checks if the key "content-length" is present
+bool	Request::isContentLengthHeader() const {
+	if (_headers.find("content-length") == _headers.end())
+		return false;
+	else
+		return true;
+}
+
+const std::string&	Request::getHeaderValue(const std::string header_name) const {
 	
 	static const std::string	empty = "";
 	std::map<std::string, std::string>::const_iterator it;

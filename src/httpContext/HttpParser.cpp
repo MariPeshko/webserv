@@ -5,6 +5,13 @@ HttpParser::HttpParser() { }
 
 HttpParser::~HttpParser() { }
 
+bool	HttpParser::parseBody(const std::string& bodyBlock, Request& req) {
+	(void)bodyBlock;
+	(void)req;
+	return true;
+}
+
+
 /**
  * Parser for a request line of the request.
  * 
@@ -125,6 +132,5 @@ bool HttpParser::parseHeaders(const std::string& headersBlock,
 		req.addHeader(name, value);
 
 	}
-	//PrintUtils::printStringMap(req.getHeaders());
 	return true;
 }

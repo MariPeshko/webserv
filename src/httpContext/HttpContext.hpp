@@ -14,6 +14,9 @@
 # include <netinet/in.h>
 # include <sstream>
 
+#define YELLOW "\033[33m"
+#define RESET "\033[0m"
+
 /**
  * Briefly: HTTP (request) state + Request/Response
  * 
@@ -42,9 +45,10 @@ class	HttpContext {
 			REQUEST_ERROR
 		};		
 		
-		void	parseRequest();
-		void	parseHeaders(std::string headers);
-		void	parseBody(std::string body);
+		void	requestParsingStateMachine();
+		// findAndParseReqLine()
+		bool	findAndParseHeaders(std::string &buf);
+		bool	isBodyToRead();
 
 		bool	isRequestComplete() const;
 		bool	isRequestError() const;

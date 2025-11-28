@@ -208,7 +208,7 @@ void	ServerManager::handleClientData(size_t i) {
 		return ;
 	}
 
-	ctx.parseRequest();
+	ctx.requestParsingStateMachine();
 	// Only parse and respond if the request is complete
 	if (ctx.isRequestComplete() || ctx.isRequestError()) {
 		// Check if it is cgi

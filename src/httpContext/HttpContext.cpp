@@ -1,4 +1,9 @@
 #include "HttpContext.hpp"
+#include "PrintUtils.hpp"
+
+using std::cout;
+using std::endl;
+using std::string;
 
 // Parametic constructor
 HttpContext::HttpContext(Connection& conn, Server& server) :
@@ -27,27 +32,83 @@ Server&     HttpContext::server()     { return _server_config; }
 Request&    HttpContext::request()    { return _request; }
 Response&   HttpContext::response()   { return _response; }
 
+bool	HttpContext::findAndParseHeaders(string &buf) {
+	size_t pos = buf.find("\r\n\r\n");
+	if (pos == string::npos) {
+		return false;
+	}
+	string	rawHeaders = buf.substr(0, pos);
+	buf.erase(0, pos + 4);
+	if (HttpParser::parseHeaders(rawHeaders, request()) == false) {
+		_state = REQUEST_ERROR;
+		return false;
+	} else {
+		return true;
+	}
+}
+
+bool	HttpContext::isBodyToRead() {
+
+	if(request().isContentLengthHeader()) {
+
+		const string& cl = request().getHeaderValue("content-length");
+		if (cl.empty()) {
+		_state = REQUEST_COMPLETE;
+		return false;
+		}
+		// Reject non-digit characters early and manual accumulation
+		size_t	need = 0;
+		bool	ok = true;
+		for (size_t i = 0; i < cl.size(); ++i) {
+			char c = cl[i];
+			if (c < '0' || c > '9') {
+				ok = false; break;
+			}
+			need = need * 10 + static_cast<size_t>(c - '0');
+			// TODO (пізніше): перевірити верхню межу й ліміти
+		}
+		if (!ok) {
+			_state = REQUEST_ERROR;
+			return false;
+		}
+		if (need == 0) {
+			_state = REQUEST_COMPLETE;
+			return false;
+		} else {
+			_state = READING_BODY;
+			_expectedBodyLen = need;
+			return true;
+		}
+	} else 
+	// check Transfer-Encoding?
+	{
+		_state = REQUEST_COMPLETE;
+		return false;
+	}
+}
+
 /**
  * REQUEST PARSER STATE MACHINE. It processes the _request_buffer
  * and transitions the client's state. It will loop as long as it can
  * make progress (e.g., parsing both request line and headers if they
  * are both in the buffer).
  */
-void	HttpContext::parseRequest() {
+void	HttpContext::requestParsingStateMachine() {
 	
-	std::string	&buf = connection().getBuffer();
+	string	&buf = connection().getBuffer();
 	bool		can_parse = true;
 
 	while (can_parse) {
 		switch (_state) {
 			case REQUEST_LINE: {
 				size_t	pos = buf.find("\r\n");
-				if (pos == std::string::npos) {
+				if (pos == string::npos) {
 					can_parse = false; break;
 				}
-				std::string	line = buf.substr(0, pos);
+				string	line = buf.substr(0, pos);
 				buf.erase(0, pos + 2);
 				if (HttpParser::parseRequestLine(line, request()) == true) {
+					PrintUtils::printRequestLineInfo(request());
 					_state = READING_HEADERS;
 					continue;
 				} else {
@@ -56,48 +117,19 @@ void	HttpContext::parseRequest() {
 				}
 			}
 			case READING_HEADERS : {
-				size_t pos = buf.find("\r\n\r\n");
-				if (pos == std::string::npos) {
+				if (!findAndParseHeaders(buf)) {
 					can_parse = false; break;
 				}
-				// TODO: Parse all headers from the header block
-				std::string	rawHeaders = buf.substr(0, pos);
-				buf.erase(0, pos + 4);
-				if (HttpParser::parseHeaders(rawHeaders, request()) == false) {
-					_state = REQUEST_ERROR;
+				PrintUtils::printRequestHeaders(request());
+
+				// TODO: Check for Content-Length or Transfer-Encoding
+				if (isBodyToRead()) {
+					cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
+					continue;
+				} else {
+					cout << YELLOW << "requestParsingStateMachine: no body to read" << RESET << endl;
 					can_parse = false; break;
 				}
-
-				const std::string& cl = request().getHeaderValue("Content-Length");
-				if (cl.empty()) {
-					_state = REQUEST_COMPLETE;
-					can_parse = false; break;
-				}
-
-				// Reject non-digit characters early and Manual accumulation
-				size_t	need = 0;
-				bool	ok = true;
-				for (size_t i = 0; i < cl.size(); ++i) {
-					char c = cl[i];
-					if (c < '0' || c > '9') {
-						ok = false; break;
-					}
-					need = need * 10 + static_cast<size_t>(c - '0');
-					// TODO (пізніше): перевірити верхню межу й ліміти
-				}
-				if (!ok) {
-					_state = REQUEST_ERROR;
-					can_parse = false;
-					break;
-				}
-
-				_expectedBodyLen = need;
-				_state = READING_BODY;
-				continue;
-
-				// // TODO: Check for Content-Length or Transfer-Encoding
-				// First step(it will be complicated):
-				// check for Content-Length
 			}
 			case READING_BODY : {
 				// If using Content-Length:
@@ -109,9 +141,11 @@ void	HttpContext::parseRequest() {
 					can_parse = false;
 					break;
 				}
-				std::string body = buf.substr(0, _expectedBodyLen);
+				string body = buf.substr(0, _expectedBodyLen);
 				buf.erase(0, _expectedBodyLen);
-				parseBody(body);
+
+				HttpParser::parseBody(body, request());
+
 				_state = REQUEST_COMPLETE;
 				can_parse = false;
 				// If using chunked encoding:
@@ -127,25 +161,13 @@ void	HttpContext::parseRequest() {
 				break;
 			}
 			default : {
-				std::cerr << "HttpContext class message: Unknown state of requst parsing" << std::endl;
+				std::cerr << "HttpContext class message: Unknown state of requst parsing" << endl;
 				_state = REQUEST_ERROR;
 				can_parse = false;
 				break;
 			}
 		}
 	}
-}
-
-void	HttpContext::parseHeaders(std::string headers) {
-	//std::cout << "Parsing request headers" << std::endl;
-	(void)headers;
-	//std::cout << headers.substr(0, 20) << std::endl;
-}
-
-void	HttpContext::parseBody(std::string body) {
-	//std::cout << "Parsing request body" << std::endl;
-	(void)body;
-	//std::cout << body.substr(0, 20) << std::endl;
 }
 
 /**
@@ -174,8 +196,8 @@ void	HttpContext::resetState() {
 	_state = REQUEST_LINE;
 }
 
-std::string	HttpContext::getResponseString() {
-	std::string	body = _response.getResponseBody();
+string	HttpContext::getResponseString() {
+	string	body = _response.getResponseBody();
 	short		status_code = _response.getStatusCode();
 	size_t		content_length = _response.getContentLength();
 	
@@ -190,8 +212,8 @@ std::string	HttpContext::getResponseString() {
 	oss << "Connection: keep-alive\r\n"; // Optional
 
 	 // Add custom headers (like Location for redirects)
-    const std::map<std::string, std::string>& headers = response().getHeaders();
-    for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
+    const std::map<string, string>& headers = response().getHeaders();
+    for (std::map<string, string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
         oss << it->first << ": " << it->second << "\r\n";
     }
 

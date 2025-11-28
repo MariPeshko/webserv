@@ -7,8 +7,12 @@
 # include <iostream>
 # include <sstream>
 
+class	PrintUtils;
+
 // Data object that holds parsed request
 class	Request {
+	friend class PrintUtils;
+
 	public:
 		Request();
 		~Request();
@@ -32,12 +36,13 @@ class	Request {
 		// getters
 		bool				getRequestLineFormatValid() const;
 		bool				getHeadersFormatValid() const;
+		bool				isContentLengthHeader() const;
 		std::string			getMethod() const;
 		std::string			getUri() const;
 		std::string			getVersion() const;
 		std::string			getBody() const;
 		std::map<std::string, std::string>	getHeaders() const;
-		const std::string &	getHeaderValue(std::string header_name) const;
+		const std::string &	getHeaderValue(const std::string header_name) const;
 
 	private:
 		bool						_validFormatReqLine;
