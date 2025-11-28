@@ -74,6 +74,7 @@ class	Response {
 		std::string		_resourcePath;
 
 		std::string			getIndexFromLocation();
+		std::string			getErrorPageContent(int code);
 
 
 		//?? for image or binary data response
