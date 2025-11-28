@@ -3,7 +3,8 @@
 Request::Request() :
 	_validFormatReqLine(false),
 	_validFormatHeaders(false),
-	_method(INVALID)
+	_method(INVALID),
+	_bodyChunked(false)
 { }
 
 Request::~Request() { }
@@ -70,6 +71,10 @@ std::string	Request::getMethod() const {
 	}
 }
 
+void	Request::setChunked(bool value) {
+	_bodyChunked = value;
+}
+
 std::string Request::getUri() const {
 	return _uri;
 }
@@ -85,6 +90,14 @@ std::map<std::string, std::string>	Request::getHeaders() const {
 // checks if the key "content-length" is present
 bool	Request::isContentLengthHeader() const {
 	if (_headers.find("content-length") == _headers.end())
+		return false;
+	else
+		return true;
+}
+
+// checks if the key "transfer-encoding" is present
+bool	Request::isTransferEncodingHeader() const {
+	if (_headers.find("transfer-encoding") == _headers.end())
 		return false;
 	else
 		return true;

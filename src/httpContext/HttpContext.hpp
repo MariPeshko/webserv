@@ -40,7 +40,8 @@ class	HttpContext {
 		enum	e_parse_state {
 			REQUEST_LINE,
 			READING_HEADERS,
-			READING_BODY,
+			READING_FIXED_BODY, // For Content-Length
+			READING_CHUNKED_BODY, // For Transfer-Encoding
 			REQUEST_COMPLETE,
 			REQUEST_ERROR
 		};		

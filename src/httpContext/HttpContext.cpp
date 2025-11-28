@@ -47,14 +47,32 @@ bool	HttpContext::findAndParseHeaders(string &buf) {
 	}
 }
 
+/**
+ * RFC note: If a message is received with both a Transfer-Encoding 
+ * header field and a Content-Length header field, the latter MUST be ignored.
+ * 
+ * Certain request methods like GET and DELETE typically do not 
+ * have a message body.
+ */
 bool	HttpContext::isBodyToRead() {
 
-	if(request().isContentLengthHeader()) {
+	std::string	method = request().getMethod();
+	if (method == "GET" || method == "DELETE") {
+		request().setChunked(true);
+		_state = REQUEST_COMPLETE; return false;
+	}
+
+	if(request().isTransferEncodingHeader()) {
+		if (request().getHeaderValue("tranfer-encoding") != "chunked") {
+			_state = REQUEST_ERROR; return false;
+		}
+		cout << "isBodyToRead(): Transfer-Encoding header is here" << endl;
+		_state = READING_CHUNKED_BODY; return true;
+	} else if(request().isContentLengthHeader()) {
 
 		const string& cl = request().getHeaderValue("content-length");
 		if (cl.empty()) {
-		_state = REQUEST_COMPLETE;
-		return false;
+		_state = REQUEST_COMPLETE; return false;
 		}
 		// Reject non-digit characters early and manual accumulation
 		size_t	need = 0;
@@ -68,23 +86,18 @@ bool	HttpContext::isBodyToRead() {
 			// TODO (пізніше): перевірити верхню межу й ліміти
 		}
 		if (!ok) {
-			_state = REQUEST_ERROR;
-			return false;
+			_state = REQUEST_ERROR;	return false;
 		}
 		if (need == 0) {
-			_state = REQUEST_COMPLETE;
-			return false;
+			_state = REQUEST_COMPLETE; return false;
 		} else {
-			_state = READING_BODY;
+			_state = READING_FIXED_BODY;
 			_expectedBodyLen = need;
 			return true;
 		}
-	} else 
-	// check Transfer-Encoding?
-	{
-		_state = REQUEST_COMPLETE;
-		return false;
 	}
+	//No body-defining headers found
+	_state = REQUEST_COMPLETE; return false;
 }
 
 /**
@@ -131,12 +144,15 @@ void	HttpContext::requestParsingStateMachine() {
 					can_parse = false; break;
 				}
 			}
-			case READING_BODY : {
+			case READING_FIXED_BODY : {
 				// If using Content-Length:
-				//   - Check if client.request_buffer.size() >= content_length
+				//   - You append the read data to your _request.body string.
+				//   - You keep track of how many bytes you have read.
 				//   - If yes: request is complete. client.state = REQUEST_COMPLETE; request_is_ready = true;
-				//   - request.parseBody()
-				//   - Remove body from the buffer
+				//   - parseBody()
+				//   - Check if client.request_buffer.size() >= content_length; REQUEST_COMPLETE
+				//   - ?Remove body from the buffer
+
 				if (buf.size() < _expectedBodyLen) {
 					can_parse = false;
 					break;
@@ -148,12 +164,28 @@ void	HttpContext::requestParsingStateMachine() {
 
 				_state = REQUEST_COMPLETE;
 				can_parse = false;
-				// If using chunked encoding:
-				//   - Parse chunks until the final "0\r\n\r\n" is found.
-				//   - request.parseBody()
-				//   - Remove body from the buffer
-				//   - If final chunk found: client.state = REQUEST_COMPLETE; request_is_ready = true;
+				
 				break ;
+			}
+			case READING_CHUNKED_BODY : {
+				// If using chunked encoding:
+				//   - The format is a loop of <chunk-size-hex>\r\n<chunk-data>\r\n
+				//   - Parse chunks until the final "0\r\n\r\n" is found.
+				//   - Your Logic: This requires its own mini-state machine.
+				//   - Read Chunk Size: Read from the socket until you find a \r\n. 
+				//   - The line before it is the size of the next chunk, written in hexadecimal.
+				//   - Parse Chunk Size: Convert the hexadecimal string to an integer (chunk_size).
+				//   - Check for End: If chunk_size is 0, this is the last chunk. You should 
+				//   - read the final \r\n and then transition the state to REQUEST_COMPLETE.
+	            //   - Read Chunk Data: If chunk_size > 0, read exactly chunk_size bytes 
+				//   - from the socket. This is the data for the current chunk. Append it to 
+				//     your _request.body.
+				//   - parseBody()
+				//   - Read Trailing CRLF: After reading the chunk data, you must read and 
+				//   - discard the trailing \r\n that follows every chunk.
+				//   - Repeat: Go back to step 1 to process the next chunk.
+				//   - If final chunk found: client.state = REQUEST_COMPLETE; request_is_ready = true;
+				break;
 			}
 			case REQUEST_COMPLETE :
 			case REQUEST_ERROR  : {
@@ -212,10 +244,10 @@ string	HttpContext::getResponseString() {
 	oss << "Connection: keep-alive\r\n"; // Optional
 
 	 // Add custom headers (like Location for redirects)
-    const std::map<string, string>& headers = response().getHeaders();
-    for (std::map<string, string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
-        oss << it->first << ": " << it->second << "\r\n";
-    }
+	const std::map<string, string>& headers = response().getHeaders();
+	for (std::map<string, string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
+		oss << it->first << ": " << it->second << "\r\n";
+	}
 
 	// 3. Empty Line (End of headers)
 	oss << "\r\n";
