@@ -44,7 +44,7 @@ const Location* Response::matchPathToLocation() {
         if (DEBUG) std::cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << std::endl;
         
         // Check if request URI starts with this location path
-        if (_request->getUri().find(locPath) == 0) {
+        if (_request->getUri() == locPath) {
             if (DEBUG) std::cout << GREEN << "    -> Match found!" << RESET << std::endl;
             // We want the longest match (e.g. location /images/ vs location /)
             if (locPath.length() > bestMatchLen) {
@@ -87,7 +87,7 @@ void Response::generateResponse() {
         if (DEBUG) std::cout << RED << "No location matched." << RESET << std::endl;
         _statusCode = 404;
         _reasonPhrase = generateStatusMessage(_statusCode);
-        _responseBody = "<html><body><h1>404 Not Found</h1><p>No matching location found.</p></body></html>";
+        _responseBody = getErrorPageContent(_statusCode);
         _contentLength = _responseBody.size();
         return;
     }
@@ -106,7 +106,7 @@ void Response::generateResponse() {
             if (DEBUG) std::cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << std::endl;
             _statusCode = 405;
             _reasonPhrase = generateStatusMessage(_statusCode);
-            _responseBody = "<html><body><h1>405 Method Not Allowed</h1></body></html>";
+            _responseBody = getErrorPageContent(_statusCode);
             _contentLength = _responseBody.size();
             return;
         }
@@ -163,7 +163,7 @@ void Response::generateResponse() {
                 if (DEBUG) std::cout << RED << "Autoindex generation failed." << RESET << std::endl;
                 _statusCode = 500;
                 _reasonPhrase = generateStatusMessage(_statusCode);
-                _responseBody = "<html><body><h1>500 Internal Server Error</h1><p>Autoindex generation failed.</p></body></html>";
+                _responseBody = getErrorPageContent(_statusCode);
                 _contentLength = _responseBody.size();
                 return;
             } else {
@@ -171,7 +171,7 @@ void Response::generateResponse() {
                 if (DEBUG) std::cout << RED << "Directory access forbidden (no index, autoindex off)" << RESET << std::endl;
                 _statusCode = 403;
                 _reasonPhrase = generateStatusMessage(_statusCode);
-                _responseBody = "<html><body><h1>403 Forbidden</h1><p>Directory listing denied.</p></body></html>";
+                _responseBody = getErrorPageContent(_statusCode);
                 _contentLength = _responseBody.size();
                 return;
             }
@@ -185,7 +185,7 @@ void Response::generateResponse() {
         if (DEBUG) std::cout << RED << "File not found: " << path << RESET << std::endl;
         _statusCode = 404;
         _reasonPhrase = generateStatusMessage(_statusCode);
-        _responseBody = "<html><body><h1>404 Not Found</h1></body></html>";
+        _responseBody = getErrorPageContent(_statusCode);
         _contentLength = _responseBody.size();
         return;
     }
@@ -220,4 +220,19 @@ std::string Response::getReasonPhrase() const {
 
 const std::map<std::string, std::string>& Response::getHeaders() const {
     return _headers;
+}
+
+std::string Response::getErrorPageContent(int code) {
+	const std::map<int, std::string>& errorPages = _server_config.getErrorPages();
+	std::map<int, std::string>::const_iterator it = errorPages.find(code);
+	
+	if (it != errorPages.end()) {
+		std::ifstream file(it->second.c_str());
+		if (file.is_open()) {
+			std::ostringstream ss;
+			ss << file.rdbuf();
+			return ss.str();
+		}
+	}
+	return "";
 }
