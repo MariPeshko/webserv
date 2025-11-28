@@ -25,7 +25,7 @@ std::vector<std::string> Config::tokenize(const std::string& content) {
             continue;
         }
         // Handle special characters as separate tokens
-        if (std::string("{};").find(content[i]) != std::string::npos) {
+        if (std::string("{};[],").find(content[i]) != std::string::npos) {
             tokens.push_back(std::string(1, content[i]));
             i++;
             continue;
@@ -33,7 +33,7 @@ std::vector<std::string> Config::tokenize(const std::string& content) {
         // Parse words/values
         size_t start = i;
         while (i < content.length() && !std::isspace(content[i]) &&
-               std::string("{};").find(content[i]) == std::string::npos) {
+               std::string("{};[],").find(content[i]) == std::string::npos) {
             i++;
         }
         tokens.push_back(content.substr(start, i - start));
