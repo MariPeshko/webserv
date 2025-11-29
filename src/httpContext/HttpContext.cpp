@@ -63,7 +63,7 @@ bool	HttpContext::isBodyToRead() {
 	}
 
 	if(request().isTransferEncodingHeader()) {
-		if (request().getHeaderValue("tranfer-encoding") != "chunked") {
+		if (request().getHeaderValue("transfer-encoding") != "chunked") {
 			_state = REQUEST_ERROR; return false;
 		}
 		cout << "isBodyToRead(): Transfer-Encoding header is here" << endl;
@@ -121,7 +121,7 @@ void	HttpContext::requestParsingStateMachine() {
 				string	line = buf.substr(0, pos);
 				buf.erase(0, pos + 2);
 				if (HttpParser::parseRequestLine(line, request()) == true) {
-					PrintUtils::printRequestLineInfo(request());
+					//PrintUtils::printRequestLineInfo(request());
 					_state = READING_HEADERS;
 					continue;
 				} else {
@@ -133,39 +133,45 @@ void	HttpContext::requestParsingStateMachine() {
 				if (!findAndParseHeaders(buf)) {
 					can_parse = false; break;
 				}
-				PrintUtils::printRequestHeaders(request());
+				//PrintUtils::printRequestHeaders(request());
 
 				// TODO: Check for Content-Length or Transfer-Encoding
 				if (isBodyToRead()) {
-					cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
+					//cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
 					continue;
 				} else {
-					cout << YELLOW << "requestParsingStateMachine: no body to read" << RESET << endl;
+					//cout << YELLOW << "requestParsingStateMachine: no body to read" << RESET << endl;
 					can_parse = false; break;
 				}
 			}
 			case READING_FIXED_BODY : {
-				// If using Content-Length:
-				//   - You append the read data to your _request.body string.
-				//   - You keep track of how many bytes you have read.
-				//   - If yes: request is complete. client.state = REQUEST_COMPLETE; request_is_ready = true;
-				//   - parseBody()
-				//   - Check if client.request_buffer.size() >= content_length; REQUEST_COMPLETE
-				//   - ?Remove body from the buffer
 
-				if (buf.size() < _expectedBodyLen) {
-					can_parse = false;
-					break;
-				}
-				string body = buf.substr(0, _expectedBodyLen);
-				buf.erase(0, _expectedBodyLen);
+				const size_t	bodySize = request().getBody().size();
+                size_t			remaining;
+                if (_expectedBodyLen > bodySize) {
+                    remaining = _expectedBodyLen - bodySize;
+                } else {
+                    remaining = 0;
+                }
+                if (remaining == 0) {
+                    _state = REQUEST_COMPLETE;
+                    can_parse = false; break;
+                }
+				const size_t take = std::min(remaining, buf.size());
+                if (take == 0) { // need more data from socket
+                    can_parse = false; break;
+                }
 
-				HttpParser::parseBody(body, request());
+                HttpParser::appendToBody(buf, take, request());
+                buf.erase(0, take);
 
-				_state = REQUEST_COMPLETE;
-				can_parse = false;
-				
-				break ;
+                if (request().getBody().size() == _expectedBodyLen) {
+                    HttpParser::parseFixBody(request().getBody(), request());
+                    _state = REQUEST_COMPLETE;
+                    can_parse = false;
+                }
+				//PrintUtils::printBody(request());
+                break;
 			}
 			case READING_CHUNKED_BODY : {
 				// If using chunked encoding:
@@ -226,6 +232,7 @@ void	HttpContext::resetState() {
 	response().reset();
 	connection().getBuffer().clear();
 	_state = REQUEST_LINE;
+	_expectedBodyLen = 0;
 }
 
 string	HttpContext::getResponseString() {

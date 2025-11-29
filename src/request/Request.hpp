@@ -42,7 +42,8 @@ class	Request {
 		std::string			getMethod() const;
 		std::string			getUri() const;
 		std::string			getVersion() const;
-		std::string			getBody() const;
+		std::string&		getBody();
+		const std::string&	getBody() const;
 		std::map<std::string, std::string>	getHeaders() const;
 		const std::string &	getHeaderValue(const std::string header_name) const;
 

@@ -14,6 +14,11 @@ class PrintUtils {
 
 	public:
 
+	static void	printBody(const Request& req) {
+		std::cout << "<< REQUEST BODY >> " << std::endl;
+		std::cout << BLUE << req.getBody() << RESET << std::endl;
+	}
+
 	static void printStringMap(const std::map<std::string, std::string>& map) {
 		for (std::map<std::string, std::string>::const_iterator it = map.begin(); it != map.end(); ++it) {
 			std::cout << BLUE << "'" << it->first << "': '";

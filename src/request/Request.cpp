@@ -116,6 +116,10 @@ const std::string&	Request::getHeaderValue(const std::string header_name) const 
 	}
 }
 
-std::string Request::getBody() const {
+std::string&		Request::getBody() {
+	return _body;
+}
+
+const std::string&	Request::getBody() const {
 	return _body;
 }
