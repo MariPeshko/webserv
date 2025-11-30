@@ -7,7 +7,9 @@ HttpContext::HttpContext(Connection& conn, Server& server) :
 	_request(),
 	_response(server),
 	_state(REQUEST_LINE),
-	_expectedBodyLen(0)
+	_expectedBodyLen(0),
+	_responseBuffer(""),
+	_bytesSent(0)
 	{ }
 
 // Copy constructor
@@ -17,7 +19,9 @@ HttpContext::HttpContext(const HttpContext &other) :
 	_request(other._request),
 	_response(other._server_config),
 	_state(other._state),
-	_expectedBodyLen(other._expectedBodyLen)
+	_expectedBodyLen(other._expectedBodyLen),
+	_responseBuffer(other._responseBuffer),
+	_bytesSent(other._bytesSent)
 { }
 
 HttpContext::~HttpContext() { }
@@ -172,6 +176,8 @@ void	HttpContext::resetState() {
 	response().reset();
 	connection().getBuffer().clear();
 	_state = REQUEST_LINE;
+	_responseBuffer = "";
+	_bytesSent = 0;
 }
 
 std::string	HttpContext::getResponseString() {
@@ -210,4 +216,25 @@ HttpContext::e_parse_state	HttpContext::getParserState() const {
 HttpContext& HttpContext::operator=(const HttpContext& other) {
 	(void)other;
 	return *this;
+}
+
+std::string HttpContext::getResponseBuffer() const {
+	return _responseBuffer;
+}
+
+size_t HttpContext::getBytesSent() const {
+	return _bytesSent;
+}
+
+void HttpContext::setResponseBuffer(const std::string& buffer) {
+	_responseBuffer = buffer;
+	_bytesSent = 0;
+}
+
+void HttpContext::addBytesSent(size_t bytes) {
+	_bytesSent += bytes;
+}
+
+bool HttpContext::isResponseComplete() const {
+	return _bytesSent >= _responseBuffer.size();
 }

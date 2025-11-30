@@ -55,6 +55,13 @@ class	HttpContext {
 		std::string		getResponseString();
 		e_parse_state	getParserState() const;
 
+		// Response buffer for POLLOUT
+		std::string		getResponseBuffer() const;
+		size_t			getBytesSent() const;
+		void			setResponseBuffer(const std::string& buffer);
+		void			addBytesSent(size_t bytes);
+		bool			isResponseComplete() const;
+
 	private:
 		HttpContext();	// no default construction
 		HttpContext& operator=(const HttpContext& other);  // no assignment
@@ -66,6 +73,10 @@ class	HttpContext {
 
 		e_parse_state	_state;
 		size_t			_expectedBodyLen;
+		
+		// For non-blocking response sending
+		std::string		_responseBuffer;
+		size_t			_bytesSent;
 };
 
 #endif

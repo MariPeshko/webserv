@@ -43,8 +43,8 @@ const Location* Response::matchPathToLocation() {
         const std::string& locPath = locations[i].getPath();
         if (DEBUG) std::cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << std::endl;
         
-        // Check if request URI starts with this location path
-        if (_request->getUri() == locPath) {
+        // Check if request URI starts with this location path (prefix match)
+        if (_request->getUri().compare(0, locPath.length(), locPath) == 0) {
             if (DEBUG) std::cout << GREEN << "    -> Match found!" << RESET << std::endl;
             // We want the longest match (e.g. location /images/ vs location /)
             if (locPath.length() > bestMatchLen) {
