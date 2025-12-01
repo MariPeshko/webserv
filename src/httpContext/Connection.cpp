@@ -30,14 +30,16 @@ ssize_t			Connection::receiveData() {
 		_request_buffer.append(buf, nbytes);
 	}
 	// debugging
-	std::cout << "pollserver: recv " << nbytes << " bytes from fd " << getFd() << std::endl;
+	std::cout << "server: recv " << nbytes << " bytes from fd " << getFd() << std::endl;
 	if (nbytes > 0) {
 		//We got some good data from a client (broadcast to other clients)
-		std::cout << "message from " << getFd() << ":\n";
+		std::cout << YELLOW << "message from " << getFd() << ":\n" << RESET;
 		int	to_print;
 		if (nbytes < 100) to_print = nbytes;
 		else to_print = 100;
 		std::cout.write(buf, to_print);
+		if (to_print >= 100)
+			std::cout << "\n(...message is limited to 100 bytes..))\n";
 		std::cout << std::endl;
 	}
 	

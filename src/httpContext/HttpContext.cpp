@@ -71,7 +71,7 @@ bool	HttpContext::isBodyToRead() {
 		if (request().getHeaderValue("transfer-encoding") != "chunked") {
 			_state = REQUEST_ERROR; return false;
 		}
-		cout << YELLOW << "isBodyToRead(): Transfer-Encoding header is here" << endl;
+		//cout << YELLOW << "isBodyToRead(): Transfer-Encoding header is here" << endl;
 		_state = READING_CHUNKED_BODY; return true;
 	} else if(request().isContentLengthHeader()) {
 
@@ -193,7 +193,7 @@ void	HttpContext::requestParsingStateMachine() {
 				//PrintUtils::printRequestHeaders(request());
 				// TODO: Check for Content-Length or Transfer-Encoding
 				if (isBodyToRead()) {
-					cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
+					//cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
 					continue;
 				} else {
 					//cout << YELLOW << "requestParsingStateMachine: no body to read" << RESET << endl;
@@ -226,21 +226,25 @@ void	HttpContext::requestParsingStateMachine() {
 					_state = REQUEST_COMPLETE;
 					can_parse = false;
 				}
-				//PrintUtils::printBody(request());
 				break;
 			}
 			case READING_CHUNKED_BODY : {
 				while (chunkedBodyStateMachine(buf)) {
 					// The body of the loop can be empty.
 				}
-				PrintUtils::printBody(request());
 				if (_state != REQUEST_COMPLETE && _state != REQUEST_ERROR) {
 					can_parse = false; // Pause parsing if we're waiting for more data
 				}
 				break;
 			}
 
-			case REQUEST_COMPLETE :
+			case REQUEST_COMPLETE : {
+				// debuggin
+				/* if (request().getBody().size() != 0)
+					PrintUtils::printBody(request()); */
+				can_parse = false;
+				break;
+			}
 			case REQUEST_ERROR  : {
 				can_parse = false;
 				break;

@@ -131,10 +131,12 @@ void	ServerManager::handleNewConnection(int listener) {
 
 	uint32_t ip = ntohl(remoteaddr.sin_addr.s_addr);
 	std::string ip_str = ipv4_to_string(ip);
-	uint16_t port = ntohs(remoteaddr.sin_port);
+	//uint16_t port = ntohs(remoteaddr.sin_port);
 		
-	std::cout << "pollserver: new connection from " << ip_str << ":" << port
-		<< " on socket " << newfd << " (accepted by listener " << listener << ")" << std::endl;
+	std::cout << GREEN << "server: new connection";
+	//from " << ip_str << ":" << port
+	std::cout << " on socket " << newfd << " (accepted by listener ";
+	std::cout << listener << ")" << RESET << std::endl;
 }
 
 void	ServerManager::sendResponse(int fd, HttpContext& ctx) {
@@ -159,14 +161,14 @@ void	ServerManager::handleErrorRevent(int fd, size_t i) {
 
 /** Client socket error. Error message and cleanup */
 void	ServerManager::handleClientError(int fd, size_t i) {
-	std::cout << "pollserver: socket " << fd << " error after recv()" << std::endl;
+	std::cout << "server: socket " << fd << " error after recv()" << std::endl;
 	removeClient(fd,i);
 	
 }
 
 /** Client socket is closed. Error message and cleanup */
 void	ServerManager::handleClientHungup(int fd, size_t i) {
-	std::cout << "pollserver: socket " << fd << " hung up" << std::endl;
+	std::cout << "server: socket " << fd << " hung up" << std::endl;
 	removeClient(fd,i);
 }
 
