@@ -13,7 +13,9 @@ HttpContext::HttpContext(Connection& conn, Server& server) :
 	_request(),
 	_response(server),
 	_state(REQUEST_LINE),
-	_expectedBodyLen(0)
+	_expectedBodyLen(0),
+	_chunkState(READING_CHUNK_SIZE),
+	_chunkSize(0)
 	{ }
 
 // Copy constructor
@@ -23,7 +25,9 @@ HttpContext::HttpContext(const HttpContext &other) :
 	_request(other._request),
 	_response(other._server_config),
 	_state(other._state),
-	_expectedBodyLen(other._expectedBodyLen)
+	_expectedBodyLen(other._expectedBodyLen),
+	_chunkState(other._chunkState),
+	_chunkSize(other._chunkSize)
 { }
 
 HttpContext::~HttpContext() { }
@@ -59,7 +63,7 @@ bool	HttpContext::isBodyToRead() {
 
 	std::string	method = request().getMethod();
 	if (method == "GET" || method == "DELETE") {
-		request().setChunked(true);
+		request().setChunked(false);
 		_state = REQUEST_COMPLETE; return false;
 	}
 
@@ -67,7 +71,7 @@ bool	HttpContext::isBodyToRead() {
 		if (request().getHeaderValue("transfer-encoding") != "chunked") {
 			_state = REQUEST_ERROR; return false;
 		}
-		cout << "isBodyToRead(): Transfer-Encoding header is here" << endl;
+		cout << YELLOW << "isBodyToRead(): Transfer-Encoding header is here" << endl;
 		_state = READING_CHUNKED_BODY; return true;
 	} else if(request().isContentLengthHeader()) {
 
@@ -99,6 +103,58 @@ bool	HttpContext::isBodyToRead() {
 	}
 	//No body-defining headers found
 	_state = REQUEST_COMPLETE; return false;
+}
+
+bool	HttpContext::chunkedBodyStateMachine(std::string &buf) {
+	if (_chunkState == READING_CHUNK_SIZE) {
+		size_t	pos = buf.find("\r\n");
+		if (pos == string::npos) { // wait more data
+			return false;
+		}
+		string	size_hex = buf.substr(0, pos);
+		// Parse Chunk Size: Convert the hexadecimal string to an integer (chunk_size).
+		if (!HttpParser::cpp98_hexaStrToInt(size_hex, _chunkSize)) {
+			cerr << "Chunked body. Invalid Hexadecimal size" << endl;
+			_state = REQUEST_ERROR;
+			return false;
+		}
+		buf.erase(0, pos + 2); // Erase hex size and \r\n
+		if (_chunkSize == 0) { // End of body. Look for final \r\n
+			_chunkState = READING_CHUNK_TRAILER;
+		} else {
+			_chunkState = READING_CHUNK_DATA;
+		}
+		return true;
+	}
+
+	if (_chunkState == READING_CHUNK_DATA) {
+		if (buf.size() < _chunkSize) { // Need more data for chunk body
+			return false;
+		}
+		HttpParser::appendToBody(buf, _chunkSize, request());
+		buf.erase(0, _chunkSize);
+		_chunkState = READING_CHUNK_TRAILER;
+		return true;
+	}
+
+	if (_chunkState == READING_CHUNK_TRAILER) {
+		if (buf.size() < 2) { // Need more data for \r\n
+			return false;
+		}
+		if (buf.rfind("\r\n", 0) != 0) { // Check for \r\n at the start
+			_state = REQUEST_ERROR;
+			return false;
+		}
+		buf.erase(0, 2);
+		if (_chunkSize == 0) {
+			_state = REQUEST_COMPLETE;
+			return false;
+		} else {
+			_chunkState = READING_CHUNK_SIZE;
+			return true;
+		}
+	}
+	return false;
 }
 
 /**
@@ -135,10 +191,9 @@ void	HttpContext::requestParsingStateMachine() {
 					can_parse = false; break;
 				}
 				//PrintUtils::printRequestHeaders(request());
-
 				// TODO: Check for Content-Length or Transfer-Encoding
 				if (isBodyToRead()) {
-					//cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
+					cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
 					continue;
 				} else {
 					//cout << YELLOW << "requestParsingStateMachine: no body to read" << RESET << endl;
@@ -148,71 +203,40 @@ void	HttpContext::requestParsingStateMachine() {
 			case READING_FIXED_BODY : {
 
 				const size_t	bodySize = request().getBody().size();
-                size_t			remaining;
-                if (_expectedBodyLen > bodySize) {
-                    remaining = _expectedBodyLen - bodySize;
-                } else {
-                    remaining = 0;
-                }
-                if (remaining == 0) {
-                    _state = REQUEST_COMPLETE;
-                    can_parse = false; break;
-                }
+				size_t			remaining;
+				if (_expectedBodyLen > bodySize) {
+					remaining = _expectedBodyLen - bodySize;
+				} else {
+					remaining = 0;
+				}
+				if (remaining == 0) {
+					_state = REQUEST_COMPLETE;
+					can_parse = false; break;
+				}
 				const size_t take = std::min(remaining, buf.size());
-                if (take == 0) { // need more data from socket
-                    can_parse = false; break;
-                }
+				if (take == 0) { // need more data from socket
+					can_parse = false; break;
+				}
 
-                HttpParser::appendToBody(buf, take, request());
-                buf.erase(0, take);
+				HttpParser::appendToBody(buf, take, request());
+				buf.erase(0, take);
 
-                if (request().getBody().size() == _expectedBodyLen) {
-                    HttpParser::parseFixBody(request().getBody(), request());
-                    _state = REQUEST_COMPLETE;
-                    can_parse = false;
-                }
+				if (request().getBody().size() == _expectedBodyLen) {
+					HttpParser::parseFixBody(request().getBody(), request());
+					_state = REQUEST_COMPLETE;
+					can_parse = false;
+				}
 				//PrintUtils::printBody(request());
-                break;
+				break;
 			}
 			case READING_CHUNKED_BODY : {
-				//   - The format is a loop of <chunk-size-hex>\r\n<chunk-data>\r\n
-				//   - Your Logic: This requires its own mini-state machine.
-				while (connection().getBuffer().size() != 0) {
-					size_t	fin_pos = buf.find("0\r\n\r\n"); // final chunk
-					if (fin_pos != string::npos) {
-						buf.erase(0, 5); // ??? Check it
-						_state = REQUEST_COMPLETE; can_parse = false; break;
-					}
-					// Read Chunk Size: Read from the socket until you find a \r\n.
-					// The line before it is the size of the next chunk, written in hexadecimal.
-					size_t	delim_1 = buf.find("\r\n");
-					if (delim_1 == string::npos) { // wait more data
-						can_parse = false; break;
-					}
-					string chunk = buf;
-					string chunk_size_hex = chunk.substr(0, delim_1);
-					chunk.erase(0, delim_1 + 2);
-
-					size_t	size = 0;
-					// Parse Chunk Size: Convert the hexadecimal string to an integer (chunk_size).
-					if (HttpParser::cpp98_hexaStrToInt(chunk_size_hex, size) == false) {
-						cerr << "Chunked body. Invalid Hexadecimal size" << endl;
-						_state = REQUEST_ERROR; can_parse = false; break;
-					}
-
-					size_t	delim_2 = chunk.find("\r\n");
-					if (delim_2 == string::npos) { // wait more data
-						can_parse = false; break;
-					}
-					string chunk_data = chunk.substr(0, delim_2);
-					// Read Chunk Data: If chunk_size > 0, read exactly chunk_size bytes 
-					if (size > 0)
-						HttpParser::appendToBody(chunk_data, size, request());
-					chunk.erase(0, size + 2); // check what is size + 2
-					// clear buffer from this chunk
-					connection().getBuffer() = chunk;
+				while (chunkedBodyStateMachine(buf)) {
+					// The body of the loop can be empty.
 				}
-				can_parse = false;
+				PrintUtils::printBody(request());
+				if (_state != REQUEST_COMPLETE && _state != REQUEST_ERROR) {
+					can_parse = false; // Pause parsing if we're waiting for more data
+				}
 				break;
 			}
 
@@ -256,6 +280,8 @@ void	HttpContext::resetState() {
 	connection().getBuffer().clear();
 	_state = REQUEST_LINE;
 	_expectedBodyLen = 0;
+	_chunkState = READING_CHUNK_SIZE;
+	_chunkSize = 0;
 }
 
 string	HttpContext::getResponseString() {

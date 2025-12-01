@@ -44,12 +44,13 @@ class	HttpContext {
 			READING_CHUNKED_BODY, // For Transfer-Encoding
 			REQUEST_COMPLETE,
 			REQUEST_ERROR
-		};		
+		};
 		
 		void	requestParsingStateMachine();
 		// findAndParseReqLine()
 		bool	findAndParseHeaders(std::string &buf);
 		bool	isBodyToRead();
+		bool	chunkedBodyStateMachine(std::string &buf);
 
 		bool	isRequestComplete() const;
 		bool	isRequestError() const;
@@ -71,6 +72,13 @@ class	HttpContext {
 
 		e_parse_state	_state;
 		size_t			_expectedBodyLen;
+		enum			e_chunk_state {
+				READING_CHUNK_SIZE,
+				READING_CHUNK_DATA,
+				READING_CHUNK_TRAILER // For the final CRLF after a chunk
+		};
+		e_chunk_state   _chunkState;
+		size_t          _chunkSize;
 };
 
 #endif
