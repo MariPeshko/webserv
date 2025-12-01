@@ -30,10 +30,9 @@ ssize_t			Connection::receiveData() {
 		_request_buffer.append(buf, nbytes);
 	}
 	// debugging
-	std::cout << "server: recv " << nbytes << " bytes from fd " << getFd() << std::endl;
+	std::cout << YELLOW << "server: recv " << nbytes << " bytes from fd " << getFd() << ". ";
 	if (nbytes > 0) {
-		//We got some good data from a client (broadcast to other clients)
-		std::cout << YELLOW << "message from " << getFd() << ":\n" << RESET;
+		std::cout << "message:\n" << RESET;
 		int	to_print;
 		if (nbytes < 100) to_print = nbytes;
 		else to_print = 100;
