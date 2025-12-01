@@ -2,6 +2,7 @@
 #include "PrintUtils.hpp"
 
 using std::cout;
+using std::cerr;
 using std::endl;
 using std::string;
 
@@ -174,25 +175,47 @@ void	HttpContext::requestParsingStateMachine() {
                 break;
 			}
 			case READING_CHUNKED_BODY : {
-				// If using chunked encoding:
 				//   - The format is a loop of <chunk-size-hex>\r\n<chunk-data>\r\n
-				//   - Parse chunks until the final "0\r\n\r\n" is found.
 				//   - Your Logic: This requires its own mini-state machine.
-				//   - Read Chunk Size: Read from the socket until you find a \r\n. 
-				//   - The line before it is the size of the next chunk, written in hexadecimal.
-				//   - Parse Chunk Size: Convert the hexadecimal string to an integer (chunk_size).
-				//   - Check for End: If chunk_size is 0, this is the last chunk. You should 
-				//   - read the final \r\n and then transition the state to REQUEST_COMPLETE.
-	            //   - Read Chunk Data: If chunk_size > 0, read exactly chunk_size bytes 
-				//   - from the socket. This is the data for the current chunk. Append it to 
-				//     your _request.body.
-				//   - parseBody()
-				//   - Read Trailing CRLF: After reading the chunk data, you must read and 
-				//   - discard the trailing \r\n that follows every chunk.
-				//   - Repeat: Go back to step 1 to process the next chunk.
-				//   - If final chunk found: client.state = REQUEST_COMPLETE; request_is_ready = true;
+				while (connection().getBuffer().size() != 0) {
+					size_t	fin_pos = buf.find("0\r\n\r\n"); // final chunk
+					if (fin_pos != string::npos) {
+						buf.erase(0, 5); // ??? Check it
+						_state = REQUEST_COMPLETE; can_parse = false; break;
+					}
+					// Read Chunk Size: Read from the socket until you find a \r\n.
+					// The line before it is the size of the next chunk, written in hexadecimal.
+					size_t	delim_1 = buf.find("\r\n");
+					if (delim_1 == string::npos) { // wait more data
+						can_parse = false; break;
+					}
+					string chunk = buf;
+					string chunk_size_hex = chunk.substr(0, delim_1);
+					chunk.erase(0, delim_1 + 2);
+
+					size_t	size = 0;
+					// Parse Chunk Size: Convert the hexadecimal string to an integer (chunk_size).
+					if (HttpParser::cpp98_hexaStrToInt(chunk_size_hex, size) == false) {
+						cerr << "Chunked body. Invalid Hexadecimal size" << endl;
+						_state = REQUEST_ERROR; can_parse = false; break;
+					}
+
+					size_t	delim_2 = chunk.find("\r\n");
+					if (delim_2 == string::npos) { // wait more data
+						can_parse = false; break;
+					}
+					string chunk_data = chunk.substr(0, delim_2);
+					// Read Chunk Data: If chunk_size > 0, read exactly chunk_size bytes 
+					if (size > 0)
+						HttpParser::appendToBody(chunk_data, size, request());
+					chunk.erase(0, size + 2); // check what is size + 2
+					// clear buffer from this chunk
+					connection().getBuffer() = chunk;
+				}
+				can_parse = false;
 				break;
 			}
+
 			case REQUEST_COMPLETE :
 			case REQUEST_ERROR  : {
 				can_parse = false;

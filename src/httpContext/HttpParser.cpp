@@ -1,5 +1,6 @@
 #include "HttpParser.hpp"
 #include "PrintUtils.hpp"
+#include <limits>
 
 HttpParser::HttpParser() { }
 
@@ -7,10 +8,10 @@ HttpParser::~HttpParser() { }
 
 void	HttpParser::appendToBody(const std::string & buffer, const size_t n, Request& req) {
 	if (n == 0 || buffer.empty()) {
-        return;
-    }
+		return;
+	}
 	 // Assumes Request::getBody() returns a non-const std::string&
-    req.getBody().append(buffer, 0, n);
+	req.getBody().append(buffer, 0, n);
 }
 
 bool	HttpParser::parseFixBody(const std::string& bodyBlock, Request& req) {
@@ -18,12 +19,12 @@ bool	HttpParser::parseFixBody(const std::string& bodyBlock, Request& req) {
 	(void)req;
 
 	/* const std::string& ct = req.getHeaderValue("content-type");
-    if (ct.find("application/x-www-form-urlencoded") != std::string::npos) {
-        // parse form if needed
-    } else if (ct.find("application/json") != std::string::npos) {
-        // defer to JSON parser later
-    }
-    return true; // return false on parse error */
+	if (ct.find("application/x-www-form-urlencoded") != std::string::npos) {
+		// parse form if needed
+	} else if (ct.find("application/json") != std::string::npos) {
+		// defer to JSON parser later
+	}
+	return true; // return false on parse error */
 
 	return true;
 }
@@ -149,5 +150,44 @@ bool HttpParser::parseHeaders(const std::string& headersBlock,
 		req.addHeader(name, value);
 
 	}
+	return true;
+}
+
+// helper. validates and converts a hex string to size_t
+// 
+// updating the 'value' in each loop iteration.
+// '10u' is the unsigned integer literal 10.
+bool	HttpParser::cpp98_hexaStrToInt(const std::string& s, size_t& out) {
+	if (s.empty())
+		return false;
+
+	size_t	value = 0;
+	for (size_t i = 0; i < s.size(); ++i) {
+		const char	c = s[i];
+		size_t		hex_digit; // 0..15
+
+		if (c >= '0' && c <= '9') {
+			hex_digit = static_cast<size_t>(c - '0');
+		} else if (c >= 'a' && c <= 'f') {
+			hex_digit = 10u + static_cast<size_t>(c - 'a');
+		} else if (c >= 'A' && c <= 'F') {
+			hex_digit = 10u + static_cast<size_t>(c - 'A');
+		} else {
+			return false; // invalid character
+		}
+
+		// Prevent overflow: (value * 16) must not exceed size_t max
+		const size_t	max_before_mul = std::numeric_limits<size_t>::max() / 16u;
+		if (value > max_before_mul)
+			return false;
+		const size_t	v16 = value * 16u; // to base-16
+		// Prevent overflow on addition
+		if (hex_digit > std::numeric_limits<size_t>::max() - v16)
+			return false;
+
+		value = v16 + hex_digit;
+	}
+
+	out = value;
 	return true;
 }
