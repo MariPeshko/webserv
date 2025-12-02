@@ -39,27 +39,23 @@ bool HttpParser::parseRequestLine(const std::string& line,
 		req.setMethod("");
 		return false;
 	}
-
+	req.setMethod(method);
+	req.setUri(uri);
+	req.setVersion(version);
 	if (method != "GET" && method != "POST" && method != "DELETE") {
 		req.setRequestLineFormatValid(false);
 		req.setMethod("");
 		return false;
 	}
-
 	if (version != "HTTP/1.1" && version != "HTTP/1.0") {
 		req.setRequestLineFormatValid(false);
 		return false;
 	}
-
 	// Rudimentary URI check
 	if (uri.empty() || uri[0] != '/' || uri.find("..") != std::string::npos) {
 		req.setRequestLineFormatValid(false);
 		return false;
 	}
-
-	req.setMethod(method);
-	req.setUri(uri);
-	req.setVersion(version);
 	req.setRequestLineFormatValid(true);
 	return true;
 }
