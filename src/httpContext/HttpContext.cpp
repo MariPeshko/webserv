@@ -52,6 +52,11 @@ void	HttpContext::requestParsingStateMachine() {
 		switch (_state) {
 			case REQUEST_LINE: {
 				if (!findAndParseReqLine(buf)) {
+					if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
+					if (!request().getRequestLineFormatValid()) {
+						_state = REQUEST_ERROR;
+						continue;
+					}
 					can_parse = false; break;
 				}
 				if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());

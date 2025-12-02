@@ -35,8 +35,13 @@ bool HttpParser::parseRequestLine(const std::string& line,
 
 	// false if the stream iss fails to extract all three strings.
 	if (!(iss >> method >> uri >> version) || !iss.eof()) {
+		if(method.size() != 0)
+			req.setMethod(method);
+		else
+			req.setMethod("");
+		if(uri.size() != 0) req.setUri(uri);
+		if(version.size() != 0) req.setVersion(version);
 		req.setRequestLineFormatValid(false);
-		req.setMethod("");
 		return false;
 	}
 	req.setMethod(method);
