@@ -37,6 +37,92 @@ Server&     HttpContext::server()     { return _server_config; }
 Request&    HttpContext::request()    { return _request; }
 Response&   HttpContext::response()   { return _response; }
 
+/**
+ * REQUEST PARSER STATE MACHINE. It processes the _request_buffer
+ * and transitions the client's state. It will loop as long as it can
+ * make progress (e.g., parsing both request line and headers if they
+ * are both in the buffer).
+ */
+void	HttpContext::requestParsingStateMachine() {
+	
+	string	&buf = connection().getBuffer();
+	bool	can_parse = true;
+
+	while (can_parse) {
+		switch (_state) {
+			case REQUEST_LINE: {
+				if (!findAndParseReqLine(buf)) {
+					can_parse = false; break;
+				}
+				if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
+				_state = READING_HEADERS;
+				continue;
+			}
+			case READING_HEADERS : {
+				if (!findAndParseHeaders(buf)) {
+					can_parse = false; break;
+				}
+				if (REQ_DEBUG) PrintUtils::printRequestHeaders(request());
+				if (isBodyToRead()) {
+					if (CTX_DEBUG) cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
+					continue;
+				} else {
+					if (CTX_DEBUG) cout << YELLOW << "requestParsingStateMachine: no body to read" << RESET << endl;
+					continue;
+				}
+			}
+			case READING_FIXED_BODY : {
+				if (!findAndParseFixBody(buf)) {
+					can_parse = false; break;
+				} else {
+					continue;
+				}
+			}
+			case READING_CHUNKED_BODY : {
+				while (chunkedBodyStateMachine(buf)) { // The body of the loop can be empty.
+					}
+				if (_state != REQUEST_COMPLETE && _state != REQUEST_ERROR) {
+					can_parse = false; // Pause parsing if we're waiting for more data
+				}
+				continue;
+			}
+			case REQUEST_COMPLETE : {
+				if (REQ_DEBUG) { if (request().getBody().size() != 0)
+						PrintUtils::printBody(request()); }
+				if (CTX_DEBUG) cout << ORANGE << "REQUEST PARSING IS COMPLETE" << RESET << endl;
+				can_parse = false;
+				break;
+			}
+			case REQUEST_ERROR  : {
+				if (CTX_DEBUG) cout << RED << "REQUEST ERROR" << RESET << endl;
+				can_parse = false;
+				break;
+			}
+			default : {
+				cerr << "HttpContext class message: Unknown state of requst parsing" << endl;
+				_state = REQUEST_ERROR;
+				can_parse = false;
+				break;
+			}
+		}
+	}
+}
+
+bool	HttpContext::findAndParseReqLine(std::string &buf) {
+	size_t	pos = buf.find("\r\n");
+	if (pos == string::npos) {
+		return false;
+	}
+	string	line = buf.substr(0, pos);
+	buf.erase(0, pos + 2);
+	if (HttpParser::parseRequestLine(line, request()) == true) {
+		return true;
+	} else {
+		_state = REQUEST_ERROR;
+		return false;
+	}
+}
+
 bool	HttpContext::findAndParseHeaders(string &buf) {
 	size_t pos = buf.find("\r\n\r\n");
 	if (pos == string::npos) {
@@ -64,20 +150,21 @@ bool	HttpContext::isBodyToRead() {
 	std::string	method = request().getMethod();
 	if (method == "GET" || method == "DELETE") {
 		request().setChunked(false);
-		_state = REQUEST_COMPLETE; return false;
+		_state = REQUEST_COMPLETE;
+		return false;
 	}
 
 	if(request().isTransferEncodingHeader()) {
 		if (request().getHeaderValue("transfer-encoding") != "chunked") {
 			_state = REQUEST_ERROR; return false;
 		}
-		//cout << YELLOW << "isBodyToRead(): Transfer-Encoding header is here" << endl;
+		if (CTX_DEBUG) cout << YELLOW << "isBodyToRead(): Transfer-Encoding header is here" << endl;
 		_state = READING_CHUNKED_BODY; return true;
 	} else if(request().isContentLengthHeader()) {
 
 		const string& cl = request().getHeaderValue("content-length");
 		if (cl.empty()) {
-		_state = REQUEST_COMPLETE; return false;
+			_state = REQUEST_COMPLETE; return false;
 		}
 		// Reject non-digit characters early and manual accumulation
 		size_t	need = 0;
@@ -103,6 +190,25 @@ bool	HttpContext::isBodyToRead() {
 	}
 	//No body-defining headers found
 	_state = REQUEST_COMPLETE; return false;
+}
+
+bool	HttpContext::findAndParseFixBody(std::string &buf) {
+	size_t	remaining = _expectedBodyLen - request().getBody().size();
+				
+	const size_t take = std::min(remaining, buf.size());
+	if (take == 0) { // need more data from socket
+		return false;
+	}
+
+	HttpParser::appendToBody(buf, take, request());
+	buf.erase(0, take);
+
+	if (request().getBody().size() == _expectedBodyLen) {
+		_state = REQUEST_COMPLETE;
+		return true;
+	} else {
+		return false;
+	}
 }
 
 bool	HttpContext::chunkedBodyStateMachine(std::string &buf) {
@@ -158,108 +264,6 @@ bool	HttpContext::chunkedBodyStateMachine(std::string &buf) {
 }
 
 /**
- * REQUEST PARSER STATE MACHINE. It processes the _request_buffer
- * and transitions the client's state. It will loop as long as it can
- * make progress (e.g., parsing both request line and headers if they
- * are both in the buffer).
- */
-void	HttpContext::requestParsingStateMachine() {
-	
-	string	&buf = connection().getBuffer();
-	bool		can_parse = true;
-
-	while (can_parse) {
-		switch (_state) {
-			case REQUEST_LINE: {
-				size_t	pos = buf.find("\r\n");
-				if (pos == string::npos) {
-					can_parse = false; break;
-				}
-				string	line = buf.substr(0, pos);
-				buf.erase(0, pos + 2);
-				if (HttpParser::parseRequestLine(line, request()) == true) {
-					//PrintUtils::printRequestLineInfo(request());
-					_state = READING_HEADERS;
-					continue;
-				} else {
-					_state = REQUEST_ERROR;
-					can_parse = false; break;
-				}
-			}
-			case READING_HEADERS : {
-				if (!findAndParseHeaders(buf)) {
-					can_parse = false; break;
-				}
-				//PrintUtils::printRequestHeaders(request());
-				// TODO: Check for Content-Length or Transfer-Encoding
-				if (isBodyToRead()) {
-					//cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
-					continue;
-				} else {
-					//cout << YELLOW << "requestParsingStateMachine: no body to read" << RESET << endl;
-					can_parse = false; break;
-				}
-			}
-			case READING_FIXED_BODY : {
-
-				const size_t	bodySize = request().getBody().size();
-				size_t			remaining;
-				if (_expectedBodyLen > bodySize) {
-					remaining = _expectedBodyLen - bodySize;
-				} else {
-					remaining = 0;
-				}
-				if (remaining == 0) {
-					_state = REQUEST_COMPLETE;
-					can_parse = false; break;
-				}
-				const size_t take = std::min(remaining, buf.size());
-				if (take == 0) { // need more data from socket
-					can_parse = false; break;
-				}
-
-				HttpParser::appendToBody(buf, take, request());
-				buf.erase(0, take);
-
-				if (request().getBody().size() == _expectedBodyLen) {
-					HttpParser::parseFixBody(request().getBody(), request());
-					_state = REQUEST_COMPLETE;
-					can_parse = false;
-				}
-				break;
-			}
-			case READING_CHUNKED_BODY : {
-				while (chunkedBodyStateMachine(buf)) {
-					// The body of the loop can be empty.
-				}
-				if (_state != REQUEST_COMPLETE && _state != REQUEST_ERROR) {
-					can_parse = false; // Pause parsing if we're waiting for more data
-				}
-				break;
-			}
-
-			case REQUEST_COMPLETE : {
-				// debuggin
-				/* if (request().getBody().size() != 0)
-					PrintUtils::printBody(request()); */
-				can_parse = false;
-				break;
-			}
-			case REQUEST_ERROR  : {
-				can_parse = false;
-				break;
-			}
-			default : {
-				std::cerr << "HttpContext class message: Unknown state of requst parsing" << endl;
-				_state = REQUEST_ERROR;
-				can_parse = false;
-				break;
-			}
-		}
-	}
-}
-
-/**
  * Checks if the received request is complete.
  * This is a basic implementation. A robust one would also check Content-Length.
  * @return true if the HTTP headers are complete, false otherwise.
@@ -290,8 +294,8 @@ void	HttpContext::resetState() {
 
 string	HttpContext::getResponseString() {
 	string	body = _response.getResponseBody();
-	short		status_code = _response.getStatusCode();
-	size_t		content_length = _response.getContentLength();
+	short	status_code = _response.getStatusCode();
+	size_t	content_length = _response.getContentLength();
 	
 	std::ostringstream	oss;
 

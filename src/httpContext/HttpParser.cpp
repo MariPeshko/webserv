@@ -14,22 +14,6 @@ void	HttpParser::appendToBody(const std::string & buffer, const size_t n, Reques
 	req.getBody().append(buffer, 0, n);
 }
 
-bool	HttpParser::parseFixBody(const std::string& bodyBlock, Request& req) {
-	(void)bodyBlock;
-	(void)req;
-
-	/* const std::string& ct = req.getHeaderValue("content-type");
-	if (ct.find("application/x-www-form-urlencoded") != std::string::npos) {
-		// parse form if needed
-	} else if (ct.find("application/json") != std::string::npos) {
-		// defer to JSON parser later
-	}
-	return true; // return false on parse error */
-
-	return true;
-}
-
-
 /**
  * Parser for a request line of the request.
  * 

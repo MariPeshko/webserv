@@ -15,7 +15,7 @@ class PrintUtils {
 	public:
 
 	static void	printBody(const Request& req) {
-		std::cout << "<< REQUEST BODY >> " << std::endl;
+		std::cout << "--- REQUEST BODY -------" << std::endl;
 		std::cout << BLUE << req.getBody() << RESET << std::endl;
 	}
 
@@ -27,7 +27,7 @@ class PrintUtils {
 	}
 
 	static void printRequestHeaders(const Request& req) {
-		std::cout << "--- Request Headers ---" << std::endl;
+		std::cout << "--- Request Headers -----" << std::endl;
 		// Directly accesses the private _headers member of the Request class
 		for (std::map<std::string, std::string>::const_iterator it = req._headers.begin(); it != req._headers.end(); ++it) {
 			std::cout << BLUE << "'" << it->first << "': '";

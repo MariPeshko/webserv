@@ -14,8 +14,15 @@
 # include <netinet/in.h>
 # include <sstream>
 
+#define CTX_DEBUG 0
+#define REQ_DEBUG 0
 #define YELLOW "\033[33m"
 #define RESET "\033[0m"
+#define GREEN "\033[32m"
+#define BLUE "\033[34m"
+#define RED "\033[31m"
+#define ORANGE "\033[38;5;208m"
+
 
 /**
  * Briefly: HTTP (request) state + Request/Response
@@ -47,9 +54,10 @@ class	HttpContext {
 		};
 		
 		void	requestParsingStateMachine();
-		// findAndParseReqLine()
+		bool	findAndParseReqLine(std::string &buf);
 		bool	findAndParseHeaders(std::string &buf);
 		bool	isBodyToRead();
+		bool	findAndParseFixBody(std::string &buf);
 		bool	chunkedBodyStateMachine(std::string &buf);
 
 		bool	isRequestComplete() const;
