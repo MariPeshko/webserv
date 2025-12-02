@@ -197,6 +197,51 @@ void Response::generateResponse() {
 		// TODO: Add your logic for handling POST requests here.
 		// For example, processing form data or file uploads.
 		// You might set status code to 201 (Created) or 200 (OK).
+		const std::string&	contentType = _request->getHeaderValue("content-type");
+		if (contentType.find("text/plain") != std::string::npos || contentType.find("image/") != std::string::npos) {
+			// --- Simple File Upload Logic ---
+			// This handles plain text, images, pdfs, etc. - anything to be saved as a file.
+			// 1. Determine the path to save the file
+			std::string	root;
+			if (loc->getRoot().empty())
+				root = _server_config.getRoot();
+			else
+				root = loc->getRoot();
+			std::string	path = root + _request->getUri(); // e.g., /uploads/new_image.jpg
+			// 2. Write the raw request body to the file
+        	std::ofstream	file(path.c_str(), std::ios::binary);
+        	if (!file.is_open()) {
+				if(D_POST) std::cout << RED << "POST. !file.is_open()" << RESET << std::endl;
+            	// Handle error (permission denied, etc.)
+            	_statusCode = 500;
+            	_reasonPhrase = generateStatusMessage(_statusCode);
+				_responseBody = getErrorPageContent(_statusCode);
+				_contentLength = _responseBody.size();
+            	return;
+        		}
+        	file << _request->getBody();
+        	file.close();
+			// 3. Send a "Created" response
+        	_statusCode = 201;
+        	_reasonPhrase = generateStatusMessage(_statusCode);
+        	// ??????????  What to do here?? 
+			_contentLength = _responseBody.size();
+		} else if (contentType.find("application/x-www-form-urlencoded") != std::string::npos) {
+			// --- Form Data Logic ---
+			// TODO: Parse the request body to get key-value pairs.
+			// For example, parse "name=Maryna&city=Kyiv"
+			_statusCode = 501; // Not Implemented yet
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_contentLength = _responseBody.size();
+    	} else {
+			// --- Unsupported Type Logic ---
+			// The server doesn't know how to handle this content type.
+			_statusCode = 415; // Unsupported Media Type
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_responseBody = getErrorPageContent(_statusCode);
+			_contentLength = _responseBody.size();
+    }
+
 		_statusCode = 501; // Not Implemented
 		_reasonPhrase = generateStatusMessage(_statusCode);
 		_responseBody = getErrorPageContent(_statusCode);
