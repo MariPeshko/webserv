@@ -41,7 +41,8 @@ class	Request {
 		bool				isTransferEncodingHeader() const;
 		std::string			getMethod() const;
 		MethodType			getEnumMethod() const { return _method;}
-		std::string			getUri() const;
+		std::string&		getUri();
+		const std::string&	getUri() const;
 		std::string			getVersion() const;
 		std::string&		getBody();
 		const std::string&	getBody() const;

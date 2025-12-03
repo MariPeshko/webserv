@@ -37,8 +37,13 @@ class	Response {
 		Response(Server& server);
 		~Response();
 
-		void		bindRequest(const Request& req); // new feat: Maryna. call after parsing
+		void		bindRequest(const Request& req);
 		void		generateResponse();
+		void		postAndGenerateResponse();
+		const Location*	matchPathToLocation();
+		const Location*	matchPrefixPathToLocation();
+		bool			prefixMatching(const std::string& locPath, const std::string& RequestUri);
+		void		reset();
 
 		short		getStatusCode() const;
 		size_t		getContentLength() const;
@@ -47,11 +52,7 @@ class	Response {
 		Server&		getServerConfig();
 		const std::map<std::string, std::string>& getHeaders() const;
 
-		const Location*	matchPathToLocation();
-
         std::string finalResponseContent;
-
-		void        reset();
 
 	private:
 		Response(); // no default construction
@@ -69,6 +70,7 @@ class	Response {
 		std::string		_reasonPhrase;
 		// Headers
 		//not sure if need a map of headers
+		// I guess we need them for successful POST method (Maryna)
 		std::map<std::string, std::string>	_headers;
 		size_t			_contentLength;
 		std::string		_responseBody;

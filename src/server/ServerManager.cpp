@@ -223,7 +223,11 @@ void	ServerManager::handleClientData(size_t i) {
 		// The parseRequest method should now use the client's internal buffer
 		// Generate response
 		ctx.response().bindRequest(ctx.request());
-		ctx.response().generateResponse();
+		if (ctx.request().getEnumMethod() == Request::POST) {
+			ctx.response().postAndGenerateResponse();
+		} else {
+			ctx.response().generateResponse();
+		}
 		sendResponse(fd, ctx);
 		ctx.resetState();
 	}
