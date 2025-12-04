@@ -11,6 +11,7 @@ SRCS =	src/main.cpp \
 		src/response/Response.cpp \
 		src/response/utils.cpp \
 		src/request/Request.cpp \
+		src/cgi/CgiHandler.cpp  \
 
 # - Header files
 HEADERS	= inc/Webserv.hpp
