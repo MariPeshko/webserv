@@ -1,4 +1,5 @@
 #include "Response.hpp"
+#include "../cgi/CgiHandler.hpp" 
 
 // Parametric constructor
 Response::Response(Server& server)
@@ -44,7 +45,7 @@ const Location* Response::matchPathToLocation() {
         if (DEBUG) std::cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << std::endl;
         
         // Check if request URI starts with this location path
-        if (_request->getUri() == locPath) {
+        if (_request->getUri().find(locPath) == 0) {
             if (DEBUG) std::cout << GREEN << "    -> Match found!" << RESET << std::endl;
             // We want the longest match (e.g. location /images/ vs location /)
             if (locPath.length() > bestMatchLen) {
@@ -124,11 +125,23 @@ void Response::generateResponse() {
 
     // Construct Path
     std::string root = !loc->getRoot().empty() ? loc->getRoot() : _server_config.getRoot();
-	if (DEBUG) std::cout << YELLOW << "Using root: " << root << RESET << std::endl;
     std::string uri = _request->getUri();
-	if (DEBUG) std::cout << YELLOW << "Using URI: " << uri << RESET << std::endl;
     std::string path;
-    path = root + getIndexFromLocation();
+    
+    // If we are exactly at the location path, check for index
+    std::string index = getIndexFromLocation();
+    if (!index.empty()) {
+        path = root + index;
+    } else {
+        // Otherwise, simply append URI to root
+        // Handling slash consistency
+        if (!root.empty() && root[root.size()-1] == '/' && !uri.empty() && uri[0] == '/')
+             path = root + uri.substr(1);
+        else if (!root.empty() && root[root.size()-1] != '/' && !uri.empty() && uri[0] != '/')
+             path = root + "/" + uri;
+        else
+             path = root + uri;
+    }
     if (DEBUG) std::cout << GREEN << "Resolved path: " << path << RESET << std::endl;
 
     // Handle Directory
@@ -177,6 +190,44 @@ void Response::generateResponse() {
             }
         }
     }
+    
+    // START OF CGI INSERTION
+    // CHECK FOR CGI
+    std::string extension = "";
+    size_t dotPos = path.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = path.substr(dotPos + 1);
+    }
+
+    const std::map<std::string, std::string>& cgi = loc->getCgi();
+    std::map<std::string, std::string>::const_iterator cgiIt = cgi.find(extension);
+    
+    if (cgiIt != cgi.end()) {
+        if (DEBUG) std::cout << BLUE << "Executing CGI: " << path << RESET << std::endl;
+        
+        // cgiIt->second is the interpreter path (e.g. /usr/bin/python3)
+        CgiHandler cgiHandler(*_request, path, cgiIt->second);
+        std::string cgiOutput = cgiHandler.executeCgi();
+        
+        // Parse CGI Output (Headers vs Body)
+        size_t headerEnd = cgiOutput.find("\r\n\r\n");
+        if (headerEnd != std::string::npos) {
+            _responseBody = cgiOutput.substr(headerEnd + 4);
+            _contentLength = _responseBody.size();
+            
+            // TODO: Parse headers from cgiOutput.substr(0, headerEnd) if needed
+            // For now, assume status 200 unless script says otherwise
+            _statusCode = 200; 
+            _reasonPhrase = "OK";
+        } else {
+            // Fallback if no headers found (raw output)
+            _responseBody = cgiOutput;
+            _contentLength = _responseBody.size();
+            _statusCode = 200;
+        }
+        return;
+    }
+    // END OF CGI INSERTION
 
     // 3. Serve File
     if (DEBUG) std::cout << BLUE << "Serving file: " << path << RESET << std::endl;
