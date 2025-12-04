@@ -37,10 +37,10 @@ void Response::bindRequest(const Request& req) {
 // 1. matchPrefixPathToLocation()(); 2. if (!loc) 3. allowed = loc->getAllowedMethods();
 // 4. if (!allowed.empty()) 5. Check for redirection if (loc->getReturnCode() != 0) 
 void	Response::postAndGenerateResponse() {
-	cout << BLUE << "POST method" << RESET << endl;
+	if (D_POST) cout << BLUE << "POST method" << RESET << endl;
 	const Location* loc = matchPrefixPathToLocation();
 	if (!loc) {
-		if (DEBUG) cout << RED << "No location matched." << RESET << endl;
+		if (D_POST) cout << RED << "No location matched." << RESET << endl;
 		_statusCode = 404;
 		_reasonPhrase = generateStatusMessage(_statusCode);
 		_responseBody = getErrorPageContent(_statusCode);
@@ -77,33 +77,34 @@ void	Response::postAndGenerateResponse() {
 	}
 	// POST METHOD logic starts here
 	// 1. Construct Path
+	if (D_POST) cout << ORANGE << "Constructing Path..." << RESET << endl;
 	string	root;
 		if (loc->getRoot().empty())
 			root = _server_config.getRoot();
 		else
 			root = loc->getRoot();
-	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
+	if (D_POST) cout << YELLOW << "Using root: " << root << RESET << endl;
 	string uri = _request->getUri();
-	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
+	if (D_POST) cout << YELLOW << "Using URI: " << uri << RESET << endl;
+	
 	string path;
 	path = root + uri;
-	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
+	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
 	// Handle Directory
 	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
-	size_t lastSlash = path.find_last_of('/');
-	if (lastSlash != std::string::npos) {
-        string	dirPath = path.substr(0, lastSlash);
-        if (!isDirectory(dirPath)) {
-            // The directory doesn't exist.
-            // Return a 409 Conflict error.
-            if (DEBUG) cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
-            _statusCode = 409;
-            _reasonPhrase = generateStatusMessage(_statusCode);
-            _responseBody = getErrorPageContent(_statusCode);
-            _contentLength = _responseBody.size();
-            return;
-        }
-    }
+	size_t path_separator = path.find_last_of('/');
+	if (path_separator != std::string::npos) {
+		string	dirPath = path.substr(0, path_separator);
+		if (!isDirectory(dirPath)) {
+			// The directory doesn't exist. Return a 409 Conflict error.
+			if (D_POST) cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
+			_statusCode = 409;
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_responseBody = getErrorPageContent(_statusCode);
+			_contentLength = _responseBody.size();
+			return;
+		}
+	}
 	// 1. Check the type of content
 	const string&	contentType = _request->getHeaderValue("content-type");
 
@@ -195,27 +196,27 @@ const Location*	Response::matchPrefixPathToLocation() {
 	size_t							bestMatchLen = 0;
 	const string&					RequestUri = _request->getUri();
 
-	if (DEBUG) cout << GREEN << "Matching URI: [" << RequestUri << "] against ";
-	if (DEBUG) cout << locations.size() << " locations." << RESET << endl;
+	if (D_POST) cout << GREEN << "Matching URI: [" << RequestUri << "] against ";
+	if (D_POST) cout << locations.size() << " locations." << RESET << endl;
 
 	for (size_t i = 0; i < locations.size(); ++i) {
 
 		const string&	locPath = locations[i].getPath();
-		if (DEBUG) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
+		if (D_POST) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
 		
 		if (RequestUri.rfind(locPath, 0) == 0) {
 
-			if (DEBUG) cout << BLUE << "    Request URI starts with the location path" << RESET << endl;
+			if (D_POST) cout << BLUE << "    Request URI starts with the location path" << RESET << endl;
 			if (prefixMatching(locPath, RequestUri)) {
 				continue;
 			}
-			if (DEBUG) cout << GREEN << "    -> Prefix Match found!" << RESET << endl;
+			if (D_POST) cout << GREEN << "    -> Prefix Match found!" << RESET << endl;
 			// We want the longest match (e.g. location /images/ vs location /)
 			if (locPath.length() > bestMatchLen) {
 				bestMatch = &locations[i];
 				bestMatchLen = locPath.length();
-				if (DEBUG) cout << GREEN << "    -> New best match (length " << bestMatchLen;
-				if (DEBUG) cout << ")" << RESET << endl;
+				if (D_POST) cout << GREEN << "    -> New best match (length " << bestMatchLen;
+				if (D_POST) cout << ")" << RESET << endl;
 			}
 		}
 	}

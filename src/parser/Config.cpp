@@ -67,12 +67,14 @@ void Config::parse(const std::string& config_file) {
 	if (_servers.empty()) {
 		throw std::runtime_error("No server blocks found in configuration file.");
 	}
-	/* std::cout << "Configuration '" << config_file << "' parsed successfully." << std::endl;
-	for (size_t i = 0; i < _servers.size(); ++i) {
-		std::cout << "\n=== Server " << i + 1 << " Configuration ===" << std::endl;
-		_servers[i].print();
-		std::cout << "=================================\n" << std::endl;
-	} */
+	std::cout << "Configuration '" << config_file << "' parsed successfully." << std::endl;
+	if (CONF_DEBUG) {
+		for (size_t i = 0; i < _servers.size(); ++i) {
+			std::cout << "\n=== Server " << i + 1 << " Configuration ===" << std::endl;
+			_servers[i].print();
+			std::cout << "=================================\n" << std::endl;
+		}
+	}
 }
 
 // Helper to check if a token is a known directive (to handle missing semicolons)
@@ -176,6 +178,9 @@ void Config::parseServer(Server& server, std::vector<std::string>& tokens) {
 		} else if (directive == "location") {
 			Location location;
 			location.setPath(tokens.back());
+
+			std::cout << location.getPath() << std::endl;
+			
 			tokens.pop_back();
 			parseLocation(location, tokens);
 			server.addLocation(location);

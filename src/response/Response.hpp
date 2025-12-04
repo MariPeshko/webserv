@@ -2,7 +2,7 @@
 #define RESPONSE_HPP
 
 #define DEBUG 0
-#define D_POST 1
+#define D_POST 0
 #define GREEN "\033[32m"
 #define RESET "\033[0m"
 #define BLUE "\033[34m"
