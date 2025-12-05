@@ -67,7 +67,7 @@ void Config::parse(const std::string& config_file) {
 	if (_servers.empty()) {
 		throw std::runtime_error("No server blocks found in configuration file.");
 	}
-	std::cout << "Configuration '" << config_file << "' parsed successfully." << std::endl;
+	if (CONF_DEBUG) std::cout << "Configuration '" << config_file << "' parsed successfully." << std::endl;
 	if (CONF_DEBUG) {
 		for (size_t i = 0; i < _servers.size(); ++i) {
 			std::cout << "\n=== Server " << i + 1 << " Configuration ===" << std::endl;
@@ -178,9 +178,6 @@ void Config::parseServer(Server& server, std::vector<std::string>& tokens) {
 		} else if (directive == "location") {
 			Location location;
 			location.setPath(tokens.back());
-
-			std::cout << location.getPath() << std::endl;
-			
 			tokens.pop_back();
 			parseLocation(location, tokens);
 			server.addLocation(location);

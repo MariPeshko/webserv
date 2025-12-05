@@ -10,7 +10,7 @@
 # include <netinet/in.h>	// do we need it here?
 # include <fcntl.h>
 
-#define CONF_DEBUG 1
+#define CONF_DEBUG 0
 
 class Location {
 	public:

@@ -92,7 +92,7 @@ void	HttpContext::requestParsingStateMachine() {
 				continue;
 			}
 			case REQUEST_COMPLETE : {
-				if (REQ_DEBUG) { if (request().getBody().size() != 0)
+				if (REQ_DEBUG_BODY) { if (request().getBody().size() != 0)
 						PrintUtils::printBody(request()); }
 				if (CTX_DEBUG) cout << ORANGE << "REQUEST PARSING IS COMPLETE" << RESET << endl;
 				can_parse = false;

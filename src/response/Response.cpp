@@ -140,14 +140,60 @@ void	Response::postAndGenerateResponse() {
 		
 		_contentLength = _responseBody.size();
 		return ;
-		} else if (contentType.find("application/x-www-form-urlencoded") != string::npos) {
+	} 
+	// --- Multipart Form Data Logic (File Upload) ---
+	/* else if (contentType.find("multipart/form-data") != string::npos) {
+        // Parse multipart data to extract the file
+        // You'll need to implement parseMultipartData() method
+        string filename, fileData;
+        if (parseMultipartData(_request->getBody(), contentType, filename, fileData)) {
+            // Construct file path with the original filename
+            string uploadPath = path;
+            if (uploadPath[uploadPath.length() - 1] != '/') {
+                uploadPath += "/";
+            }
+            uploadPath += filename;
+            
+            // Write the file data
+            std::ofstream file(uploadPath.c_str(), std::ios::binary);
+            if (!file.is_open()) {
+                if(D_POST) cout << RED << "POST. Could not open file for writing: " << uploadPath << RESET << endl;
+                _statusCode = 500;
+                _reasonPhrase = generateStatusMessage(_statusCode);
+                _responseBody = getErrorPageContent(_statusCode);
+                _contentLength = _responseBody.size();
+                return;
+            }
+            file << fileData;
+            file.close();
+
+            if(D_POST) cout << GREEN << "POST. File uploaded: " << uploadPath << RESET << endl;
+            
+            _statusCode = 201;
+            _reasonPhrase = generateStatusMessage(_statusCode);
+            _headers["Location"] = _request->getUri() + filename;
+            _responseBody = "<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>";
+            _contentLength = _responseBody.size();
+            return;
+        } else {
+            _statusCode = 400; // Bad Request
+            _reasonPhrase = generateStatusMessage(_statusCode);
+            _responseBody = getErrorPageContent(_statusCode);
+            _contentLength = _responseBody.size();
+            return;
+        }
+    } */
+
+
+
+	else if (contentType.find("application/x-www-form-urlencoded") != string::npos) {
 			// --- Form Data Logic ---
 			// TODO: Parse the request body to get key-value pairs.
 			// For example, parse "name=Maryna&city=Kyiv"
 			_statusCode = 501; // Not Implemented yet
 			_reasonPhrase = generateStatusMessage(_statusCode);
 			_contentLength = _responseBody.size();
-		} else {
+	} else {
 			// --- Unsupported Type Logic ---
 			// The server doesn't know how to handle this content type.
 			_statusCode = 415; // Unsupported Media Type
@@ -260,7 +306,8 @@ std::string Response::getIndexFromLocation() {
 void Response::generateResponse() {
 	if (!_request) return;
 
-	const Location* loc = matchPathToLocation();
+	const Location* loc = matchPrefixPathToLocation();
+	//const Location* loc = matchPathToLocation();
 	if (!loc) {
 		if (DEBUG) cout << RED << "No location matched." << RESET << endl;
 		_statusCode = 404;
@@ -308,7 +355,7 @@ void Response::generateResponse() {
 		string uri = _request->getUri();
 		if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
 		string path;
-		path = root + getIndexFromLocation();
+		path = root + uri + getIndexFromLocation();
 		if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
 
 		// Handle Directory
