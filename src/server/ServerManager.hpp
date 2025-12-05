@@ -42,8 +42,6 @@ class	ServerManager {
 	void	handleClientError(int fd, size_t i);
 	void	handleClientHungup(int fd, size_t i);
 	bool	isListener(int fd);
-	void	sendResponse(int fd, HttpContext& ctx);
-	void	setPollEvents(int fd, short events);
 };
 
 #endif

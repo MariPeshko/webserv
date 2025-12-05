@@ -180,7 +180,7 @@ void	HttpContext::resetState() {
 	_bytesSent = 0;
 }
 
-std::string	HttpContext::getResponseString() {
+void	HttpContext::buildResponseString() {
 	std::string	body = _response.getResponseBody();
 	short		status_code = _response.getStatusCode();
 	size_t		content_length = _response.getContentLength();
@@ -205,7 +205,9 @@ std::string	HttpContext::getResponseString() {
 	oss << "\r\n";
 	oss << body;
 
-	return oss.str();
+	setResponseBuffer(oss.str());
+
+	//return oss.str();
 }
 
 HttpContext::e_parse_state	HttpContext::getParserState() const {

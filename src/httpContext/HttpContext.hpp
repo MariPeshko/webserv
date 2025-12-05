@@ -48,11 +48,11 @@ class	HttpContext {
 
 		bool	isRequestComplete() const;
 		bool	isRequestError() const;
-
+		
+		void		buildResponseString();
 		void	resetState();
 		
 		// getters
-		std::string		getResponseString();
 		e_parse_state	getParserState() const;
 
 		// Response buffer for POLLOUT
