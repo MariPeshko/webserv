@@ -69,9 +69,12 @@ int buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_l
         if (!file_path.empty() && file_path[file_path.length() - 1] != '/')
             file_path += "/";
         file_path += entityStruct->d_name;
+		std::cout << YELLOW << "Processing entity: " << file_path << RESET << std::endl;
 
-        if (stat(file_path.c_str(), &file_stat) != 0)
+        if (stat(file_path.c_str(), &file_stat) != 0){
+			std::cout << RED << "stat() failed for: " << file_path << RESET << std::endl;
             continue;
+		}
 
         dirListPage.append("<tr>\n<td>\n<a href=\"");
         dirListPage.append(entityStruct->d_name);
