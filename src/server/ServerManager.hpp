@@ -35,16 +35,16 @@ class	ServerManager {
 		// Now HttpContext owns Connection by value.
 		std::map<int, HttpContext>	_contexts;
 		
-		void	addToPfds(std::vector<pollfd>& pfds, int newfd);
-		void	delFromPfds(size_t index);
-		void	processConnections();
-		void	handleNewConnection(int listener);
-		void	handleClientData(size_t i);
-		void	handleErrorRevent(int fd, size_t i);
-		void	handleClientError(int fd, size_t i);
-		void	handleClientHungup(int fd, size_t i);
-		bool	isListener(int fd);
-		void	sendResponse(int fd, HttpContext& ctx);
+	void	addToPfds(std::vector<pollfd>& pfds, int newfd);
+	void	delFromPfds(size_t index);
+	void	processConnections();
+	void	handleNewConnection(int listener);
+	void	handleClientData(size_t i);
+	void	handleClientWrite(size_t i);
+	void	handleErrorRevent(int fd, size_t i);
+	void	handleClientError(int fd, size_t i);
+	void	handleClientHungup(int fd, size_t i);
+	bool	isListener(int fd);
 };
 
 #endif

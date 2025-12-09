@@ -1,8 +1,8 @@
 #include "Server.hpp"
-#include <arpa/inet.h>	// For inet_addr
-#include <unistd.h>		// For close
-#include <string.h>		// For memset
-#include <cerrno>		// errno
+#include <arpa/inet.h> // For inet_addr
+#include <unistd.h>	   // For close
+#include <string.h>	   // For memset
+#include <cerrno>	   // errno
 
 // --- Location Implementation ---
 

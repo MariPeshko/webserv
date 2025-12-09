@@ -1,18 +1,18 @@
 #ifndef HTTPCONTEXT_HPP
-# define HTTPCONTEXT_HPP
+#define HTTPCONTEXT_HPP
 
-# include "../response/Response.hpp"
-# include "HttpParser.hpp"
-# include "../request/Request.hpp"
-# include "../server/Server.hpp"
+#include "../response/Response.hpp"
+#include "HttpParser.hpp"
+#include "../request/Request.hpp"
+#include "../server/Server.hpp"
 #include "../httpContext/Connection.hpp"
-# include <iostream>
-# include <string>
-# include <vector>
-# include <map>
-# include <sys/socket.h>
-# include <netinet/in.h>
-# include <sstream>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <map>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sstream>
 
 #define CTX_DEBUG 0
 #define REQ_DEBUG 0
@@ -23,70 +23,83 @@
 #define RED "\033[31m"
 #define ORANGE "\033[38;5;208m"
 
-
 /**
  * Briefly: HTTP (request) state + Request/Response
- * 
- * HTTP parsing state machine over Connection’s buffer, 
- * owns Request/Response, Parser class has static methods, 
+ *
+ * HTTP parsing state machine over Connection’s buffer,
+ * owns Request/Response, Parser class has static methods,
  * produces Response when complete.
  */
-class	HttpContext {
+class HttpContext
+{
 
-	public:
-		HttpContext(Connection& conn, Server& server);
-		HttpContext(const HttpContext &other);
-		~HttpContext();
+public:
+	HttpContext(Connection &conn, Server &server);
+	HttpContext(const HttpContext &other);
+	~HttpContext();
 
-		Connection&		connection();
-		Server&			server();
-		//static functions of HttpParser class
-		Request&		request();
-		Response&		response();
+	Connection &connection();
+	Server &server();
+	// static functions of HttpParser class
+	Request &request();
+	Response &response();
 
-		enum	e_parse_state {
-			REQUEST_LINE,
-			READING_HEADERS,
-			READING_FIXED_BODY, // For Content-Length
-			READING_CHUNKED_BODY, // For Transfer-Encoding
-			REQUEST_COMPLETE,
-			REQUEST_ERROR
-		};
-		
-		void	requestParsingStateMachine();
-		bool	findAndParseReqLine(std::string &buf);
-		bool	findAndParseHeaders(std::string &buf);
-		bool	isBodyToRead();
-		bool	findAndParseFixBody(std::string &buf);
-		bool	chunkedBodyStateMachine(std::string &buf);
+	enum e_parse_state
+	{
+		REQUEST_LINE,
+		READING_HEADERS,
+		READING_FIXED_BODY,	  // For Content-Length
+		READING_CHUNKED_BODY, // For Transfer-Encoding
+		REQUEST_COMPLETE,
+		REQUEST_ERROR
+	};
 
-		bool	isRequestComplete() const;
-		bool	isRequestError() const;
+	void requestParsingStateMachine();
+	bool findAndParseReqLine(std::string &buf);
+	bool findAndParseHeaders(std::string &buf);
+	bool isBodyToRead();
+	bool findAndParseFixBody(std::string &buf);
+	bool chunkedBodyStateMachine(std::string &buf);
 
-		void	resetState();
-		
-		// getters
-		std::string		getResponseString();
-		e_parse_state	getParserState() const;
+	bool isRequestComplete() const;
+	bool isRequestError() const;
 
-	private:
-		HttpContext();	// no default construction
-		HttpContext& operator=(const HttpContext& other);  // no assignment
+	void buildResponseString();
+	void resetState();
 
-		Connection	_conn;
-		Server&		_server_config;
-		Request		_request;
-		Response	_response;
+	// getters
+	e_parse_state getParserState() const;
 
-		e_parse_state	_state;
-		size_t			_expectedBodyLen;
-		enum			e_chunk_state {
-				READING_CHUNK_SIZE,
-				READING_CHUNK_DATA,
-				READING_CHUNK_TRAILER // For the final CRLF after a chunk
-		};
-		e_chunk_state   _chunkState;
-		size_t          _chunkSize;
+	// Response buffer for POLLOUT
+	std::string getResponseBuffer() const;
+	size_t getBytesSent() const;
+	void setResponseBuffer(const std::string &buffer);
+	void addBytesSent(size_t bytes);
+	bool isResponseComplete() const;
+
+private:
+	HttpContext();									  // no default construction
+	HttpContext &operator=(const HttpContext &other); // no assignment
+
+	Connection _conn;
+	Server &_server_config;
+	Request _request;
+	Response _response;
+
+	e_parse_state _state;
+	size_t _expectedBodyLen;
+	enum e_chunk_state
+	{
+		READING_CHUNK_SIZE,
+		READING_CHUNK_DATA,
+		READING_CHUNK_TRAILER // For the final CRLF after a chunk
+	};
+	e_chunk_state _chunkState;
+	size_t _chunkSize;
+
+	// For non-blocking response sending
+	std::string _responseBuffer;
+	size_t _bytesSent;
 };
 
 #endif

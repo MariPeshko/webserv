@@ -94,6 +94,13 @@ void	ServerManager::processConnections() {
 				}
 			}
 		}
+		if (_pfds[i].revents & POLLOUT) {
+			size_t	pfd_size_before = _pfds.size();
+			handleClientWrite(i);
+			if (_pfds.size() < pfd_size_before) {
+				continue;
+			}
+		}
 		i++;
 	}
 }
@@ -137,20 +144,6 @@ void	ServerManager::handleNewConnection(int listener) {
 	//from " << ip_str << ":" << port
 	std::cout << " on socket " << newfd << " (accepted by listener ";
 	std::cout << listener << ")" << RESET << std::endl;
-}
-
-void	ServerManager::sendResponse(int fd, HttpContext& ctx) {
-	std::string response = ctx.getResponseString();
-
-	ssize_t bytes_sent = send(fd, response.c_str(), response.size(), 0);
-	
-	if (bytes_sent == -1) {
-		// This will now happen on a broken pipe instead of a crash
-		std::cerr << "Send error on socket " << fd << std::endl;
-		// You might want to trigger client cleanup here, though the main loop
-		// will likely catch the POLLERR on the next iteration anyway.
-	}
-
 }
 
 void	ServerManager::handleErrorRevent(int fd, size_t i) {
@@ -224,8 +217,11 @@ void	ServerManager::handleClientData(size_t i) {
 		// Generate response
 		ctx.response().bindRequest(ctx.request());
 		ctx.response().generateResponse();
-		sendResponse(fd, ctx);
-		ctx.resetState();
+		ctx.buildResponseString();
+		_pfds[i].events |= POLLOUT;
+
+		// Don't reset state yet - will reset after response is fully sent
+		// ctx.resetState();
 	}
 	// If request is not complete, we do nothing and wait for the next poll() event.
 }
@@ -253,3 +249,64 @@ void	ServerManager::delFromPfds(size_t index) {
 		_pfds.erase(_pfds.begin() + index);
 	}
 }
+
+/** Handle POLLOUT event - send response data when socket is ready */
+void	ServerManager::handleClientWrite(size_t i) {
+	const int fd = _pfds[i].fd;
+	std::map<int, HttpContext>::iterator it = _contexts.find(fd);
+	if (it == _contexts.end()) {
+		std::cerr << "Error: No context found for fd " << fd << std::endl;
+		close(fd);
+		delFromPfds(i);
+		return;
+	}
+	HttpContext& ctx = it->second;
+	// Get remaining data to send
+	const std::string& buffer = ctx.getResponseBuffer();
+	size_t already_sent = ctx.getBytesSent();
+	
+	if (buffer.size() <= already_sent) { // a safeguard
+		// Response fully sent, switch off POLLOUT
+		_pfds[i].events = POLLIN;
+		ctx.resetState();
+		return;
+	}
+	
+	// Send remaining data
+	size_t remaining = buffer.size() - already_sent;
+	const char* data_ptr = buffer.c_str() + already_sent;
+	ssize_t bytes_sent = send(fd, data_ptr, remaining, 0); /// ? last parameter NON_BLOCK
+
+	if (bytes_sent == -1) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			// Socket buffer full, wait for next POLLOUT
+			return;
+		}
+		// Real error occurred
+		std::cerr << "Send error on socket " << fd << ": " << strerror(errno) << std::endl;
+		removeClient(fd, i);
+		return;
+	}
+	if (bytes_sent == 0) {
+		// Connection closed by peer
+		std::cout << "Con_pfds[i].events &= ~POLLOUT;nection closed by peer on socket " << fd << std::endl;
+		removeClient(fd, i);
+		return;
+	}
+	// Update bytes sent counter
+	ctx.addBytesSent(static_cast<size_t>(bytes_sent));
+	// Check if response is complete
+	if (ctx.isResponseComplete()) {
+		 if (ctx.request().getHeaderValue("connection") == "close") {
+            std::cout << "Connection: close. Closing socket " << fd << std::endl;
+            removeClient(fd, i);
+        } else {
+            // Keep-alive: reset state for the next request and wait for POLLIN
+            _pfds[i].events = POLLIN;
+            ctx.resetState();
+        }
+	}
+	// Otherwise, wait for next POLLOUT event
+}
+
+
