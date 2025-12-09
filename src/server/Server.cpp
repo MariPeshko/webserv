@@ -7,12 +7,7 @@
 // for now set up mock data
 Server::Server()
 {
-	_port = 8080;
 	_host = "127.0.0.1";
-	_server_names.push_back("localhost");
-	_root = "";
-	_index = "index.html";
-	_error_pages[404] = "/var/www/errors/404.html";
 	_client_max_body_size = "1m"; // default value
 	_listen_fd = -1;			  // an invalid value
 }

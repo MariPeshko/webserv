@@ -106,7 +106,10 @@ const Location *Response::matchPathToLocation()
 					bestMatch = &locations[i];
 					bestMatchLen = locPath.length();
 					if (DEBUG)
+					{
 						std::cout << GREEN << "    -> New best match (length " << bestMatchLen << ")" << RESET << std::endl;
+						std::cout << GREEN << "    -> Best match root: " << bestMatch->getRoot() << RESET << std::endl;
+					}
 				}
 			}
 			else
@@ -288,12 +291,30 @@ void Response::generateResponse()
 		return;
 	}
 
-	// Construct Path: root + remaining URI after location prefix
-	std::string root = !loc->getRoot().empty() ? loc->getRoot() : _server_config.getRoot();
-	if (root[0] != '/' && !loc->getRoot().empty() && root.find(_server_config.getRoot()) == std::string::npos)
-		root = _server_config.getRoot() + "/" + root;
+	// Construct Path
+	// Standard NGINX 'root' logic:
+	// 1. If location has 'root', it replaces server 'root'.
+	// 2. Path = root + URI (no stripping of location prefix).
+
+	std::string root;
+	if (!loc->getRoot().empty())
+	{
+		root = loc->getRoot();
+	}
+	else
+	{
+		root = _server_config.getRoot();
+	}
+
+	// Fallback if root is empty: use current directory
+	if (root.empty())
+	{
+		root = ".";
+	}
+
 	if (DEBUG)
 		std::cout << YELLOW << "Using root: " << root << RESET << std::endl;
+
 	std::string uri = _request->getUri();
 	if (DEBUG)
 		std::cout << YELLOW << "Using URI: " << uri << RESET << std::endl;
@@ -334,45 +355,13 @@ void Response::generateResponse()
 	// CRITICAL: If location exists in config but path doesn't exist on disk → 404
 	if (pathType == NOT_EXIST)
 	{
-		// Special case: if URI exactly matches location path and location has index
-		// Try serving the index file directly (e.g., /about → about.html)
-		if (uri == loc->getPath() && !loc->getIndex().empty())
-		{
-			std::string indexFile = loc->getIndex();
-			std::string indexPath = root + "/" + indexFile;
-			if (DEBUG)
-				std::cout << BLUE << "Path doesn't exist, trying location index: " << indexPath << RESET << std::endl;
-
-			if (getPathType(indexPath) == FILE_PATH)
-			{
-				path = indexPath;
-				if (DEBUG)
-					std::cout << GREEN << "Using location index file: " << path << RESET << std::endl;
-				pathType = FILE_PATH;
-			}
-			else
-			{
-				// Index file also doesn't exist → 404
-				if (DEBUG)
-					std::cout << RED << "Location index file not found: " << indexPath << RESET << std::endl;
-				_statusCode = 404;
-				_reasonPhrase = generateStatusMessage(_statusCode);
-				_responseBody = getErrorPageContent(_statusCode);
-				_contentLength = _responseBody.size();
-				return;
-			}
-		}
-		else
-		{
-			// Path doesn't exist and no index fallback → 404
-			if (DEBUG)
-				std::cout << RED << "Path not found: " << path << RESET << std::endl;
-			_statusCode = 404;
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			_responseBody = getErrorPageContent(_statusCode);
-			_contentLength = _responseBody.size();
-			return;
-		}
+		if (DEBUG)
+			std::cout << RED << "Path not found: " << path << RESET << std::endl;
+		_statusCode = 404;
+		_reasonPhrase = generateStatusMessage(_statusCode);
+		_responseBody = getErrorPageContent(_statusCode);
+		_contentLength = _responseBody.size();
+		return;
 	}
 
 	// Handle Directory

@@ -267,10 +267,7 @@ void Config::parseLocation(Location &location, std::vector<std::string> &tokens,
 
 		if (directive == "root")
 		{
-			std::string root = tokens.back();
-			if (root[0] != '/' && !server.getRoot().empty())
-				root = server.getRoot() + "/" + root;
-			location.setRoot(root);
+			location.setRoot(tokens.back());
 			tokens.pop_back();
 		}
 		else if (directive == "methods" || directive == "allow_methods")
