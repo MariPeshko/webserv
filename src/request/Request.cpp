@@ -2,7 +2,9 @@
 
 Request::Request() :
 	_validFormatReqLine(false),
-	_method(INVALID)
+	_validFormatHeaders(false),
+	_method(INVALID),
+	_bodyChunked(false)
 { }
 
 Request::~Request() { }
@@ -12,35 +14,39 @@ void Request::setMethod(const std::string &method) {
 		_method = INVALID;
 		return;
 	}
-    if (method == "GET") {
-        _method = GET;
-    } else if (method == "POST") {
-        _method = POST;
-    } else if (method == "DELETE") {
-        _method = DELETE;
-    } else {
+	if (method == "GET") {
+		_method = GET;
+	} else if (method == "POST") {
+		_method = POST;
+	} else if (method == "DELETE") {
+		_method = DELETE;
+	} else {
 		_method = INVALID;
 	}
 }
 
 void Request::setUri(const std::string &uri) {
-    _uri = uri;
+	_uri = uri;
 }
 
 void Request::setVersion(const std::string &version) {
-    _httpVersion = version;
+	_httpVersion = version;
 }
 
 void Request::addHeader(const std::string &key, const std::string &value) {
-    _headers[key] = value;
+	_headers[key] = value;
 }
 
 void Request::setBody(const std::string &body) {
-    _body = body;
+	_body = body;
 }
 
 void	Request::setRequestLineFormatValid(bool value) {
 	_validFormatReqLine = value;
+}
+
+void	Request::setHeadersFormatValid(bool value) {
+	_validFormatHeaders = value;
 }
 
 /**
@@ -52,40 +58,68 @@ bool		Request::getRequestLineFormatValid() const {
 	return _validFormatReqLine;
 }
 
+bool		Request::getHeadersFormatValid() const {
+	return _validFormatHeaders;
+}
+
 std::string	Request::getMethod() const {
-    switch (_method) {
-        case GET: return "GET";
-        case POST: return "POST";
-        case DELETE: return "DELETE";
-        default: return "";
-    }
+	switch (_method) {
+		case GET: return "GET";
+		case POST: return "POST";
+		case DELETE: return "DELETE";
+		default: return "";
+	}
+}
+
+void	Request::setChunked(bool value) {
+	_bodyChunked = value;
 }
 
 std::string Request::getUri() const {
-    return _uri;
+	return _uri;
 }
 
 std::string Request::getVersion() const {
-    return _httpVersion;
+	return _httpVersion;
 }
 
 std::map<std::string, std::string>	Request::getHeaders() const {
-    return _headers;
+	return _headers;
 }
 
-const std::string &		Request::getHeaderValue(std::string header_name) const {
-    
+// checks if the key "content-length" is present
+bool	Request::isContentLengthHeader() const {
+	if (_headers.find("content-length") == _headers.end())
+		return false;
+	else
+		return true;
+}
+
+// checks if the key "transfer-encoding" is present
+bool	Request::isTransferEncodingHeader() const {
+	if (_headers.find("transfer-encoding") == _headers.end())
+		return false;
+	else
+		return true;
+}
+
+const std::string&	Request::getHeaderValue(const std::string header_name) const {
+	
 	static const std::string	empty = "";
-    std::map<std::string, std::string>::const_iterator it;
+	std::map<std::string, std::string>::const_iterator it;
 
 	it = _headers.find(header_name);
-    if (it == _headers.end()) {
-        return empty;
-    } else {
-        return it->second;
-    }
+	if (it == _headers.end()) {
+		return empty;
+	} else {
+		return it->second;
+	}
 }
 
-std::string Request::getBody() const {
-    return _body;
+std::string&		Request::getBody() {
+	return _body;
+}
+
+const std::string&	Request::getBody() const {
+	return _body;
 }

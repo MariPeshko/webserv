@@ -1,10 +1,45 @@
 # webserv
 This project aims to create our own HTTP server.
 
+## FEATURES
 
-### To compile with C++98:
-g++ -Wall -Wextra -Werror -std=c++98 -pedantic main.cpp -o webserv
+- Supports HTTP/1.0 and HTTP/1.1 request parsing (basic methods: GET/POST/DELETE).
+- Persistent connections (keep-alive) in sequential mode (one active request at a time).
+- Chunked transfer encoding (incoming request bodies) supported.
+- Static file serving.
+- Basic CGI execution based on file extension (e.g. `.php`, `.py`, etc.).
+- Graceful handling of SIGPIPE via MSG_NOSIGNAL on send().
 
+## LIMITATIONS (LEARNING PURPOSE)
+
+This server intentionally keeps the HTTP model minimal:
+
+- No HTTP/1.1 request pipelining: only one in‑flight request per connection. A new request is expected after the previous response is fully sent.
+- No multiplexing/protocol upgrade (no HTTP/2, no WebSocket).
+- Keep-Alive is tolerated but sequential: request → response → reset → wait.
+- CGI selection is purely by file extension (no shebang resolution, no FCGI).
+- Limited header validation; unsupported/complex features (Expect: 100-continue, Range, etc.) are ignored.
+- Routing / virtual host logic is minimal and may not reflect full Nginx‑style semantics.
+
+If you use specialized tools (e.g. wrk, curl with --next, custom scripts) that rely on pipelining, results will not reflect a fully compliant HTTP/1.1 server.
+
+## TESTING REMINDER
+
+Use telnet or nc to send a single full request, then wait for the response before sending the next one.
+
+Example:
+```
+printf "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n" | nc localhost 8080
+```
+
+### Telnet quick test
+
+```
+telnet localhost 8080
+GET /index.php HTTP/1.1
+Host: localhost
+
+```
 
 ### To test it easily, you need two terminals - one running the server, one acting as the client.
 
@@ -21,9 +56,7 @@ Connected to localhost.
 Escape character is '^]'.
 ```
 
-
 3. In the telnet terminal, type some text and press Enter. The server will echo it back.
-
 
 4. To exit telnet, press `Ctrl+]` then type `quit` and press Enter.
 

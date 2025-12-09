@@ -2,6 +2,8 @@
 # define SERVER_MANAGER_HPP
 
 #include "Server.hpp"
+#include "../httpContext/Connection.hpp"
+#include "../httpContext/HttpContext.hpp"
 #include <unistd.h>	// close()
 #include <poll.h>
 #include <vector>
@@ -9,9 +11,11 @@
 #include <cstring>	// strerror()
 #include <cerrno>
 #include <sstream>	// for std::ostringstream
-#include "Client.hpp"
 #include <iostream>
+#include <fcntl.h>
 
+#define GREEN "\033[32m"
+#define RESET "\033[0m"
 
 class	ServerManager {
 	public:
@@ -20,25 +24,27 @@ class	ServerManager {
 		
 		void	setupServers(std::vector<Server> & server_configs);
 		void	runServers();
+
+		void	removeClient(int fd, size_t i);
 		
 	private:
-		// Vector of poll file descriptors
 		std::vector<pollfd>		_pfds;
-		// Map of Server's pointers (listener fd)
 		std::map<int, Server*>	_map_servers;
-		// 
-		std::map<int, Client>	_clients;
+
+		// REFACTORED: consolidation of two maps HttpContext and Connection. 
+		// Now HttpContext owns Connection by value.
+		std::map<int, HttpContext>	_contexts;
 		
-		void	addToPfds(std::vector<pollfd>& pfds, int newfd);
-		void	delFromPfds(size_t index);
-		void	processConnections();
-		void	handleErrorRevent(size_t i);
-		void	handleNewConnection(int listener);
-		void	handleClientData(size_t i);
-		void	handleClientHungup(Client& client, size_t i);
-		void	handleClientError(Client& client, size_t i);
-		bool	isListener(int fd);
-		void	sendResponse(Client& client);
+	void	addToPfds(std::vector<pollfd>& pfds, int newfd);
+	void	delFromPfds(size_t index);
+	void	processConnections();
+	void	handleNewConnection(int listener);
+	void	handleClientData(size_t i);
+	void	handleClientWrite(size_t i);
+	void	handleErrorRevent(int fd, size_t i);
+	void	handleClientError(int fd, size_t i);
+	void	handleClientHungup(int fd, size_t i);
+	bool	isListener(int fd);
 };
 
 #endif
