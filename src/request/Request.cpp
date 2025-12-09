@@ -3,7 +3,8 @@
 Request::Request() :
 	_validFormatReqLine(false),
 	_validFormatHeaders(false),
-	_method(INVALID)
+	_method(INVALID),
+	_bodyChunked(false)
 { }
 
 Request::~Request() { }
@@ -70,6 +71,10 @@ std::string	Request::getMethod() const {
 	}
 }
 
+void	Request::setChunked(bool value) {
+	_bodyChunked = value;
+}
+
 std::string Request::getUri() const {
 	return _uri;
 }
@@ -82,7 +87,23 @@ std::map<std::string, std::string>	Request::getHeaders() const {
 	return _headers;
 }
 
-const std::string &		Request::getHeaderValue(std::string header_name) const {
+// checks if the key "content-length" is present
+bool	Request::isContentLengthHeader() const {
+	if (_headers.find("content-length") == _headers.end())
+		return false;
+	else
+		return true;
+}
+
+// checks if the key "transfer-encoding" is present
+bool	Request::isTransferEncodingHeader() const {
+	if (_headers.find("transfer-encoding") == _headers.end())
+		return false;
+	else
+		return true;
+}
+
+const std::string&	Request::getHeaderValue(const std::string header_name) const {
 	
 	static const std::string	empty = "";
 	std::map<std::string, std::string>::const_iterator it;
@@ -95,6 +116,10 @@ const std::string &		Request::getHeaderValue(std::string header_name) const {
 	}
 }
 
-std::string Request::getBody() const {
+std::string&		Request::getBody() {
+	return _body;
+}
+
+const std::string&	Request::getBody() const {
 	return _body;
 }

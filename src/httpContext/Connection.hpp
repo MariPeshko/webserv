@@ -9,6 +9,9 @@
 # include <sys/socket.h>
 # include <netinet/in.h>
 
+#define YELLOW "\033[33m"
+#define RESET "\033[0m"
+
 /**
  * Briefly: transport + buffer
  * 

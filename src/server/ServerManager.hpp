@@ -14,6 +14,9 @@
 #include <iostream>
 #include <fcntl.h>
 
+#define GREEN "\033[32m"
+#define RESET "\033[0m"
+
 class	ServerManager {
 	public:
 		ServerManager();
