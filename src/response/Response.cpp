@@ -176,7 +176,7 @@ void Response::generateResponse()
 		std::string root = _server_config.getRoot();
 		if (DEBUG)
 			std::cout << YELLOW << "Using root: " << root << RESET << std::endl;
-		std::string uri = _request->getUri();
+		std::string uri = _request->getUri() + _server_config.getRoot();
 		if (DEBUG)
 			std::cout << YELLOW << "Using URI: " << uri << RESET << std::endl;
 		std::string path = root + uri;
@@ -290,6 +290,8 @@ void Response::generateResponse()
 
 	// Construct Path: root + remaining URI after location prefix
 	std::string root = !loc->getRoot().empty() ? loc->getRoot() : _server_config.getRoot();
+	if (root[0] != '/' && !loc->getRoot().empty() && root.find(_server_config.getRoot()) == std::string::npos)
+		root = _server_config.getRoot() + "/" + root;
 	if (DEBUG)
 		std::cout << YELLOW << "Using root: " << root << RESET << std::endl;
 	std::string uri = _request->getUri();
