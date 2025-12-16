@@ -1,4 +1,5 @@
 #include "Response.hpp"
+# include "../httpContext/HttpParser.hpp"
 
 using std::cout;
 using std::cerr;
@@ -71,6 +72,7 @@ void	Response::postAndGenerateResponse() {
 		_statusCode = loc->getReturnCode();
 		_reasonPhrase = generateStatusMessage(_statusCode);
 		_headers["Location"] = loc->getReturnUrl();
+		_headers["Content-Type"] = "text/html";
 		_responseBody = "<html><body><h1>" + toString(_statusCode) + " " + _reasonPhrase + "</h1></body></html>";
 		_contentLength = _responseBody.size();
 		return;
@@ -137,52 +139,57 @@ void	Response::postAndGenerateResponse() {
 		_headers["Location"] = _request->getUri();
 
 		_responseBody = "<html><body><h1>201 Created</h1><p>Resource created at <a href=\"" + _request->getUri() + "\">" + _request->getUri() + "</a></p></body></html>";
-		
+		_headers["Content-Type"] = "text/html";
 		_contentLength = _responseBody.size();
 		return ;
 	} 
 	// --- Multipart Form Data Logic (File Upload) ---
-	/* else if (contentType.find("multipart/form-data") != string::npos) {
-        // Parse multipart data to extract the file
-        // You'll need to implement parseMultipartData() method
-        string filename, fileData;
-        if (parseMultipartData(_request->getBody(), contentType, filename, fileData)) {
-            // Construct file path with the original filename
-            string uploadPath = path;
-            if (uploadPath[uploadPath.length() - 1] != '/') {
-                uploadPath += "/";
-            }
-            uploadPath += filename;
-            
-            // Write the file data
-            std::ofstream file(uploadPath.c_str(), std::ios::binary);
-            if (!file.is_open()) {
-                if(D_POST) cout << RED << "POST. Could not open file for writing: " << uploadPath << RESET << endl;
-                _statusCode = 500;
-                _reasonPhrase = generateStatusMessage(_statusCode);
-                _responseBody = getErrorPageContent(_statusCode);
-                _contentLength = _responseBody.size();
-                return;
-            }
-            file << fileData;
-            file.close();
+	else if (contentType.find("multipart/form-data") != string::npos) {
+		// Parse multipart data to extract the file
+		// You'll need to implement parseMultipartData() method
+		string filename, fileData;
 
-            if(D_POST) cout << GREEN << "POST. File uploaded: " << uploadPath << RESET << endl;
-            
-            _statusCode = 201;
-            _reasonPhrase = generateStatusMessage(_statusCode);
-            _headers["Location"] = _request->getUri() + filename;
-            _responseBody = "<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>";
-            _contentLength = _responseBody.size();
-            return;
-        } else {
-            _statusCode = 400; // Bad Request
-            _reasonPhrase = generateStatusMessage(_statusCode);
-            _responseBody = getErrorPageContent(_statusCode);
-            _contentLength = _responseBody.size();
-            return;
-        }
-    } */
+		string boundary = HttpParser::extractBoundary(_request->getHeaderValue("content-type"));
+		if (HttpParser::parseMultipartData(_request->getBody(), boundary, filename, fileData)) {
+			// Construct file path with the original filename
+			string uploadPath = path;
+			/* if (uploadPath[uploadPath.length() - 1] != '/') {
+				uploadPath += "/";
+			} */
+			uploadPath += filename;
+
+			if (D_POST) cout << ORANGE << "uploadPath: " << uploadPath << RESET << endl;
+			
+			// Write the file data
+			std::ofstream file(uploadPath.c_str(), std::ios::binary);
+			if (!file.is_open()) {
+				if(D_POST) cout << RED << "POST. Could not open file for writing: " << uploadPath << RESET << endl;
+				_statusCode = 500;
+				_reasonPhrase = generateStatusMessage(_statusCode);
+				_responseBody = getErrorPageContent(_statusCode);
+				_contentLength = _responseBody.size();
+				return;
+			}
+			file << fileData;
+			file.close();
+
+			if(D_POST) cout << GREEN << "POST. File uploaded: " << uploadPath << RESET << endl;
+			
+			_statusCode = 201;
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_headers["Location"] = _request->getUri() + filename;
+			_responseBody = "<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>";
+			_headers["Content-Type"] = "text/html";
+			_contentLength = _responseBody.size();
+			return;
+		} else {
+			_statusCode = 400; // Bad Request
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_responseBody = getErrorPageContent(_statusCode);
+			_contentLength = _responseBody.size();
+			return;
+		}
+	}
 
 
 
@@ -342,6 +349,7 @@ void Response::generateResponse() {
 		_statusCode = loc->getReturnCode();
 		_reasonPhrase = generateStatusMessage(_statusCode);
 		_headers["Location"] = loc->getReturnUrl();
+		_headers["Content-Type"] = "text/html";
 		_responseBody = "<html><body><h1>" + toString(_statusCode) + " " + _reasonPhrase + "</h1></body></html>";
 		_contentLength = _responseBody.size();
 		return;
@@ -383,6 +391,7 @@ void Response::generateResponse() {
 					if (buildHtmlIndexTable(path, body, bodyLen) == 0) {
 						_statusCode = 200;
 						_reasonPhrase = generateStatusMessage(_statusCode);
+						_headers["Content-Type"] = "text/html";
 						_responseBody = body;
 						_contentLength = bodyLen;
 						return;
@@ -417,7 +426,10 @@ void Response::generateResponse() {
 			return;
 		}
 
-		std::ostringstream ss;
+		std::string contentType = getMimeType(path);
+        _headers["Content-Type"] = contentType;
+
+		std::ostringstream	ss;
 		ss << file.rdbuf();
 		_responseBody = ss.str();
 		_contentLength = _responseBody.size();
@@ -478,8 +490,42 @@ string Response::getErrorPageContent(int code) {
 		if (file.is_open()) {
 			std::ostringstream ss;
 			ss << file.rdbuf();
+			_headers["Content-Type"] = "text/html";
 			return ss.str();
 		}
 	}
 	return "";
+}
+
+std::string	Response::getMimeType(const std::string& filePath) {
+	
+    size_t dotPos = filePath.find_last_of('.');
+    if (dotPos == std::string::npos) {
+        return "application/octet-stream";
+    }
+    
+    std::string extension = filePath.substr(dotPos);
+    
+    // Convert to lowercase
+    for (size_t i = 0; i < extension.length(); ++i) {
+        extension[i] = std::tolower(extension[i]);
+    }
+    
+    if (extension == ".jpg" || extension == ".jpeg") {
+        return "image/jpeg";
+    } else if (extension == ".png") {
+        return "image/png";
+    } else if (extension == ".gif") {
+        return "image/gif";
+    } else if (extension == ".html" || extension == ".htm") {
+        return "text/html";
+    } else if (extension == ".css") {
+        return "text/css";
+    } else if (extension == ".js") {
+        return "application/javascript";
+    } else if (extension == ".txt") {
+        return "text/plain";
+    }
+    
+    return "application/octet-stream";
 }

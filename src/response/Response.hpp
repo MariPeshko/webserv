@@ -2,7 +2,7 @@
 #define RESPONSE_HPP
 
 #define DEBUG 0
-#define D_POST 0
+#define D_POST 1
 #define GREEN "\033[32m"
 #define RESET "\033[0m"
 #define BLUE "\033[34m"
@@ -51,6 +51,8 @@ class	Response {
 		std::string getReasonPhrase() const; 
 		Server&		getServerConfig();
 		const std::map<std::string, std::string>& getHeaders() const;
+
+		static std::string	getMimeType(const std::string& filePath);
 
         std::string finalResponseContent;
 

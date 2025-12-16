@@ -16,7 +16,17 @@ class PrintUtils {
 
 	static void	printBody(const Request& req) {
 		std::cout << "--- REQUEST BODY -------" << std::endl;
-		std::cout << BLUE << req.getBody() << RESET << std::endl;
+
+		if (req.getBody().size() > 200) {
+			std::cout << "\n(...message is limited to 200 bytes..))\n";
+			std::cout << BLUE << req.getBody().substr(0, 200) << RESET << std::endl;
+		}
+		else {
+			std::cout << BLUE << req.getBody() << RESET << std::endl;
+
+		}
+		
+		//std::cout << BLUE << req.getBody() << RESET << std::endl;
 	}
 
 	static void printStringMap(const std::map<std::string, std::string>& map) {

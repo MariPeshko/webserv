@@ -5,7 +5,7 @@
 # include "HttpParser.hpp"
 # include "../request/Request.hpp"
 # include "../server/Server.hpp"
-#include "../httpContext/Connection.hpp"
+# include "../httpContext/Connection.hpp"
 # include <iostream>
 # include <string>
 # include <vector>
@@ -16,7 +16,7 @@
 
 #define CTX_DEBUG 0
 #define REQ_DEBUG 1
-#define REQ_DEBUG_BODY 0
+#define REQ_DEBUG_BODY 1
 #define YELLOW "\033[33m"
 #define RESET "\033[0m"
 #define GREEN "\033[32m"
