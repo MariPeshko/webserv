@@ -176,6 +176,7 @@ void Response::generateResponse()
 	const Location *loc = matchPathToLocation();
 	if (!loc)
 	{
+		std::cout << RED << "No location matched, using server root." << RESET << std::endl;
 		std::string root = _server_config.getRoot();
 		if (DEBUG)
 			std::cout << YELLOW << "Using root: " << root << RESET << std::endl;
@@ -438,29 +439,7 @@ void Response::generateResponse()
 		std::cout << BLUE << "Serving file: " << path << RESET << std::endl;
 	std::ifstream file(path.c_str());
 
-	if (loc->getAutoindex())
-	{
-		if (DEBUG)
-			std::cout << BLUE << "Autoindex is ON. Generating listing for: " << path << RESET << std::endl;
-		std::string body;
-		size_t bodyLen = 0;
-		if (buildHtmlIndexTable(path, body, bodyLen) == 0)
-		{
-			_statusCode = 200;
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			_responseBody = body;
-			_contentLength = bodyLen;
-			return;
-		}
-		if (DEBUG)
-			std::cout << RED << "Autoindex generation failed." << RESET << std::endl;
-		_statusCode = 500;
-		_reasonPhrase = generateStatusMessage(_statusCode);
-		_responseBody = getErrorPageContent(_statusCode);
-		_contentLength = _responseBody.size();
-		return;
-	}
-	else if (!file.is_open())
+	if (!file.is_open())
 	{
 		if (DEBUG)
 			std::cout << RED << "File not found: " << path << RESET << std::endl;
