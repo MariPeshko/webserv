@@ -4,7 +4,7 @@ import time
 
 # Configuration
 HOST = "127.0.0.1"
-PORT = 8082
+PORT = 8080
 
 # Colors
 GREEN = "\033[92m"
