@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Simple HTML Page</title>
+	<style>
+		:root {
+			--bg: #f7fafc;
+			--card: #ffffff;
+			--accent: #2563eb;
+			--text: #0f172a;
+		}
+
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+			background: var(--bg);
+			color: var(--text);
+		}
+
+		.container {
+			max-width: 900px;
+			margin: 3rem auto;
+			padding: 1.5rem;
+		}
+
+		header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+		}
+
+		nav a {
+			margin-left: 0.75rem;
+			text-decoration: none;
+			color: var(--accent);
+			font-weight: 600;
+		}
+
+		.hero {
+			background: linear-gradient(180deg, rgba(37, 99, 235, 0.06), transparent);
+			border-radius: 12px;
+			padding: 2rem;
+			box-shadow: 0 6px 18px rgba(2, 6, 23, 0.06);
+		}
+
+		.hero h1 {
+			margin: 0 0 .5rem 0;
+			font-size: 1.6rem;
+		}
+
+		.hero p {
+			margin: 0 0 1rem 0;
+			color: #334155;
+		}
+
+		.btn {
+			display: inline-block;
+			background: var(--accent);
+			color: white;
+			padding: .6rem 1rem;
+			border-radius: 8px;
+			text-decoration: none;
+			font-weight: 600;
+		}
+
+		section {
+			margin-top: 1.25rem;
+			background: var(--card);
+			padding: 1rem;
+			border-radius: 8px;
+		}
+
+		footer {
+			margin-top: 2rem;
+			text-align: center;
+			color: #64748b;
+			font-size: 0.9rem;
+		}
+
+		@media (max-width:560px) {
+			.container {
+				margin: 1.5rem;
+				padding: .75rem;
+			}
+
+			header {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: .5rem;
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<header>
+			<div>
+				<strong>MySite</strong>
+				<div style="color:#475569;font-size:.9rem">A minimal starter page</div>
+			</div>
+			<nav aria-label="Main navigation">
+				<a href="/">Home</a>
+				<a href="/about">About</a>
+				<a href="/additional">Additional</a>
+			</nav>
+		</header>
+
+		<main>
+			<section class="hero" aria-labelledby="hero-title">
+				<h1 id="hero-title">Welcome to your new page</h1>
+				<p>Simple, responsive HTML template to start a small site or demo.
+					<br>Edit this file at /www/web/uploads/uploads.html.</p>
+				<a class="btn" href="#" role="button">Get started</a>
+			</section>
+
+		<section aria-labelledby="upload-title">
+			<h3 id="upload-title">Upload a Picture</h3>
+			<p>Select an image file to upload to the server.</p>
+			<form class="upload-form" action="/uploads/uploads.jpg" method="post" enctype="multipart/form-data">
+				<div class="file-input-wrapper">
+					<input type="file" id="picture" name="picture" accept="image/*" class="file-input" required>
+					<button type="button" class="btn" onclick="document.getElementById('picture').click()">
+						Choose Picture
+					</button>
+				</div>
+				<br><br>
+				<button type="submit" class="btn">Upload Picture</button>
+			</form>
+		</section>
+
+		<section aria-labelledby="about-title">
+			<h3 id="about-title">About this template</h3>
+			<p>This file is intentionally small and dependency-free. Replace the content, add styles or scripts as
+					needed.</p>
+		</section>
+	</main>
+
+		<footer>
+			© <span id="year"></span> MySite — Built with plain HTML
+		</footer>
+	</div>
+
+	<script>
+		// small script to update the year
+        document.getElementById('year').textContent = new Date().getFullYear();
+        
+        // Show selected file name
+        document.getElementById('picture').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : 'No file selected';
+            console.log('Selected file:', fileName);
+        });
+	</script>
+</body>
+
+</html>

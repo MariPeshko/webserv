@@ -207,21 +207,20 @@ void	ServerManager::handleClientData(size_t i) {
 	// Only parse and respond if the request is complete
 	if (ctx.isRequestComplete() || ctx.isRequestError()) {
 		// Check if it is cgi
-		// HttpContext method for checking if server
-		// has a /cgi-bin
+		// HttpContext method for checking if server has a /cgi-bin
 		// If it's a CGI request: You trigger your CGI execution logic. 
 		// If it's NOT a CGI request: You proceed with 
 		// the normal static file handling logic
 
-		// The parseRequest method should now use the client's internal buffer
 		// Generate response
 		ctx.response().bindRequest(ctx.request());
-		ctx.response().generateResponse();
+		if (ctx.request().getEnumMethod() == Request::POST) {
+			ctx.response().postAndGenerateResponse();
+		} else {
+			ctx.response().generateResponse();
+		}
 		ctx.buildResponseString();
 		_pfds[i].events |= POLLOUT;
-
-		// Don't reset state yet - will reset after response is fully sent
-		// ctx.resetState();
 	}
 	// If request is not complete, we do nothing and wait for the next poll() event.
 }

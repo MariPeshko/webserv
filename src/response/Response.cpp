@@ -1,4 +1,10 @@
 #include "Response.hpp"
+#include "../httpContext/HttpParser.hpp"
+
+using std::cerr;
+using std::cout;
+using std::endl;
+using std::string;
 
 // Parametric constructor
 Response::Response(Server &server)
@@ -31,18 +37,224 @@ void Response::bindRequest(const Request &req)
 	_request = &req;
 }
 
+// Method POST and generation of the response
+// To Do refactor code that ised in generateResponse():
+// 1. matchPrefixPathToLocation()(); 2. if (!loc) 3. allowed = loc->getAllowedMethods();
+// 4. if (!allowed.empty()) 5. Check for redirection if (loc->getReturnCode() != 0)
+void Response::postAndGenerateResponse()
+{
+	if (D_POST)
+		cout << BLUE << "POST method" << RESET << endl;
+	const Location *loc = matchPrefixPathToLocation();
+	if (!loc)
+	{
+		if (D_POST)
+			cout << RED << "No location matched." << RESET << endl;
+		_statusCode = 404;
+		_reasonPhrase = generateStatusMessage(_statusCode);
+		_responseBody = getErrorPageContent(_statusCode);
+		_contentLength = _responseBody.size();
+		return;
+	}
+	// Check for allowed methods
+	const std::vector<string> &allowed = loc->getAllowedMethods();
+	if (!allowed.empty())
+	{
+		bool methodAllowed = false;
+		for (size_t i = 0; i < allowed.size(); ++i)
+		{
+			if (allowed[i] == _request->getMethod())
+			{
+				methodAllowed = true;
+				break;
+			}
+		}
+		if (!methodAllowed)
+		{
+			if (DEBUG)
+				cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
+			_statusCode = 405;
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_responseBody = getErrorPageContent(_statusCode);
+			_contentLength = _responseBody.size();
+			return;
+		}
+	}
+	// Check for redirection
+	if (loc->getReturnCode() != 0)
+	{
+		_statusCode = loc->getReturnCode();
+		_reasonPhrase = generateStatusMessage(_statusCode);
+		_headers["Location"] = loc->getReturnUrl();
+		_headers["Content-Type"] = "text/html";
+		_responseBody = "<html><body><h1>" + toString(_statusCode) + " " + _reasonPhrase + "</h1></body></html>";
+		_contentLength = _responseBody.size();
+		return;
+	}
+	// POST METHOD logic starts here
+	// 1. Construct Path
+	if (D_POST)
+		cout << ORANGE << "Constructing Path..." << RESET << endl;
+	string root;
+	if (loc->getRoot().empty())
+		root = _server_config.getRoot();
+	else
+		root = loc->getRoot();
+	if (D_POST)
+		cout << YELLOW << "Using root: " << root << RESET << endl;
+	string uri = _request->getUri();
+	if (D_POST)
+		cout << YELLOW << "Using URI: " << uri << RESET << endl;
+
+	string path;
+	path = root + uri;
+	if (D_POST)
+		cout << GREEN << "Resolved path: " << path << RESET << endl;
+	// Handle Directory
+	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
+	size_t path_separator = path.find_last_of('/');
+	if (path_separator != string::npos)
+	{
+		string dirPath = path.substr(0, path_separator);
+		if (!isDirectory(dirPath))
+		{
+			// The directory doesn't exist. Return a 409 Conflict error.
+			if (D_POST)
+				cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
+			_statusCode = 409;
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_responseBody = getErrorPageContent(_statusCode);
+			_contentLength = _responseBody.size();
+			return;
+		}
+	}
+	// 1. Check the type of content
+	const string &contentType = _request->getHeaderValue("content-type");
+
+	// --- Simple File Upload Logic ---
+	// This handles plain text, images, pdfs, etc. - anything to be saved as a file.
+	if (contentType.find("text/plain") != string::npos || contentType.find("image/") != string::npos)
+	{
+
+		// 3. Write the raw request body to the file
+		std::ofstream file(path.c_str(), std::ios::binary);
+		if (!file.is_open())
+		{
+			if (D_POST)
+				cout << RED << "POST. Could not open file for writing: " << path << RESET << endl;
+			// Handle error (permission denied, etc.)
+			_statusCode = 500;
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_responseBody = getErrorPageContent(_statusCode);
+			_contentLength = _responseBody.size();
+			return;
+		}
+		file << _request->getBody();
+		file.close();
+
+		if (D_POST)
+			cout << GREEN << "POST. File created at: " << path << RESET << endl;
+
+		// 4. Send a "Created" response
+		_statusCode = 201;
+		_reasonPhrase = generateStatusMessage(_statusCode);
+		// Set the 'Location' header to the URI of the new file
+		// it's good practice to include a Location header that points
+		// to the newly created resource.
+		_headers["Location"] = _request->getUri();
+
+		_responseBody = "<html><body><h1>201 Created</h1><p>Resource created at <a href=\"" + _request->getUri() + "\">" + _request->getUri() + "</a></p></body></html>";
+		_headers["Content-Type"] = "text/html";
+		_contentLength = _responseBody.size();
+		return;
+	}
+	// --- Multipart Form Data Logic (File Upload) ---
+	else if (contentType.find("multipart/form-data") != string::npos)
+	{
+		// Parse multipart data to extract the file
+		// You'll need to implement parseMultipartData() method
+		string filename, fileData;
+
+		string boundary = HttpParser::extractBoundary(_request->getHeaderValue("content-type"));
+		if (HttpParser::parseMultipartData(_request->getBody(), boundary, filename, fileData))
+		{
+			// Construct file path with the original filename
+			string uploadPath = path;
+			/* if (uploadPath[uploadPath.length() - 1] != '/') {
+				uploadPath += "/";
+			} */
+			uploadPath += filename;
+
+			if (D_POST)
+				cout << ORANGE << "uploadPath: " << uploadPath << RESET << endl;
+
+			// Write the file data
+			std::ofstream file(uploadPath.c_str(), std::ios::binary);
+			if (!file.is_open())
+			{
+				if (D_POST)
+					cout << RED << "POST. Could not open file for writing: " << uploadPath << RESET << endl;
+				_statusCode = 500;
+				_reasonPhrase = generateStatusMessage(_statusCode);
+				_responseBody = getErrorPageContent(_statusCode);
+				_contentLength = _responseBody.size();
+				return;
+			}
+			file << fileData;
+			file.close();
+
+			if (D_POST)
+				cout << GREEN << "POST. File uploaded: " << uploadPath << RESET << endl;
+
+			_statusCode = 201;
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_headers["Location"] = _request->getUri() + filename;
+			_responseBody = "<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>";
+			_headers["Content-Type"] = "text/html";
+			_contentLength = _responseBody.size();
+			return;
+		}
+		else
+		{
+			_statusCode = 400; // Bad Request
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_responseBody = getErrorPageContent(_statusCode);
+			_contentLength = _responseBody.size();
+			return;
+		}
+	}
+	else if (contentType.find("application/x-www-form-urlencoded") != string::npos)
+	{
+		// --- Form Data Logic ---
+		// TODO: Parse the request body to get key-value pairs.
+		// For example, parse "name=Maryna&city=Kyiv"
+		_statusCode = 501; // Not Implemented yet
+		_reasonPhrase = generateStatusMessage(_statusCode);
+		_contentLength = _responseBody.size();
+	}
+	else
+	{
+		// --- Unsupported Type Logic ---
+		// The server doesn't know how to handle this content type.
+		_statusCode = 415; // Unsupported Media Type
+		_reasonPhrase = generateStatusMessage(_statusCode);
+		_responseBody = getErrorPageContent(_statusCode);
+		_contentLength = _responseBody.size();
+	}
+}
+
 void printCurrentLocation(const Location *loc)
 {
 	if (loc)
 	{
-		std::cout << "Current matched location: " << loc->getPath() << std::endl;
-		std::cout << "  Root: " << loc->getRoot() << std::endl;
-		std::cout << "  Index: " << loc->getIndex() << std::endl;
-		std::cout << "  Autoindex: " << (loc->getAutoindex() ? "on" : "off") << std::endl;
+		cout << "Current matched location: " << loc->getPath() << endl;
+		cout << "  Root: " << loc->getRoot() << endl;
+		cout << "  Index: " << loc->getIndex() << endl;
+		cout << "  Autoindex: " << (loc->getAutoindex() ? "on" : "off") << endl;
 	}
 	else
 	{
-		std::cout << "No location matched." << std::endl;
+		cout << "No location matched." << endl;
 	}
 }
 
@@ -51,27 +263,28 @@ void printCurrentLocation(const Location *loc)
 const Location *Response::matchPathToLocation()
 {
 	if (!_request)
-	{
 		return NULL;
-	}
+
 	const std::vector<Location> &locations = _server_config.getLocations();
 	const Location *bestMatch = NULL;
 	size_t bestMatchLen = 0;
 
 	if (DEBUG)
-		std::cout << GREEN << "Matching URI: [" << _request->getUri() << "] against " << locations.size() << " locations." << RESET << std::endl;
+		cout << GREEN << "Matching URI: [" << _request->getUri() << "] against ";
+	if (DEBUG)
+		cout << locations.size() << " locations." << RESET << endl;
 
 	for (size_t i = 0; i < locations.size(); ++i)
 	{
-		const std::string &locPath = locations[i].getPath();
+		const string &locPath = locations[i].getPath();
 		if (DEBUG)
-			std::cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << std::endl;
+			cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
 
 		// Check if request URI starts with this location path (proper prefix match)
-		const std::string &uri = _request->getUri();
+		const string &uri = _request->getUri();
 		if (DEBUG)
-			std::cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << std::endl;
-		const std::string html_ext = ".html";
+			cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << endl;
+		const string html_ext = ".html";
 
 		if (uri.compare(0, locPath.length(), locPath) == 0)
 		{
@@ -95,11 +308,10 @@ const Location *Response::matchPathToLocation()
 				// Path continues with '/' (e.g., /about matches /about/page)
 				isValidPrefix = true;
 			}
-
 			if (isValidPrefix)
 			{
 				if (DEBUG)
-					std::cout << GREEN << "    -> Match found!" << RESET << std::endl;
+					cout << GREEN << "    -> Match found!" << RESET << endl;
 				// We want the longest match (e.g. location /images/ vs location /)
 				if (locPath.length() > bestMatchLen)
 				{
@@ -107,15 +319,15 @@ const Location *Response::matchPathToLocation()
 					bestMatchLen = locPath.length();
 					if (DEBUG)
 					{
-						std::cout << GREEN << "    -> New best match (length " << bestMatchLen << ")" << RESET << std::endl;
-						std::cout << GREEN << "    -> Best match root: " << bestMatch->getRoot() << RESET << std::endl;
+						cout << GREEN << "    -> New best match (length " << bestMatchLen << ")" << RESET << endl;
+						cout << GREEN << "    -> Best match root: " << bestMatch->getRoot() << RESET << endl;
 					}
 				}
 			}
 			else
 			{
 				if (DEBUG)
-					std::cout << YELLOW << "    -> Substring match but not path prefix (rejected)" << RESET << std::endl;
+					cout << YELLOW << "    -> Substring match but not path prefix (rejected)" << RESET << endl;
 			}
 		}
 	}
@@ -123,18 +335,85 @@ const Location *Response::matchPathToLocation()
 	return bestMatch;
 }
 
+// Helper to find the location that is the longest matching prefix of the request URI.
+const Location *Response::matchPrefixPathToLocation()
+{
+
+	const std::vector<Location> &locations = _server_config.getLocations();
+	const Location *bestMatch = NULL;
+	size_t bestMatchLen = 0;
+	const string &RequestUri = _request->getUri();
+
+	if (D_POST)
+		cout << GREEN << "Matching URI: [" << RequestUri << "] against ";
+	if (D_POST)
+		cout << locations.size() << " locations." << RESET << endl;
+
+	for (size_t i = 0; i < locations.size(); ++i)
+	{
+
+		const string &locPath = locations[i].getPath();
+		if (D_POST)
+			cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
+
+		if (RequestUri.rfind(locPath, 0) == 0)
+		{
+
+			if (D_POST)
+				cout << BLUE << "    Request URI starts with the location path" << RESET << endl;
+			if (prefixMatching(locPath, RequestUri))
+			{
+				continue;
+			}
+			if (D_POST)
+				cout << GREEN << "    -> Prefix Match found!" << RESET << endl;
+			// We want the longest match (e.g. location /images/ vs location /)
+			if (locPath.length() > bestMatchLen)
+			{
+				bestMatch = &locations[i];
+				bestMatchLen = locPath.length();
+				if (D_POST)
+					cout << GREEN << "    -> New best match (length " << bestMatchLen;
+				if (D_POST)
+					cout << ")" << RESET << endl;
+			}
+		}
+	}
+	return bestMatch;
+}
+
+// It should only match if there's a "/" after the match.
+// e.g. URI "/about-us/team.html" should not match location "/about"
+// The character at index 6 of "/about-us/team.html" is a hyphen (-).
+bool Response::prefixMatching(const string &locPath, const string &RequestUri)
+{
+
+	// cout << RED << "RequestUri: " << RequestUri << "; LocPrefixPath: " << locPath << endl;
+	//  character in the URI right after the prefix
+	size_t index = locPath.length();
+
+	if (locPath.length() > 1 && RequestUri.length() > locPath.length() && RequestUri[index] != '/')
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
 // returns the index file name for the matched location or an empty string if none found
-std::string Response::getIndexFromLocation()
+string Response::getIndexFromLocation()
 {
 	for (std::vector<Location>::const_iterator it = _server_config.getLocations().begin();
 		 it != _server_config.getLocations().end(); ++it)
 	{
 		if (DEBUG)
 		{
-			std::cout << "Checking location for index: " << it->getPath() << std::endl;
-			std::cout << ORANGE << "Request URI: " << _request->getUri() << RESET << std::endl;
-			std::cout << ORANGE << "Location Path: " << it->getPath() << RESET << std::endl;
-			std::cout << ORANGE << "Location Index: " << it->getIndex() << RESET << std::endl;
+			cout << "Checking location for index: " << it->getPath() << endl;
+			cout << ORANGE << "Request URI: " << _request->getUri() << RESET << endl;
+			cout << ORANGE << "Location Path: " << it->getPath() << RESET << endl;
+			cout << ORANGE << "Location Index: " << it->getIndex() << RESET << endl;
 		}
 		if (_request->getUri() == it->getPath())
 		{
@@ -144,7 +423,7 @@ std::string Response::getIndexFromLocation()
 	return "";
 }
 
-Response::PathType Response::getPathType(std::string const path)
+Response::PathType Response::getPathType(string const path)
 {
 	struct stat buffer;
 	int result;
@@ -176,7 +455,7 @@ void Response::generateResponse()
 	const Location *loc = matchPathToLocation();
 
 	// Check for allowed methods
-	const std::vector<std::string> &allowed = loc->getAllowedMethods();
+	const std::vector<string> &allowed = loc->getAllowedMethods();
 	if (!allowed.empty())
 	{
 		bool methodAllowed = false;
@@ -191,7 +470,7 @@ void Response::generateResponse()
 		if (!methodAllowed)
 		{
 			if (DEBUG)
-				std::cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << std::endl;
+				cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
 			_statusCode = 405;
 			_reasonPhrase = generateStatusMessage(_statusCode);
 			_responseBody = getErrorPageContent(_statusCode);
@@ -199,24 +478,23 @@ void Response::generateResponse()
 			return;
 		}
 	}
-
 	// Check for redirection
 	if (loc->getReturnCode() != 0)
 	{
 		_statusCode = loc->getReturnCode();
 		_reasonPhrase = generateStatusMessage(_statusCode);
 		_headers["Location"] = loc->getReturnUrl();
+		_headers["Content-Type"] = "text/html";
 		_responseBody = "<html><body><h1>" + toString(_statusCode) + " " + _reasonPhrase + "</h1></body></html>";
 		_contentLength = _responseBody.size();
 		return;
 	}
-
 	// Construct Path
 	// Standard NGINX 'root' logic:
 	// 1. If location has 'root', it replaces server 'root'.
 	// 2. Path = root + URI (no stripping of location prefix).
 
-	std::string root;
+	string root;
 	if (!loc->getRoot().empty())
 	{
 		root = loc->getRoot();
@@ -225,24 +503,22 @@ void Response::generateResponse()
 	{
 		root = _server_config.getRoot();
 	}
-
 	// Fallback if root is empty: use current directory
 	if (root.empty())
 	{
 		root = ".";
 	}
-
 	if (DEBUG)
-		std::cout << YELLOW << "Using root: " << root << RESET << std::endl;
+		cout << YELLOW << "Using root: " << root << RESET << endl;
 
-	std::string uri = _request->getUri();
+	string uri = _request->getUri();
 	if (DEBUG)
-		std::cout << YELLOW << "Using URI: " << uri << RESET << std::endl;
+		cout << YELLOW << "Using URI: " << uri << RESET << endl;
 
 	// Strip location prefix from URI to get the remaining path
 	// e.g., location /gallery/ -> /gallery
-	std::string locPath = loc->getPath();
-	std::string remainingUri;
+	string locPath = loc->getPath();
+	string remainingUri;
 	if (locPath == "/")
 	{
 		// Root location: use full URI
@@ -259,36 +535,33 @@ void Response::generateResponse()
 	}
 	else
 	{
-		// Shouldn't happen if matching worked correctly
-		remainingUri = uri;
+		remainingUri = uri; // Shouldn't happen if matching worked correctly
 	}
 
 	if (DEBUG)
-		std::cout << YELLOW << "Remaining URI after location: " << remainingUri << RESET << std::endl;
-	std::string path = root + remainingUri;
+		cout << YELLOW << "Remaining URI after location: " << remainingUri << RESET << endl;
+	string path = root + remainingUri;
 	if (DEBUG)
-		std::cout << GREEN << "Resolved path: " << path << RESET << std::endl;
+		cout << GREEN << "Resolved path: " << path << RESET << endl;
 
 	// Check if path exists
 	PathType pathType = getPathType(path);
-
 	// CRITICAL: If location exists in config but path doesn't exist on disk → 404
 	if (pathType == NOT_EXIST)
 	{
 		if (DEBUG)
-			std::cout << RED << "Path not found: " << path << RESET << std::endl;
+			cout << RED << "Path not found: " << path << RESET << endl;
 		_statusCode = 404;
 		_reasonPhrase = generateStatusMessage(_statusCode);
 		_responseBody = getErrorPageContent(_statusCode);
 		_contentLength = _responseBody.size();
 		return;
 	}
-
 	// Handle Directory
 	if (pathType == DIRECTORY_PATH)
 	{
 		if (DEBUG)
-			std::cout << BLUE << "Path is a directory.1" << RESET << std::endl;
+			cout << BLUE << "Path is a directory.1" << RESET << endl;
 		if (path[path.length() - 1] != '/')
 			path += "/";
 		// if autoindex true
@@ -296,32 +569,32 @@ void Response::generateResponse()
 		bool isIndexPresent = loc->getIndex().empty() ? false : true;
 		bool isAutoindexPresent = loc->getAutoindex() ? true : false;
 		// Check for index file
-		std::string indexFile = isIndexPresent ? loc->getIndex() : "";
+		string indexFile = isIndexPresent ? loc->getIndex() : "";
 
-		// std::string targetPath = path + indexFile;
-		std::string targetPath = indexFile.empty() ? isAutoindexPresent ? path : "" : path + indexFile;
+		// string targetPath = path + indexFile;
+		string targetPath = indexFile.empty() ? isAutoindexPresent ? path : "" : path + indexFile;
 
 		if (DEBUG)
-			std::cout << BLUE << "Checking targetPath file1: " << targetPath << RESET << std::endl;
+			cout << BLUE << "Checking targetPath file1: " << targetPath << RESET << endl;
 		if (DEBUG)
-			std::cout << YELLOW << "Index to use: " << indexFile << RESET << std::endl;
+			cout << YELLOW << "Index to use: " << indexFile << RESET << endl;
 
 		if (getPathType(targetPath) == FILE_PATH)
 		{
 			path = targetPath; // Index exists, serve this file
 			if (DEBUG)
-				std::cout << GREEN << "Index file exists1: " << path << RESET << std::endl;
+				cout << GREEN << "Index file exists1: " << path << RESET << endl;
 		}
 		else
 		{
 			if (DEBUG)
-				std::cout << BLUE << "Index file not found." << RESET << std::endl;
+				cout << BLUE << "Index file not found." << RESET << endl;
 			// No index file found. Check Autoindex.
 			if (loc->getAutoindex())
 			{
 				if (DEBUG)
-					std::cout << BLUE << "Autoindex is ON. Generating listing for: " << path << RESET << std::endl;
-				std::string body;
+					cout << BLUE << "Autoindex is ON. Generating listing for: " << path << RESET << endl;
+				string body;
 				size_t bodyLen = 0;
 				if (buildHtmlIndexTable(path, body, bodyLen) == 0)
 				{
@@ -332,7 +605,7 @@ void Response::generateResponse()
 					return;
 				}
 				if (DEBUG)
-					std::cout << RED << "Autoindex generation failed." << RESET << std::endl;
+					cout << RED << "Autoindex generation failed." << RESET << endl;
 				_statusCode = 500;
 				_reasonPhrase = generateStatusMessage(_statusCode);
 				_responseBody = getErrorPageContent(_statusCode);
@@ -343,7 +616,7 @@ void Response::generateResponse()
 			{
 				// Directory, no index, no autoindex -> Forbidden
 				if (DEBUG)
-					std::cout << RED << "Directory access forbidden (no index, autoindex off2)" << RESET << std::endl;
+					cout << RED << "Directory access forbidden (no index, autoindex off2)" << RESET << endl;
 				_statusCode = 403;
 				_reasonPhrase = generateStatusMessage(_statusCode);
 				_responseBody = getErrorPageContent(_statusCode);
@@ -352,10 +625,9 @@ void Response::generateResponse()
 			}
 		}
 	}
-
 	// 3. Serve File
 	if (DEBUG)
-		std::cout << BLUE << "Serving file: " << path << RESET << std::endl;
+		cout << BLUE << "Serving file: " << path << RESET << endl;
 	std::ifstream file(path.c_str());
 
 	if (!file.is_open())
@@ -369,18 +641,35 @@ void Response::generateResponse()
 		return;
 	}
 
+	string contentType = getMimeType(path);
+	_headers["Content-Type"] = contentType;
+
 	std::ostringstream ss;
 	ss << file.rdbuf();
 	_responseBody = ss.str();
 	_contentLength = _responseBody.size();
 	file.close();
 }
+/* else if (_request->getEnumMethod() == Request::DELETE) {
+	// TODO: Add your logic for handling DELETE requests here.
+	// For example, deleting a resource from the server.
+	// You might set status code to 200 (OK) or 204 (No Content).
+	_statusCode = 501; // Not Implemented
+	_reasonPhrase = generateStatusMessage(_statusCode);
+	_responseBody = getErrorPageContent(_statusCode);
+	_contentLength = _responseBody.size();
+} else if (_request->getEnumMethod() == Request::INVALID) {
+	_statusCode = 501; // Not Implemented
+	_reasonPhrase = generateStatusMessage(_statusCode);
+	_responseBody = getErrorPageContent(_statusCode);
+	 _contentLength = _responseBody.size();
+} */
 
 short Response::getStatusCode() const { return _statusCode; }
 
 size_t Response::getContentLength() const { return _contentLength; }
 
-std::string Response::getResponseBody() const
+string Response::getResponseBody() const
 {
 	return _responseBody;
 }
@@ -389,6 +678,10 @@ std::string Response::getResponseBody() const
 void Response::reset()
 {
 	_request = 0;
+	_statusCode = 200;
+	_reasonPhrase = generateStatusMessage(_statusCode);
+	_responseBody.clear();
+	_contentLength = 0;
 }
 
 Server &Response::getServerConfig()
@@ -396,20 +689,20 @@ Server &Response::getServerConfig()
 	return _server_config;
 }
 
-std::string Response::getReasonPhrase() const
+string Response::getReasonPhrase() const
 {
 	return _reasonPhrase;
 }
 
-const std::map<std::string, std::string> &Response::getHeaders() const
+const std::map<string, string> &Response::getHeaders() const
 {
 	return _headers;
 }
 
-std::string Response::getErrorPageContent(int code)
+string Response::getErrorPageContent(int code)
 {
-	const std::map<int, std::string> &errorPages = _server_config.getErrorPages();
-	std::map<int, std::string>::const_iterator it = errorPages.find(code);
+	const std::map<int, string> &errorPages = _server_config.getErrorPages();
+	std::map<int, string>::const_iterator it = errorPages.find(code);
 
 	if (it != errorPages.end())
 	{
@@ -418,8 +711,58 @@ std::string Response::getErrorPageContent(int code)
 		{
 			std::ostringstream ss;
 			ss << file.rdbuf();
+			_headers["Content-Type"] = "text/html";
 			return ss.str();
 		}
 	}
 	return "";
+}
+
+string Response::getMimeType(const string &filePath)
+{
+
+	size_t dotPos = filePath.find_last_of('.');
+	if (dotPos == string::npos)
+	{
+		return "application/octet-stream";
+	}
+
+	string extension = filePath.substr(dotPos);
+
+	// Convert to lowercase
+	for (size_t i = 0; i < extension.length(); ++i)
+	{
+		extension[i] = std::tolower(extension[i]);
+	}
+
+	if (extension == ".jpg" || extension == ".jpeg")
+	{
+		return "image/jpeg";
+	}
+	else if (extension == ".png")
+	{
+		return "image/png";
+	}
+	else if (extension == ".gif")
+	{
+		return "image/gif";
+	}
+	else if (extension == ".html" || extension == ".htm")
+	{
+		return "text/html";
+	}
+	else if (extension == ".css")
+	{
+		return "text/css";
+	}
+	else if (extension == ".js")
+	{
+		return "application/javascript";
+	}
+	else if (extension == ".txt")
+	{
+		return "text/plain";
+	}
+
+	return "application/octet-stream";
 }

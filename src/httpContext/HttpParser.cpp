@@ -1,6 +1,12 @@
 #include "HttpParser.hpp"
 #include "PrintUtils.hpp"
 #include <limits>
+#include <cstdio>
+
+using std::cout;
+using std::cerr;
+using std::endl;
+using std::string;
 
 HttpParser::HttpParser() { }
 
@@ -35,31 +41,32 @@ bool HttpParser::parseRequestLine(const std::string& line,
 
 	// false if the stream iss fails to extract all three strings.
 	if (!(iss >> method >> uri >> version) || !iss.eof()) {
+		if(method.size() != 0)
+			req.setMethod(method);
+		else
+			req.setMethod("");
+		if(uri.size() != 0) req.setUri(uri);
+		if(version.size() != 0) req.setVersion(version);
 		req.setRequestLineFormatValid(false);
-		req.setMethod("");
 		return false;
 	}
-
+	req.setMethod(method);
+	req.setUri(uri);
+	req.setVersion(version);
 	if (method != "GET" && method != "POST" && method != "DELETE") {
 		req.setRequestLineFormatValid(false);
 		req.setMethod("");
 		return false;
 	}
-
 	if (version != "HTTP/1.1" && version != "HTTP/1.0") {
 		req.setRequestLineFormatValid(false);
 		return false;
 	}
-
 	// Rudimentary URI check
 	if (uri.empty() || uri[0] != '/' || uri.find("..") != std::string::npos) {
 		req.setRequestLineFormatValid(false);
 		return false;
 	}
-
-	req.setMethod(method);
-	req.setUri(uri);
-	req.setVersion(version);
 	req.setRequestLineFormatValid(true);
 	return true;
 }
@@ -174,4 +181,110 @@ bool	HttpParser::cpp98_hexaStrToInt(const std::string& s, size_t& out) {
 
 	out = value;
 	return true;
+}
+
+// parser for multipart/form-data
+bool	HttpParser::parseMultipartData(const std::string& reqBody, 
+			const std::string& boundary, std::string& filename,
+				std::string& fileData)
+{
+	std::cout << "parseMultipartData()" << std::endl;
+	cout << "boundary: " << boundary << endl;
+	if (boundary.empty()) {
+		std::cerr << "Error: malformed multipart request; no boundary found" << std::endl;
+		return false;
+	}
+
+	std::string buf = reqBody;
+	(void)filename;
+	// Multipart boundaries are prefixed with "--" in the body
+	std::string startBoundary = "--" + boundary;
+	std::string endBoundary = "--" + boundary + "--";
+	
+	size_t	pos_start_headers = reqBody.find(startBoundary);
+	if (pos_start_headers == std::string::npos) {
+		std::cerr << "Error: malformed multipart request; no start boundary found" << std::endl;
+		return false;
+	}
+	buf.erase(0, startBoundary.size() + 2);
+	size_t	pos_end_headers = buf.find("\r\n\r\n");
+	if (pos_end_headers == string::npos) {
+		std::cerr << "Error: malformed multipart request" << std::endl;
+		return false;
+	}
+	std::string multipart_headers = buf.substr(0, pos_end_headers);
+	cout << "multipart_headers:\n" << multipart_headers << endl;
+	buf.erase(0, pos_end_headers + 4);
+	// The actual file data starts after \r\n\r\n
+    size_t pos_body_start = 0;
+
+	// .find() - string Search Operation
+	// s2, pos Look for the string s2 starting at position pos
+	// in s.pos defaults to 0.
+	size_t pos_end_boundary = buf.find(endBoundary, pos_body_start);
+	if (pos_end_boundary == string::npos) {
+		std::cerr << "Error: malformed multipart request; no end boundary found" << endl;
+		return false;
+	}
+	// Extract file data (subtract 2 for the \r\n before end boundary)
+	size_t file_data_length = pos_end_boundary - 2;
+	fileData = buf.substr(0, file_data_length);
+	cout << "File data size: " << fileData.size() << " bytes" << endl;
+	
+	string picture = fileData.substr(0, 10);
+	cout << "picture check:\n" << picture << endl;
+
+	// Expected JPEG structure:
+	// Start: FF D8 FF (JPEG header)
+	// End: FF D9 (JPEG end marker) + possible metadata
+	// %02x is a formatting specifier used with the string formatting 
+	// operator % to represent an integer as a two-digit hexadecimal (base-16) number.
+	cout << "First 10 bytes (JPEG header): ";
+	for (size_t i = 0; i < 10 && i < fileData.size(); ++i) {
+		printf("%02X ", (unsigned char)fileData[i]);
+	}
+	cout << endl;
+
+/* 	cout << "Last 30 bytes: ";
+	for (size_t i = std::max(0, (int)fileData.size() - 30); i < fileData.size(); ++i) {
+		printf("%02X ", (unsigned char)fileData[i]);
+	}
+	cout << endl; */
+
+	size_t jpegEnd = fileData.find("\xFF\xD9");
+	// Include the FF D9 bytes (add 2)
+	string cleanJpeg = fileData.substr(0, jpegEnd + 2);
+	cout << "Clean JPEG size: " << cleanJpeg.size() << " bytes" << endl;
+
+	// Verify it ends with FF D9
+    cout << "Last 2 bytes should be FF D9: ";
+	for (size_t i = std::max(0, (int)cleanJpeg.size() - 2); i < cleanJpeg.size(); ++i) {
+		printf("%02X ", (unsigned char)cleanJpeg[i]);
+	}
+	cout << endl;
+
+	/* string picture_end = raw_data.substr(std::max(0, (int)raw_data.size() - 10), std::max(0, (int)raw_data.size()));
+	cout << "picture_end check:\n" << picture_end << endl; */
+	
+	// Use the clean JPEG data
+	//fileData = cleanJpeg;
+	return true;
+}
+
+std::string	HttpParser::extractBoundary(const std::string& contentType) {
+	
+	size_t	boundaryPos = contentType.find("boundary=");
+	if (boundaryPos == std::string::npos) {
+		return ""; // Error: no boundary found
+	}
+	// Skip "boundary="
+	std::string boundary = contentType.substr(boundaryPos + 9); 
+	
+	// Remove any trailing semicolon or whitespace
+	size_t	semicolon = boundary.find(';');
+	if (semicolon != std::string::npos) {
+		boundary = boundary.substr(0, semicolon);
+	}
+	
+	return boundary;
 }

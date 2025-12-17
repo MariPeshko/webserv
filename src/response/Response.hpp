@@ -1,7 +1,8 @@
 #ifndef RESPONSE_HPP
 #define RESPONSE_HPP
 
-#define DEBUG 1
+#define DEBUG 0
+#define D_POST 0
 #define GREEN "\033[32m"
 #define RESET "\033[0m"
 #define BLUE "\033[34m"
@@ -36,21 +37,23 @@ public:
 	Response(Server &server);
 	~Response();
 
-	void bindRequest(const Request &req); // new feat: Maryna. call after parsing
+	void bindRequest(const Request &req);
 	void generateResponse();
+	void postAndGenerateResponse();
+	const Location *matchPathToLocation();
+	const Location *matchPrefixPathToLocation();
+	bool prefixMatching(const std::string &locPath, const std::string &RequestUri);
 
 	short getStatusCode() const;
 	size_t getContentLength() const;
 	std::string getResponseBody() const;
 	std::string getReasonPhrase() const;
 	Server &getServerConfig();
+	static std::string getMimeType(const std::string &filePath);
 	const std::map<std::string, std::string> &getHeaders() const;
-
-	const Location *matchPathToLocation();
+	void reset();
 
 	std::string finalResponseContent;
-
-	void reset();
 
 	enum PathType
 	{
@@ -60,32 +63,23 @@ public:
 	};
 
 private:
-	Response(); // no default construction
-	// Maryna's suggestion. No copyable, for safety.
+	Response();
 	Response(const Response &);
 	Response &operator=(const Response &other);
 
-	// we should check what to store here
-	// most of the data will be stored in Request object
-	// Status Line
-	Server &_server_config;	 // reference
-	const Request *_request; // pointer
+	Server &_server_config;
+	const Request *_request;
 
 	short _statusCode;
 	std::string _reasonPhrase;
-	// Headers
-	// not sure if need a map of headers
-	std::map<std::string, std::string> _headers;
 	size_t _contentLength;
 	std::string _responseBody;
 	std::string _resourcePath;
+	std::map<std::string, std::string> _headers;
 
 	std::string getIndexFromLocation();
 	std::string getErrorPageContent(int code);
 	PathType getPathType(std::string const path);
-
-	//?? for image or binary data response
-	// std::vector<uint8_t> _responseBody;
 };
 
 #endif
