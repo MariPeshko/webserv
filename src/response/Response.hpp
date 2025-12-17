@@ -2,7 +2,7 @@
 #define RESPONSE_HPP
 
 #define DEBUG 0
-#define D_POST 1
+#define D_POST 0
 #define GREEN "\033[32m"
 #define RESET "\033[0m"
 #define BLUE "\033[34m"
@@ -24,67 +24,62 @@
 #include <unistd.h>
 #include <dirent.h>
 
-//TODO:
-// - if error - build error response
-// - set up status code during response generation (code could be changed due to errors, file not found, etc.)
-// - build html response based on request and server config
-// - set headers (just append important headers to map<string, string> _headers)
-// - add body content
+// TODO:
+//  - if error - build error response
+//  - set up status code during response generation (code could be changed due to errors, file not found, etc.)
+//  - build html response based on request and server config
+//  - set headers (just append important headers to map<string, string> _headers)
+//  - add body content
 
-class	Response {
+class Response
+{
 	public:
-		
-		Response(Server& server);
+		Response(Server &server);
 		~Response();
 
-		void		bindRequest(const Request& req);
-		void		generateResponse();
-		void		postAndGenerateResponse();
+		void			bindRequest(const Request &req);
+		void			generateResponse();
+		void			postAndGenerateResponse();
 		const Location*	matchPathToLocation();
 		const Location*	matchPrefixPathToLocation();
 		bool			prefixMatching(const std::string& locPath, const std::string& RequestUri);
-		void		reset();
+		
+		short			getStatusCode() const;
+		size_t			getContentLength() const;
+		std::string		getResponseBody() const;
+		std::string		getReasonPhrase() const;
+		Server			&getServerConfig();
+		static std::string							getMimeType(const std::string& filePath);
+		const std::map<std::string, std::string>	&getHeaders() const;
+		void			reset();
 
-		short		getStatusCode() const;
-		size_t		getContentLength() const;
-		std::string	getResponseBody() const;
-		std::string getReasonPhrase() const; 
-		Server&		getServerConfig();
-		const std::map<std::string, std::string>& getHeaders() const;
+		std::string		finalResponseContent;
 
-		static std::string	getMimeType(const std::string& filePath);
-
-        std::string finalResponseContent;
+		enum PathType {
+			FILE_PATH,
+			DIRECTORY_PATH,
+			NOT_EXIST
+		};
 
 	private:
-		Response(); // no default construction
-		// Maryna's suggestion. No copyable, for safety.
-		Response(const Response&);
-		Response&	operator= (const Response & other);
-	
-		// we should check what to store here
-		// most of the data will be stored in Request object
-		// Status Line
-		Server&			_server_config; // reference
-		const Request*	_request;		// pointer
+		Response();
+		Response(const Response &);
+		Response &operator=(const Response &other);
+
+		Server			&_server_config;
+		const Request	*_request;
 
 		short			_statusCode;
 		std::string		_reasonPhrase;
-		// Headers
-		//not sure if need a map of headers
-		// I guess we need them for successful POST method (Maryna)
-		std::map<std::string, std::string>	_headers;
 		size_t			_contentLength;
 		std::string		_responseBody;
 		std::string		_resourcePath;
+		std::map<std::string, std::string>	_headers;
 
-		std::string			getIndexFromLocation();
-		std::string			getErrorPageContent(int code);
+		std::string		getIndexFromLocation();
+		std::string		getErrorPageContent(int code);
+		PathType		getPathType(std::string const path);
 
-
-		//?? for image or binary data response
-		// std::vector<uint8_t> _responseBody;
 };
-
 
 #endif
