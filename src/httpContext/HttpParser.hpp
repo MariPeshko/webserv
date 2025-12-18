@@ -24,7 +24,10 @@ class	HttpParser {
 	static bool	cpp98_hexaStrToInt(const std::string& s, size_t& out);
 	static bool parseMultipartData(const std::string& reqBody, const std::string& boundary, 
 					std::string& filename, std::string& fileData);
+	static std::string	getExtensionStr(const std::string& filename);
+	static bool	parseMultiHeadersName(std::string& multipart_headers, std::string& filename);
 	static std::string	extractBoundary(const std::string& contentType);
+	static bool	isExtensionAllowed(const std::string& filename);
 
 	private:
 };

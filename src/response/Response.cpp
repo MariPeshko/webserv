@@ -142,11 +142,12 @@ void Response::postAndGenerateResponse()
 		string	boundary = HttpParser::extractBoundary(_request->getHeaderValue("content-type"));
 		if (HttpParser::parseMultipartData(_request->getBody(), boundary, filename, fileData))
 		{
+			if (!HttpParser::isExtensionAllowed(filename)) {
+				fillResponse(415, getErrorPageContent(415));
+				return;
+			}
 			// Construct file path with the original filename
 			string	uploadPath = path;
-			/* if (uploadPath[uploadPath.length() - 1] != '/') {
-				uploadPath += "/";
-			} */
 			uploadPath += filename;
 
 			if (D_POST) cout << ORANGE << "uploadPath: " << uploadPath << RESET << endl;
