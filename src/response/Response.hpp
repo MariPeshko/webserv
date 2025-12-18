@@ -80,6 +80,7 @@ private:
 	std::string getIndexFromLocation();
 	std::string getErrorPageContent(int code);
 	PathType getPathType(std::string const path);
+	void fillResponse(short statusCode, const std::string &bodyContent);
 };
 
 #endif

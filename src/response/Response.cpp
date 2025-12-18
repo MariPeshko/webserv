@@ -37,6 +37,13 @@ void Response::bindRequest(const Request &req)
 	_request = &req;
 }
 
+void Response::fillResponse(short statusCode, const string &bodyContent)
+{
+	_statusCode = statusCode;
+	_reasonPhrase = generateStatusMessage(_statusCode);
+	_responseBody = bodyContent;
+	_contentLength = _responseBody.size();
+}
 // Method POST and generation of the response
 // To Do refactor code that ised in generateResponse():
 // 1. matchPrefixPathToLocation()(); 2. if (!loc) 3. allowed = loc->getAllowedMethods();
@@ -57,21 +64,17 @@ void Response::postAndGenerateResponse()
 		}
 		if (!methodAllowed) {
 			if (DEBUG) cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
-			_statusCode = 405;
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			_responseBody = getErrorPageContent(_statusCode);
-			_contentLength = _responseBody.size();
+			fillResponse(405, getErrorPageContent(405));
 			return;
 		}
 	}
 	// Check for redirection
 	if (loc->getReturnCode() != 0) {
-		_statusCode = loc->getReturnCode();
-		_reasonPhrase = generateStatusMessage(_statusCode);
+		fillResponse(loc->getReturnCode(),
+			"<html><body><h1>" + toString(loc->getReturnCode()) + " " +
+			generateStatusMessage(loc->getReturnCode()) + "</h1></body></html>");
 		_headers["Location"] = loc->getReturnUrl();
 		_headers["Content-Type"] = "text/html";
-		_responseBody = "<html><body><h1>" + toString(_statusCode) + " " + _reasonPhrase + "</h1></body></html>";
-		_contentLength = _responseBody.size();
 		return;
 	}
 	// POST METHOD logic starts here
@@ -97,10 +100,7 @@ void Response::postAndGenerateResponse()
 		if (!isDirectory(dirPath)) {
 			// The directory doesn't exist. Return a 409 Conflict error.
 			if (D_POST) cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
-			_statusCode = 409;
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			_responseBody = getErrorPageContent(_statusCode);
-			_contentLength = _responseBody.size();
+			fillResponse(409, getErrorPageContent(409));
 			return;
 		}
 	}
@@ -115,10 +115,7 @@ void Response::postAndGenerateResponse()
 		if (!file.is_open()) {
 			if (D_POST) cout << RED << "POST. Could not open file for writing: " << path << RESET << endl;
 			// Handle error (permission denied, etc.)
-			_statusCode = 500;
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			_responseBody = getErrorPageContent(_statusCode);
-			_contentLength = _responseBody.size();
+			fillResponse(500, getErrorPageContent(500));
 			return;
 		}
 		file << _request->getBody();
@@ -127,15 +124,13 @@ void Response::postAndGenerateResponse()
 		if (D_POST) cout << GREEN << "POST. File created at: " << path << RESET << endl;
 
 		// 4. Send a "Created" response
-		_statusCode = 201;
-		_reasonPhrase = generateStatusMessage(_statusCode);
+		fillResponse(201,
+			"<html><body><h1>201 Created</h1><p>Resource created at <a href=\"" + _request->getUri() + "\">" + _request->getUri() + "</a></p></body></html>");
 		// Set the 'Location' header to the URI of the new file
 		// it's good practice to include a Location header that points
 		// to the newly created resource.
 		_headers["Location"] = _request->getUri();
-		_responseBody = "<html><body><h1>201 Created</h1><p>Resource created at <a href=\"" + _request->getUri() + "\">" + _request->getUri() + "</a></p></body></html>";
 		_headers["Content-Type"] = "text/html";
-		_contentLength = _responseBody.size();
 		return;
 	}
 	// --- Multipart Form Data Logic (File Upload) ---
@@ -159,44 +154,31 @@ void Response::postAndGenerateResponse()
 			std::ofstream	file(uploadPath.c_str(), std::ios::binary);
 			if (!file.is_open()) {
 				if (D_POST) cout << RED << "POST. Could not open file for writing: " << uploadPath << RESET << endl;
-				_statusCode = 500;
-				_reasonPhrase = generateStatusMessage(_statusCode);
-				_responseBody = getErrorPageContent(_statusCode);
-				_contentLength = _responseBody.size();
+				fillResponse(500, getErrorPageContent(500));
 				return;
 			}
 			file << fileData;
 			file.close();
 
 			if (D_POST) cout << GREEN << "POST. File uploaded: " << uploadPath << RESET << endl;
-			_statusCode = 201;
-			_reasonPhrase = generateStatusMessage(_statusCode);
+			fillResponse(201,
+				"<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>");
 			_headers["Location"] = _request->getUri() + filename;
-			_responseBody = "<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>";
 			_headers["Content-Type"] = "text/html";
-			_contentLength = _responseBody.size();
 			return;
 		} else {
-			_statusCode = 400; // Bad Request
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			_responseBody = getErrorPageContent(_statusCode);
-			_contentLength = _responseBody.size();
+			fillResponse(400, getErrorPageContent(400));
 			return;
 		}
 	} else if (contentType.find("application/x-www-form-urlencoded") != string::npos) {
 		// --- Form Data Logic ---
 		// TODO: Parse the request body to get key-value pairs.
 		// For example, parse "name=Maryna&city=Kyiv"
-		_statusCode = 501; // Not Implemented yet
-		_reasonPhrase = generateStatusMessage(_statusCode);
-		_contentLength = _responseBody.size();
+		fillResponse(501, getErrorPageContent(501)); // Not Implemented yet
 	} else {
 		// --- Unsupported Type Logic ---
 		// The server doesn't know how to handle this content type.
-		_statusCode = 415; // Unsupported Media Type
-		_reasonPhrase = generateStatusMessage(_statusCode);
-		_responseBody = getErrorPageContent(_statusCode);
-		_contentLength = _responseBody.size();
+		fillResponse(415, getErrorPageContent(415));
 	}
 }
 
@@ -371,10 +353,7 @@ void	Response::generateResponse()
 {
 	if (!_request) return;
 
-	_statusCode = 200;
-	_reasonPhrase = generateStatusMessage(_statusCode);
-	_responseBody.clear();
-	_contentLength = 0;
+	fillResponse(200, "");
 
 	const Location	*loc = matchPathToLocation();
 
@@ -390,21 +369,17 @@ void	Response::generateResponse()
 		}
 		if (!methodAllowed) {
 			if (DEBUG) cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
-			_statusCode = 405;
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			_responseBody = getErrorPageContent(_statusCode);
-			_contentLength = _responseBody.size();
+			fillResponse(405, getErrorPageContent(405));
 			return;
 		}
 	}
 	// Check for redirection
 	if (loc->getReturnCode() != 0) {
-		_statusCode = loc->getReturnCode();
-		_reasonPhrase = generateStatusMessage(_statusCode);
+		fillResponse(loc->getReturnCode(),
+			"<html><body><h1>" + toString(loc->getReturnCode()) + " " +
+			generateStatusMessage(loc->getReturnCode()) + "</h1></body></html>");
 		_headers["Location"] = loc->getReturnUrl();
 		_headers["Content-Type"] = "text/html";
-		_responseBody = "<html><body><h1>" + toString(_statusCode) + " " + _reasonPhrase + "</h1></body></html>";
-		_contentLength = _responseBody.size();
 		return;
 	}
 	// Construct Path
@@ -418,31 +393,14 @@ void	Response::generateResponse()
 	} else {
 		root = _server_config.getRoot();	// Fall back to server root
 	}
-	// Safety. Fallback if root is empty: use current directory. 
+	// Safety. Fallback if root is empty: use current directory.
 	if (root.empty()) root = "."; // the current working directory
 	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
 
 	string		uri = _request->getUri();
 	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
 
-	// Strip location prefix from URI to get the remaining path
-	// e.g., location /gallery/ -> /gallery
-	string		locPath = loc->getPath();
-	string		remainingUri;
-	if (locPath == "/") {
-		// Root location: use full URI
-		remainingUri = uri;
-	} else if (uri.compare(0, locPath.length(), locPath) == 0) {
-		// URI starts with location path: strip it
-		remainingUri = uri.substr(locPath.length());
-		if (remainingUri.empty()) {
-			remainingUri = "/";
-		}
-	} else {
-		remainingUri = uri; // Shouldn't happen if matching worked correctly
-	}
-	if (DEBUG) cout << YELLOW << "Remaining URI after location: " << remainingUri << RESET << endl;
-	string	path = root + remainingUri;
+	string	path = root + uri;
 	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
 
 	// Check if path exists
@@ -450,10 +408,7 @@ void	Response::generateResponse()
 	// CRITICAL: If location exists in config but path doesn't exist on disk → 404
 	if (pathType == NOT_EXIST) {
 		if (DEBUG) cout << RED << "Path not found: " << path << RESET << endl;
-		_statusCode = 404;
-		_reasonPhrase = generateStatusMessage(_statusCode);
-		_responseBody = getErrorPageContent(_statusCode);
-		_contentLength = _responseBody.size();
+		fillResponse(404, getErrorPageContent(404));
 		return;
 	}
 	// Handle Directory
@@ -484,25 +439,16 @@ void	Response::generateResponse()
 				string	body;
 				size_t	bodyLen = 0;
 				if (buildHtmlIndexTable(path, body, bodyLen) == 0) {
-					_statusCode = 200;
-					_reasonPhrase = generateStatusMessage(_statusCode);
-					_responseBody = body;
-					_contentLength = bodyLen;
+					fillResponse(200, body);
 					return;
 				}
 				if (DEBUG) cout << RED << "Autoindex generation failed." << RESET << endl;
-				_statusCode = 500;
-				_reasonPhrase = generateStatusMessage(_statusCode);
-				_responseBody = getErrorPageContent(_statusCode);
-				_contentLength = _responseBody.size();
+				fillResponse(500, getErrorPageContent(500));
 				return;
 			} else {
 				// Directory, no index, no autoindex -> Forbidden
 				if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off2)" << RESET << endl;
-				_statusCode = 403;
-				_reasonPhrase = generateStatusMessage(_statusCode);
-				_responseBody = getErrorPageContent(_statusCode);
-				_contentLength = _responseBody.size();
+				fillResponse(403, getErrorPageContent(403));
 				return;
 			}
 		}
@@ -512,10 +458,7 @@ void	Response::generateResponse()
 	std::ifstream	file(path.c_str());
 	if (!file.is_open()) {
 		if (DEBUG) cout << RED << "File not found: " << path << RESET << endl;
-		_statusCode = 404;
-		_reasonPhrase = generateStatusMessage(_statusCode);
-		_responseBody = getErrorPageContent(_statusCode);
-		_contentLength = _responseBody.size();
+		fillResponse(404, getErrorPageContent(404));
 		return;
 	}
 
@@ -532,15 +475,9 @@ void	Response::generateResponse()
 	// TODO: Add your logic for handling DELETE requests here.
 	// For example, deleting a resource from the server.
 	// You might set status code to 200 (OK) or 204 (No Content).
-	_statusCode = 501; // Not Implemented
-	_reasonPhrase = generateStatusMessage(_statusCode);
-	_responseBody = getErrorPageContent(_statusCode);
-	_contentLength = _responseBody.size();
+	fillResponse(501, getErrorPageContent(501)); // Not Implemented
 } else if (_request->getEnumMethod() == Request::INVALID) {
-	_statusCode = 501; // Not Implemented
-	_reasonPhrase = generateStatusMessage(_statusCode);
-	_responseBody = getErrorPageContent(_statusCode);
-	 _contentLength = _responseBody.size();
+	fillResponse(400, getErrorPageContent(400)); // Bad Request
 } */
 
 short	Response::getStatusCode() const { return _statusCode; }
@@ -555,10 +492,8 @@ string	Response::getResponseBody() const {
 void Response::reset()
 {
 	_request = 0;
-	_statusCode = 200;
-	_reasonPhrase = generateStatusMessage(_statusCode);
-	_responseBody.clear();
-	_contentLength = 0;
+	fillResponse(200, "");
+	_headers.clear();
 }
 
 Server&							Response::getServerConfig() {
