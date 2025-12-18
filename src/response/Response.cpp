@@ -253,7 +253,7 @@ const Location*	Response::matchPathToLocation()
 			}
 		}
 	}
-	printCurrentLocation(bestMatch);
+	if (DEBUG) printCurrentLocation(bestMatch);
 	return bestMatch;
 }
 
