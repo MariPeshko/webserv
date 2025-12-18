@@ -2,6 +2,8 @@
 #include "PrintUtils.hpp"
 #include <limits>
 #include <cstdio>
+#include <ctime>    // For time functions
+#include <sstream>  // For stringstream
 
 using std::cout;
 using std::cerr;
@@ -183,9 +185,27 @@ bool	HttpParser::cpp98_hexaStrToInt(const std::string& s, size_t& out) {
 	return true;
 }
 
-static bool	parseMultiHeadersName(string& multipart_headers, string& filename)
+// Generate Timestamp for a filename
+static string generateTimestamp() {
+	
+	time_t				now = time(0);
+	struct tm*			tstruct = localtime(&now);
+	std::stringstream	timestamp_ss;
+	timestamp_ss << (1900 + tstruct->tm_year)
+				<< (tstruct->tm_mon + 1 < 10 ? "0" : "") << (tstruct->tm_mon + 1) // a zero-based index; 0 = January
+				<< (tstruct->tm_mday < 10 ? "0" : "") << tstruct->tm_mday
+				<< "-"
+				<< (tstruct->tm_hour < 10 ? "0" : "") << tstruct->tm_hour
+				<< (tstruct->tm_min < 10 ? "0" : "") << tstruct->tm_min
+				<< (tstruct->tm_sec < 10 ? "0" : "") << tstruct->tm_sec;
+	return timestamp_ss.str();
+}
+
+bool	HttpParser::parseMultiHeadersName(string& multipart_headers, string& filename)
 {
 	string	headers = multipart_headers;
+	string	original_filename;
+	string	sanitized_filename;
 
 	size_t	filename_header = headers.find("filename=\"");
 	if (filename_header == std::string::npos) {
@@ -193,13 +213,30 @@ static bool	parseMultiHeadersName(string& multipart_headers, string& filename)
 		return false;
 	}
 	headers.erase(0, filename_header + 10);
-	cout << headers << endl;
 	size_t	char_after_name = headers.find("\"");
 	if (char_after_name == std::string::npos) {
 		cerr << "Error: malformed multipart header; no closure \" found" << endl;
 		return false;
 	}
-	filename = headers.substr(0, char_after_name);
+	original_filename = headers.substr(0, char_after_name);
+	// Sanitize filename
+    for (size_t i = 0; i < original_filename.length(); ++i) {
+        unsigned char c = original_filename[i];
+        if (c < 128) {
+            if (c == ' ' || c == '\t') {
+                sanitized_filename += '_';
+            } else {
+                sanitized_filename += c;
+            }
+		} else {
+			sanitized_filename += "non_ascii_name";
+			sanitized_filename += HttpParser::getExtensionStr(original_filename);
+			break;
+		}
+    }
+	string	timestamp_ss = generateTimestamp();
+	// Prepend timestamp to the filename
+	filename = timestamp_ss + "_" + sanitized_filename;
 	
 	return true;
 }
@@ -209,8 +246,6 @@ bool	HttpParser::parseMultipartData(const string& reqBody,
 			const string& boundary, string& filename,
 				string& fileData)
 {
-	cout << "parseMultipartData()" << endl;
-	cout << "boundary: " << boundary << endl;
 	if (boundary.empty()) {
 		cerr << "Error: malformed multipart request; no boundary found" << endl;
 		return false;
@@ -241,7 +276,7 @@ bool	HttpParser::parseMultipartData(const string& reqBody,
 
 	buf.erase(0, pos_end_headers + 4);
 	// The actual file data starts after \r\n\r\n
-    size_t pos_body_start = 0;
+	size_t pos_body_start = 0;
 
 	// .find() - string Search Operation
 	// s2, pos Look for the string s2 starting at position pos
@@ -252,47 +287,32 @@ bool	HttpParser::parseMultipartData(const string& reqBody,
 		return false;
 	}
 	// Extract file data (subtract 2 for the \r\n before end boundary)
-	size_t file_data_length = pos_end_boundary - 2;
+	size_t	file_data_length = pos_end_boundary - 2;
 	fileData = buf.substr(0, file_data_length);
-	cout << "File data size: " << fileData.size() << " bytes" << endl;
 	
-	string picture = fileData.substr(0, 10);
-	cout << "picture check:\n" << picture << endl;
+	string	picture = fileData.substr(0, 10);
 
-	// Expected JPEG structure:
+	// TO DELETE Expected JPEG structure:
 	// Start: FF D8 FF (JPEG header)
 	// End: FF D9 (JPEG end marker) + possible metadata
 	// %02x is a formatting specifier used with the string formatting 
 	// operator % to represent an integer as a two-digit hexadecimal (base-16) number.
-	cout << "First 10 bytes (JPEG header): ";
+	/* cout << "First 10 bytes (JPEG header): ";
 	for (size_t i = 0; i < 10 && i < fileData.size(); ++i) {
 		printf("%02X ", (unsigned char)fileData[i]);
 	}
-	cout << endl;
-
-/* 	cout << "Last 30 bytes: ";
-	for (size_t i = std::max(0, (int)fileData.size() - 30); i < fileData.size(); ++i) {
-		printf("%02X ", (unsigned char)fileData[i]);
-	}
 	cout << endl; */
-
-	size_t jpegEnd = fileData.find("\xFF\xD9");
+	/* size_t jpegEnd = fileData.find("\xFF\xD9");
 	// Include the FF D9 bytes (add 2)
 	string cleanJpeg = fileData.substr(0, jpegEnd + 2);
 	cout << "Clean JPEG size: " << cleanJpeg.size() << " bytes" << endl;
 
 	// Verify it ends with FF D9
-    cout << "Last 2 bytes should be FF D9: ";
+	cout << "Last 2 bytes should be FF D9: ";
 	for (size_t i = std::max(0, (int)cleanJpeg.size() - 2); i < cleanJpeg.size(); ++i) {
 		printf("%02X ", (unsigned char)cleanJpeg[i]);
 	}
-	cout << endl;
-
-	/* string picture_end = raw_data.substr(std::max(0, (int)raw_data.size() - 10), std::max(0, (int)raw_data.size()));
-	cout << "picture_end check:\n" << picture_end << endl; */
-	
-	// Use the clean JPEG data
-	//fileData = cleanJpeg;
+	cout << endl; */
 	return true;
 }
 
@@ -312,4 +332,40 @@ std::string	HttpParser::extractBoundary(const std::string& contentType) {
 	}
 	
 	return boundary;
+}
+
+string HttpParser::getExtensionStr(const std::string& filename) {
+	size_t dot_pos = filename.find_last_of(".");
+    if (dot_pos == std::string::npos) {
+        return ".no_extention";
+    }
+	std::string	ext = filename.substr(dot_pos);
+	for (size_t i = 0; i < ext.length(); ++i) {
+        ext[i] = std::tolower(ext[i]);
+    }
+	return ext;
+}
+
+// Conceptual function to sanitize and validate a filename's extension
+bool	HttpParser::isExtensionAllowed(const std::string& filename) {
+    // 1. Isolate the extension
+    size_t dot_pos = filename.find_last_of(".");
+    if (dot_pos == std::string::npos) {
+        return false;
+    }
+    std::string	ext = filename.substr(dot_pos);
+    // 2. Normalize to lowercase
+    for (size_t i = 0; i < ext.length(); ++i) {
+        ext[i] = std::tolower(ext[i]);
+    }
+    // 3. Whitelist of allowed extensions
+    const char*		allowed_extensions[] = {".jpg", ".jpeg", ".png", ".gif"};
+    const size_t	num_allowed = sizeof(allowed_extensions) / sizeof(allowed_extensions[0]);
+    // 4. Validate against the whitelist
+    for (size_t i = 0; i < num_allowed; ++i) {
+        if (ext == allowed_extensions[i]) {
+            return true;
+        }
+    }
+    return false;
 }
