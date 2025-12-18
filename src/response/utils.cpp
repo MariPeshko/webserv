@@ -25,8 +25,12 @@ const char *generateStatusMessage(short status_code)
 		return "Not Found";
 	case 405:
 		return "Method Not Allowed";
+	case 415:
+		return "Unsupported Media Type";
 	case 500:
 		return "Internal Server Error";
+	case 501:
+		return "Not Implemented";
 	default:
 		return "Unknown Error";
 	}
