@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<title>Simple HTML Page</title>
+	<title>About - MySite</title>
 	<style>
 		:root {
 			--bg: #f7fafc;
@@ -114,33 +114,27 @@
 
 		<main>
 			<section class="hero" aria-labelledby="hero-title">
-				<h1 id="hero-title">Welcome to your new page</h1>
-				<p>Simple, responsive HTML template to start a small site or demo.
-					<br>Edit this file at /www/web/uploads/uploads.html.</p>
-				<a class="btn" href="#" role="button">Get started</a>
+				<h1 id="hero-title">About Us</h1>
+				<p>Learn more about our mission, vision, and the team behind MySite.</p>
 			</section>
 
-		<section aria-labelledby="upload-title">
-			<h3 id="upload-title">Upload a Picture</h3>
-			<p>Select an image file to upload to the server.</p>
-			<form class="upload-form" action="/tmp/" method="post" enctype="multipart/form-data">
-				<div class="file-input-wrapper">
-					<input type="file" id="picture" name="picture" accept="image/*" class="file-input" required>
-					<button type="button" class="btn" onclick="document.getElementById('picture').click()">
-						Choose Picture
-					</button>
-				</div>
-				<br><br>
-				<button type="submit" class="btn">Upload Picture</button>
-			</form>
-		</section>
+			<section aria-labelledby="mission-title">
+				<h3 id="mission-title">Our Mission</h3>
+				<p>We strive to provide simple, elegant, and efficient web solutions. Our goal is to make the web
+					accessible and enjoyable for everyone.</p>
+			</section>
 
-		<section aria-labelledby="about-title">
-			<h3 id="about-title">About this template</h3>
-			<p>This file is intentionally small and dependency-free. Replace the content, add styles or scripts as
-					needed.</p>
-		</section>
-	</main>
+			<section aria-labelledby="team-title">
+				<h3 id="team-title">The Team</h3>
+				<p>We are a passionate group of developers, designers, and creators dedicated to building high-quality
+					software.</p>
+				<ul>
+					<li><strong>Alice:</strong> Lead Developer</li>
+					<li><strong>Bob:</strong> UI/UX Designer</li>
+					<li><strong>Charlie:</strong> Project Manager</li>
+				</ul>
+			</section>
+		</main>
 
 		<footer>
 			© <span id="year"></span> MySite — Built with plain HTML
@@ -149,13 +143,7 @@
 
 	<script>
 		// small script to update the year
-        document.getElementById('year').textContent = new Date().getFullYear();
-        
-        // Show selected file name
-        document.getElementById('picture').addEventListener('change', function(e) {
-            const fileName = e.target.files[0] ? e.target.files[0].name : 'No file selected';
-            console.log('Selected file:', fileName);
-        });
+		document.getElementById('year').textContent = new Date().getFullYear();
 	</script>
 </body>
 

@@ -183,37 +183,62 @@ bool	HttpParser::cpp98_hexaStrToInt(const std::string& s, size_t& out) {
 	return true;
 }
 
-// parser for multipart/form-data
-bool	HttpParser::parseMultipartData(const std::string& reqBody, 
-			const std::string& boundary, std::string& filename,
-				std::string& fileData)
+static bool	parseMultiHeadersName(string& multipart_headers, string& filename)
 {
-	std::cout << "parseMultipartData()" << std::endl;
+	string	headers = multipart_headers;
+
+	size_t	filename_header = headers.find("filename=\"");
+	if (filename_header == std::string::npos) {
+		cerr << "Error: malformed multipart header; no \"filename=\"\" found" << endl;
+		return false;
+	}
+	headers.erase(0, filename_header + 10);
+	cout << headers << endl;
+	size_t	char_after_name = headers.find("\"");
+	if (char_after_name == std::string::npos) {
+		cerr << "Error: malformed multipart header; no closure \" found" << endl;
+		return false;
+	}
+	filename = headers.substr(0, char_after_name);
+	
+	return true;
+}
+
+// parser for multipart/form-data
+bool	HttpParser::parseMultipartData(const string& reqBody, 
+			const string& boundary, string& filename,
+				string& fileData)
+{
+	cout << "parseMultipartData()" << endl;
 	cout << "boundary: " << boundary << endl;
 	if (boundary.empty()) {
-		std::cerr << "Error: malformed multipart request; no boundary found" << std::endl;
+		cerr << "Error: malformed multipart request; no boundary found" << endl;
 		return false;
 	}
 
-	std::string buf = reqBody;
-	(void)filename;
+	string buf = reqBody;
 	// Multipart boundaries are prefixed with "--" in the body
-	std::string startBoundary = "--" + boundary;
-	std::string endBoundary = "--" + boundary + "--";
+	string startBoundary = "--" + boundary;
+	string endBoundary = "--" + boundary + "--";
 	
 	size_t	pos_start_headers = reqBody.find(startBoundary);
 	if (pos_start_headers == std::string::npos) {
-		std::cerr << "Error: malformed multipart request; no start boundary found" << std::endl;
+		cerr << "Error: malformed multipart request; no start boundary found" << endl;
 		return false;
 	}
 	buf.erase(0, startBoundary.size() + 2);
 	size_t	pos_end_headers = buf.find("\r\n\r\n");
 	if (pos_end_headers == string::npos) {
-		std::cerr << "Error: malformed multipart request" << std::endl;
+		cerr << "Error: malformed multipart request" << endl;
 		return false;
 	}
-	std::string multipart_headers = buf.substr(0, pos_end_headers);
-	cout << "multipart_headers:\n" << multipart_headers << endl;
+	string	multipart_headers = buf.substr(0, pos_end_headers);
+
+	if (!parseMultiHeadersName(multipart_headers, filename)) {
+		return false;
+	}
+	cout << "filename: " << filename << endl;
+
 	buf.erase(0, pos_end_headers + 4);
 	// The actual file data starts after \r\n\r\n
     size_t pos_body_start = 0;

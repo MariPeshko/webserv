@@ -428,7 +428,7 @@ void	Response::generateResponse()
 	// Strip location prefix from URI to get the remaining path
 	// e.g., location /gallery/ -> /gallery
 	string		locPath = loc->getPath();
-	string		remainingUri;
+	/* string		remainingUri;
 	if (locPath == "/") {
 		// Root location: use full URI
 		remainingUri = uri;
@@ -442,7 +442,8 @@ void	Response::generateResponse()
 		remainingUri = uri; // Shouldn't happen if matching worked correctly
 	}
 	if (DEBUG) cout << YELLOW << "Remaining URI after location: " << remainingUri << RESET << endl;
-	string	path = root + remainingUri;
+	string	path = root + remainingUri; */
+	string	path = root + uri;
 	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
 
 	// Check if path exists
