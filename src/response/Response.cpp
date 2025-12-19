@@ -32,12 +32,12 @@ Response &Response::operator=(const Response &other)
 Response::~Response() {}
 
 // call after parsing
-void Response::bindRequest(const Request &req)
+void	Response::bindRequest(const Request &req)
 {
 	_request = &req;
 }
 
-void Response::fillResponse(short statusCode, const string &bodyContent)
+void	Response::fillResponse(short statusCode, const string &bodyContent)
 {
 	_statusCode = statusCode;
 	_reasonPhrase = generateStatusMessage(_statusCode);
@@ -48,7 +48,7 @@ void Response::fillResponse(short statusCode, const string &bodyContent)
 // To Do refactor code that ised in generateResponse():
 // 1. matchPrefixPathToLocation()(); 2. if (!loc) 3. allowed = loc->getAllowedMethods();
 // 4. if (!allowed.empty()) 5. Check for redirection if (loc->getReturnCode() != 0)
-void Response::postAndGenerateResponse()
+void	Response::postAndGenerateResponse()
 {
 	if (D_POST) cout << BLUE << "POST method" << RESET << endl;
 	const Location*	loc = matchPrefixPathToLocation();
@@ -161,11 +161,15 @@ void Response::postAndGenerateResponse()
 			file << fileData;
 			file.close();
 
-			if (D_POST) cout << GREEN << "POST. File uploaded: " << uploadPath << RESET << endl;
-			fillResponse(201,
+			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern" << uploadPath << RESET << endl;
+			// TO DELETE
+			/* fillResponse(201,
 				"<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>");
 			_headers["Location"] = _request->getUri() + filename;
-			_headers["Content-Type"] = "text/html";
+			_headers["Content-Type"] = "text/html"; */
+			// Instead of 201, send a 303 redirect back to the uploads page
+			fillResponse(303, ""); // 303 See Other, empty body
+			_headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
 			return;
 		} else {
 			fillResponse(400, getErrorPageContent(400));
@@ -208,16 +212,16 @@ const Location*	Response::matchPathToLocation()
 	const Location*					bestMatch = NULL;
 	size_t							bestMatchLen = 0;
 
-	if (DEBUG) cout << GREEN << "Matching URI: [" << _request->getUri() << "] against ";
-	if (DEBUG) cout << locations.size() << " locations." << RESET << endl;
+	if (DEBUG_PATH) cout << GREEN << "Matching URI: [" << _request->getUri() << "] against ";
+	if (DEBUG_PATH) cout << locations.size() << " locations." << RESET << endl;
 
 	for (size_t i = 0; i < locations.size(); ++i) {
 		const string &locPath = locations[i].getPath();
-		if (DEBUG) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
+		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
 
 		// Check if request URI starts with this location path (proper prefix match)
 		const string &uri = _request->getUri();
-		if (DEBUG) cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << endl;
+		if (DEBUG_PATH) cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << endl;
 		const string html_ext = ".html";
 
 		if (uri.compare(0, locPath.length(), locPath) == 0)
@@ -238,22 +242,22 @@ const Location*	Response::matchPathToLocation()
 				isValidPrefix = true;
 			}
 			if (isValidPrefix) {
-				if (DEBUG) cout << GREEN << "    -> Match found!" << RESET << endl;
+				if (DEBUG_PATH) cout << GREEN << "    -> Match found!" << RESET << endl;
 				// We want the longest match (e.g. location /images/ vs location /)
 				if (locPath.length() > bestMatchLen) {
 					bestMatch = &locations[i];
 					bestMatchLen = locPath.length();
-					if (DEBUG) {
+					if (DEBUG_PATH) {
 						cout << GREEN << "    -> New best match (length " << bestMatchLen << ")" << RESET << endl;
 						cout << GREEN << "    -> Best match root: " << bestMatch->getRoot() << RESET << endl;
 					}
 				}
 			} else {
-				if (DEBUG) cout << YELLOW << "    -> Substring match but not path prefix (rejected)" << RESET << endl;
+				if (DEBUG_PATH) cout << YELLOW << "    -> Substring match but not path prefix (rejected)" << RESET << endl;
 			}
 		}
 	}
-	if (DEBUG) printCurrentLocation(bestMatch);
+	if (DEBUG_PATH) printCurrentLocation(bestMatch);
 	return bestMatch;
 }
 
@@ -440,6 +444,8 @@ void	Response::generateResponse()
 				string	body;
 				size_t	bodyLen = 0;
 				if (buildHtmlIndexTable(path, body, bodyLen) == 0) {
+					if (DEBUG) cout << "buildHtmlIndexTable(). " << "path: " << path << endl;
+					_headers["Content-Type"] = "text/html";
 					fillResponse(200, body);
 					return;
 				}

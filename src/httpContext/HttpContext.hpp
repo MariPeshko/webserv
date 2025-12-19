@@ -17,6 +17,7 @@
 #define CTX_DEBUG 0
 #define REQ_DEBUG 0
 #define REQ_DEBUG_BODY 0
+#define RESP_DEBUG 0
 #define YELLOW "\033[33m"
 #define RESET "\033[0m"
 #define GREEN "\033[32m"
@@ -82,10 +83,10 @@ class HttpContext
 		HttpContext();									  // no default construction
 		HttpContext &operator=(const HttpContext &other); // no assignment
 
-		Connection	_conn;
-		Server&		_server_config;
-		Request		_request;
-		Response	_response;
+		Connection		_conn;
+		Server&			_server_config;
+		Request			_request;
+		Response		_response;
 		e_parse_state	_state;
 
 		// body members

@@ -321,15 +321,15 @@ void	HttpContext::buildResponseString()
 	std::ostringstream	oss;
 
 	// 1. Status Line
-	oss << "HTTP/1.1 " << status_code << " " << reason_phrase << "\r\n";
+	oss << _request.getVersion() << " " << status_code << " " << reason_phrase << "\r\n";
 
 	// 2. Headers
-	oss << "Content-Type: text/html\r\n";
+	//oss << "Content-Type: text/html\r\n";
 	oss << "Content-Length: " << content_length << "\r\n";
 	oss << "Connection: keep-alive\r\n"; // Optional
 
-	// Add custom headers (like Location for redirects)
-	const std::map<string, string> &headers = response().getHeaders();
+	// Add custom headers (like Content-Type and Location)
+	const std::map<string, string>&	headers = response().getHeaders();
 	for (std::map<string, string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
 	{
 		oss << it->first << ": " << it->second << "\r\n";
@@ -344,33 +344,38 @@ void	HttpContext::buildResponseString()
 	// return oss.str();
 }
 
-HttpContext::e_parse_state HttpContext::getParserState() const {
+HttpContext::e_parse_state	HttpContext::getParserState() const {
 	return _state;
 }
 
 // disabled operator, it is in private
-HttpContext &HttpContext::operator=(const HttpContext &other) {
+HttpContext&	HttpContext::operator=(const HttpContext &other) {
 	(void)other;
 	return *this;
 }
 
-std::string HttpContext::getResponseBuffer() const {
+std::string		HttpContext::getResponseBuffer() const {
 	return _responseBuffer;
 }
 
-size_t HttpContext::getBytesSent() const {
+size_t			HttpContext::getBytesSent() const {
 	return _bytesSent;
 }
 
-void HttpContext::setResponseBuffer(const std::string &buffer) {
+void			HttpContext::setResponseBuffer(const std::string &buffer) {
 	_responseBuffer = buffer;
+	if (RESP_DEBUG) cout << "setResponseBuffer():\n";
+	if (RESP_DEBUG) cout << "METHOD/URI: " << _request.getMethod() << " " << _request.getUri() << endl;
+	if (RESP_DEBUG) cout << "Response. 150 lines:\n";
+	if (RESP_DEBUG) cout << YELLOW << _responseBuffer.substr(0, 100) << RESET << endl;
+	if (RESP_DEBUG) cout << "|||" << endl;
 	_bytesSent = 0;
 }
 
-void HttpContext::addBytesSent(size_t bytes) {
+void			HttpContext::addBytesSent(size_t bytes) {
 	_bytesSent += bytes;
 }
 
-bool HttpContext::isResponseComplete() const {
+bool			HttpContext::isResponseComplete() const {
 	return _bytesSent >= _responseBuffer.size();
 }
