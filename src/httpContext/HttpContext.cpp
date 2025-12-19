@@ -300,7 +300,7 @@ bool HttpContext::isRequestError() const {
 		return false;
 }
 
-void HttpContext::resetState() {
+void	HttpContext::resetState() {
 	_request = Request();
 	response().reset();
 	connection().getBuffer().clear();
@@ -312,16 +312,16 @@ void HttpContext::resetState() {
 	_bytesSent = 0;
 }
 
-void HttpContext::buildResponseString()
+void	HttpContext::buildResponseString()
 {
-	std::string	body = _response.getResponseBody();
-	short		status_code = _response.getStatusCode();
-	size_t		content_length = _response.getContentLength();
-
+	std::string			body = _response.getResponseBody();
+	short				status_code = _response.getStatusCode();
+	size_t				content_length = _response.getContentLength();
+	const std::string&	reason_phrase = _response.getReasonPhrase();
 	std::ostringstream	oss;
 
 	// 1. Status Line
-	oss << "HTTP/1.1 " << status_code << " OK\r\n";
+	oss << "HTTP/1.1 " << status_code << " " << reason_phrase << "\r\n";
 
 	// 2. Headers
 	oss << "Content-Type: text/html\r\n";

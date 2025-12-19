@@ -311,7 +311,7 @@ bool Response::prefixMatching(const string &locPath, const string &RequestUri)
 }
 
 // returns the index file name for the matched location or an empty string if none found
-string Response::getIndexFromLocation()
+string	Response::getIndexFromLocation()
 {
 	for (std::vector<Location>::const_iterator it = _server_config.getLocations().begin();
 		 it != _server_config.getLocations().end(); ++it)
@@ -481,45 +481,46 @@ void	Response::generateResponse()
 	fillResponse(400, getErrorPageContent(400)); // Bad Request
 } */
 
-short	Response::getStatusCode() const { return _statusCode; }
+short			Response::getStatusCode() const { return _statusCode; }
 
-size_t	Response::getContentLength() const { return _contentLength; }
+size_t			Response::getContentLength() const { return _contentLength; }
 
-string	Response::getResponseBody() const {
+const string&	Response::getResponseBody() const {
 	return _responseBody;
 }
 
-/** nulls the Request* before new HTTP request-response cycle */
-void Response::reset()
-{
-	_request = 0;
-	fillResponse(200, "");
-	_headers.clear();
-}
-
-Server&							Response::getServerConfig() {
-	return _server_config;
-}
-
-string							Response::getReasonPhrase() const {
+const string&	Response::getReasonPhrase() const {
 	return _reasonPhrase;
+}
+
+Server&			Response::getServerConfig() {
+	return _server_config;
 }
 
 const std::map<string, string>&	Response::getHeaders() const {
 	return _headers;
 }
 
+/** nulls the Request* before new HTTP request-response cycle */
+void			Response::reset()
+{
+	_request = 0;
+	fillResponse(200, "");
+	_headers.clear();
+}
+
 string							Response::getErrorPageContent(int code)
 {
-	const std::map<int, string> &errorPages = _server_config.getErrorPages();
-	std::map<int, string>::const_iterator it = errorPages.find(code);
+	const std::map<int, string>&			errorPages = _server_config.getErrorPages();
+	std::map<int, string>::const_iterator	it = errorPages.find(code);
 
 	if (it != errorPages.end())
 	{
-		std::ifstream file(it->second.c_str());
+		std::ifstream	file(it->second.c_str());
 		if (file.is_open())
 		{
-			std::ostringstream ss;
+			std::ostringstream	ss;
+			
 			ss << file.rdbuf();
 			_headers["Content-Type"] = "text/html";
 			return ss.str();

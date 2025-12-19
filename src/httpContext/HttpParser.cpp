@@ -272,8 +272,6 @@ bool	HttpParser::parseMultipartData(const string& reqBody,
 	if (!parseMultiHeadersName(multipart_headers, filename)) {
 		return false;
 	}
-	cout << "filename: " << filename << endl;
-
 	buf.erase(0, pos_end_headers + 4);
 	// The actual file data starts after \r\n\r\n
 	size_t pos_body_start = 0;
