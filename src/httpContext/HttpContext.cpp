@@ -322,26 +322,20 @@ void	HttpContext::buildResponseString()
 
 	// 1. Status Line
 	oss << _request.getVersion() << " " << status_code << " " << reason_phrase << "\r\n";
+	oss << "Connection: " <<  _request.getHeaderValue("connection") << "\r\n";
 
 	// 2. Headers
-	//oss << "Content-Type: text/html\r\n";
 	oss << "Content-Length: " << content_length << "\r\n";
-	oss << "Connection: keep-alive\r\n"; // Optional
-
-	// Add custom headers (like Content-Type and Location)
 	const std::map<string, string>&	headers = response().getHeaders();
 	for (std::map<string, string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
 	{
 		oss << it->first << ": " << it->second << "\r\n";
 	}
-
 	// 3. Empty Line (End of headers)
 	oss << "\r\n";
 	oss << body;
 
 	setResponseBuffer(oss.str());
-
-	// return oss.str();
 }
 
 HttpContext::e_parse_state	HttpContext::getParserState() const {
