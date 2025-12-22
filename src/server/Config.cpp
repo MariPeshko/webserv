@@ -243,11 +243,12 @@ void Config::parseLocation(Location &location, std::vector<std::string> &tokens,
 			location.setReturn(code, tokens.back());
 			tokens.pop_back();
 		} else if (directive == "cgi") {
-			std::string ext = tokens.back();
+			std::string ext = tokens.back(); // Correct: first arg is extension
 			tokens.pop_back();
-			location.addCgi(ext, tokens.back());
+			std::string path = tokens.back(); // Correct: second arg is path
 			tokens.pop_back();
-		} else if (directive == "cgi_pass")	{
+			location.addCgi(ext, path);
+		} else if (directive == "cgi_pass") {
 			// Assume path extension derived from location path or generic
 			std::string path = tokens.back();
 			tokens.pop_back();
