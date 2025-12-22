@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Test Cases</title>
+	<style>
+		:root {
+			--bg: #f7fafc;
+			--card: #ffffff;
+			--accent: #2563eb;
+			--text: #0f172a;
+			--danger: #ef4444;
+			--success: #22c55e;
+			--warning: #f59e0b;
+		}
+
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+			background: var(--bg);
+			color: var(--text);
+		}
+
+		.container {
+			max-width: 900px;
+			margin: 3rem auto;
+			padding: 1.5rem;
+		}
+
+		header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+			margin-bottom: 2rem;
+		}
+
+		nav a {
+			margin-left: 0.75rem;
+			text-decoration: none;
+			color: var(--accent);
+			font-weight: 600;
+		}
+
+		h1 {
+			font-size: 1.8rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+			gap: 1.5rem;
+		}
+
+		.card {
+			background: var(--card);
+			padding: 1.5rem;
+			border-radius: 8px;
+			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+			transition: transform 0.2s;
+		}
+
+		.card:hover {
+			transform: translateY(-2px);
+		}
+
+		.card h3 {
+			margin-top: 0;
+			font-size: 1.1rem;
+			color: var(--text);
+		}
+
+		.card p {
+			font-size: 0.9rem;
+			color: #64748b;
+			margin-bottom: 1rem;
+		}
+
+		.tag {
+			display: inline-block;
+			padding: 0.25rem 0.5rem;
+			border-radius: 4px;
+			font-size: 0.75rem;
+			font-weight: 600;
+			margin-bottom: 0.5rem;
+		}
+
+		.tag.success {
+			background: #dcfce7;
+			color: #166534;
+		}
+
+		.tag.danger {
+			background: #fee2e2;
+			color: #991b1b;
+		}
+
+		.tag.warning {
+			background: #fef3c7;
+			color: #92400e;
+		}
+
+		.tag.info {
+			background: #dbeafe;
+			color: #1e40af;
+		}
+
+		.btn {
+			display: inline-block;
+			background: var(--accent);
+			color: white;
+			padding: .5rem 1rem;
+			border-radius: 6px;
+			text-decoration: none;
+			font-size: 0.9rem;
+			font-weight: 500;
+		}
+
+		.btn:hover {
+			opacity: 0.9;
+		}
+
+		footer {
+			margin-top: 3rem;
+			text-align: center;
+			color: #64748b;
+			font-size: 0.9rem;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<header>
+			<div>
+				<strong>MySite</strong>
+				<div style="color:#475569;font-size:.9rem">Test Suite</div>
+			</div>
+			<nav aria-label="Main navigation">
+				<a href="/">Home</a>
+				<a href="/about">About</a>
+				<a href="/test_cases.html">Test Cases</a>
+			</nav>
+		</header>
+
+		<main>
+			<h1>Server Behavior Test Cases</h1>
+
+			<div class="grid">
+				<!-- Basic Navigation -->
+				<div class="card">
+					<span class="tag success">200 OK</span>
+					<h3>Standard Page</h3>
+					<p>Serve a simple static HTML file.</p>
+					<a href="/about.html" class="btn">Visit /about.html</a>
+				</div>
+
+				<!-- Directory Handling -->
+				<div class="card">
+					<span class="tag success">200 OK</span>
+					<h3>Directory with Index</h3>
+					<p>Requesting a directory that contains an index file (should serve about.html).</p>
+					<a href="/about" class="btn">Visit /about</a>
+				</div>
+
+				<!-- Autoindex -->
+				<div class="card">
+					<span class="tag info">Autoindex</span>
+					<h3>Directory Listing</h3>
+					<p>Autoindex is ON. Should show list of files.</p>
+					<a href="/correct-auto-index" class="btn">Visit /correct-auto-index</a>
+				</div>
+
+				<div class="card">
+					<span class="tag info">Autoindex</span>
+					<h3>Nested Directory</h3>
+					<p>Autoindex in a subdirectory.</p>
+					<a href="/correct-auto-index/nested" class="btn">Visit .../nested</a>
+				</div>
+
+				<div class="card">
+					<span class="tag success">200 OK</span>
+					<h3>Autoindex with Index File</h3>
+					<p>Directory has autoindex ON but also contains an index file. Should serve the file.</p>
+					<a href="/correct-auto-index/with-index" class="btn">Visit .../with-index</a>
+				</div>
+
+				<!-- Custom Root -->
+				<div class="card">
+					<span class="tag info">Alias/Root</span>
+					<h3>Custom Root Mapping</h3>
+					<p>Maps /gallery/gallery.html to www/gallery/gallery.html</p>
+					<a href="/gallery/gallery.html" class="btn">Visit Gallery File</a>
+				</div>
+
+				<div class="card">
+					<span class="tag info">Alias/Root</span>
+					<h3>Deep Root Mapping</h3>
+					<p>Maps /correct-auto-index/contact.html to www/web/auto-index/contact.html</p>
+					<a href="/correct-auto-index/contact.html" class="btn">Visit Contact File</a>
+				</div>
+
+				<!-- Errors -->
+				<div class="card">
+					<span class="tag danger">404 Not Found</span>
+					<h3>Non-existent Page</h3>
+					<p>Request a resource that does not exist.</p>
+					<a href="/this-does-not-exist" class="btn">Trigger 404</a>
+				</div>
+
+				<div class="card">
+					<span class="tag danger">403 Forbidden</span>
+					<h3>Forbidden Directory</h3>
+					<p>Autoindex OFF and no index file exists.</p>
+					<a href="/wrong-auto-index" class="btn">Trigger 403</a>
+				</div>
+
+				<!-- Redirection -->
+				<div class="card">
+					<span class="tag warning">301 Redirect</span>
+					<h3>Redirection</h3>
+					<p>Redirects from /old-page to /new-page.</p>
+					<a href="/old-page" class="btn">Visit /old-page</a>
+				</div>
+
+				<!-- CGI (Placeholder if configured) -->
+				<div class="card">
+					<span class="tag warning">CGI</span>
+					<h3>CGI Script</h3>
+					<p>Execute a PHP script (if configured).</p>
+					<a href="/cgi-bin/index.php" class="btn">Visit /cgi-bin/index.php</a>
+				</div>
+
+			</div>
+		</main>
+
+		<footer>
+			© <span id="year"></span> MySite — WebServer Tests
+		</footer>
+	</div>
+
+	<script>
+		document.getElementById('year').textContent = new Date().getFullYear();
+	</script>
+</body>
+
+</html>

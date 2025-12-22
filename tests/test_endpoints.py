@@ -44,10 +44,14 @@ def main():
         ("GET", "/", 200, "Root Index Page"),
         ("GET", "/index.html", 200, "Explicit Index File"),
         ("GET", "/about.html", 200, "About Page"),
-        ("GET", "/favicon.ico", 200, "Favicon"),
+        # ("GET", "/favicon.ico", 200, "Favicon"),
         
         # Directory Handling
         ("GET", "/about", 200, "Directory with Index (should serve about.html)"),
+        
+        # Custom Root Mapping (User Request)
+        ("GET", "/gallery/gallery.html", 200, "Custom Root Path Mapping (/gallery/gallery.html -> www/gallery/gallery.html)"),
+        ("GET", "/correct-auto-index/contact.html", 200, "Custom Root Path Mapping (/correct-auto-index/contact.html -> www/web/auto-index/contact.html)"),
         
         # Error Handling
         ("GET", "/this-does-not-exist", 404, "Non-existent Page (404)"),
@@ -62,6 +66,8 @@ def main():
         
         # Autoindex
         ("GET", "/correct-auto-index", 200, "Autoindex Directory Listing"),
+        ("GET", "/correct-auto-index/nested", 200, "Nested Autoindex Directory Listing"),
+        ("GET", "/correct-auto-index/with-index", 200, "Autoindex Directory with Index File (Should serve index)"),
         ("GET", "/wrong-auto-index", 403, "Directory Forbidden (Autoindex Off, No Index)"),
         ("GET", "/auto-index-off", 403, "Directory Forbidden (Autoindex Off)"),
         

@@ -8,9 +8,9 @@
 # include <sys/types.h>		// socket(), bind(), listen()
 # include <sys/socket.h>	// socket(), bind(), listen()
 # include <netinet/in.h>	// do we need it here?
-#include <fcntl.h>
+# include <fcntl.h>
 
-// Ivan -> Alberto
+#define CONF_DEBUG 0
 
 class Location {
 	public:
@@ -91,19 +91,18 @@ class	Server {
         
         void print() const;
 
-    private:
-        int							_port; // ?uint16_t
-        std::string					_host; // ?in_addr_t
-        std::vector<std::string>	_server_names;
-        std::string					_root;
-        std::string					_index; // bool _autoindex;
-        std::map<int, std::string>	_error_pages;
-        std::vector<Location>		_locations;
-        std::string					_client_max_body_size; // unsigned long
-        std::vector<std::string>	_allowed_methods;
-		// members of Ivan's class ServerConfig
+	private:
+		int							_port; // ?uint16_t
+		std::string					_host; // ?in_addr_t
+		std::vector<std::string>	_server_names;
+		std::string					_root;
+		std::string					_index; // bool _autoindex;
+		std::map<int, std::string>	_error_pages;
+		std::vector<Location>		_locations;
+		std::string					_client_max_body_size; // unsigned long
+		std::vector<std::string>	_allowed_methods;
 		struct sockaddr_in			_server_address;
-        int							_listen_fd;
+		int							_listen_fd;
 };
 
 #endif
