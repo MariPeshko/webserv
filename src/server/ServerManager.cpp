@@ -55,6 +55,7 @@ void	ServerManager::runServers() {
 		if (poll_count > 0) {
 			processConnections();
 		}
+		checkTimeouts();
 	}
 	//Loop is broken. Cleanup
 	std::cout << "Closing all connections..." << std::endl;
@@ -261,6 +262,9 @@ void	ServerManager::handleClientWrite(size_t i) {
 		return;
 	}
 	HttpContext&		ctx = it->second;
+	
+	ctx.connection().updateLastActivity();
+
 	// Get remaining data to send
 	const std::string&	buffer = ctx.getResponseBuffer();
 	size_t				already_sent = ctx.getBytesSent();
@@ -308,4 +312,23 @@ void	ServerManager::handleClientWrite(size_t i) {
 	// Otherwise, wait for next POLLOUT event
 }
 
+
+
+void ServerManager::checkTimeouts() {
+    time_t timeout = 60; // 60 seconds timeout
+    for (size_t i = 0; i < _pfds.size(); ) {
+        int fd = _pfds[i].fd;
+        if (!isListener(fd)) {
+            std::map<int, HttpContext>::iterator it = _contexts.find(fd);
+            if (it != _contexts.end()) {
+                 if (it->second.connection().hasTimedOut(timeout)) {
+                     std::cout << "Connection timed out on socket " << fd << std::endl;
+                     removeClient(fd, i);
+                     continue; 
+                 }
+            }
+        }
+        i++;
+    }
+}
 

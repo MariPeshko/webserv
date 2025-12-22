@@ -42,6 +42,7 @@ class	ServerManager {
 		void	handleClientError(int fd, size_t i);
 		void	handleClientHungup(int fd, size_t i);
 		bool	isListener(int fd);
+		void	checkTimeouts();
 };
 
 #endif

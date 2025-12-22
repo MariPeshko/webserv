@@ -77,6 +77,10 @@ def main():
         # Second Server (Port 8081)
         ("GET", "/", 301, "Server 2: Redirect Root -> /additional", None, 8081),
         ("GET", "/additional", 200, "Server 2: Additional Page", None, 8081),
+
+        # CGI Error Tests
+        ("GET", "/cgi-bin/syntax_error.py", 500, "CGI Syntax Error (Should be 500)"),
+        ("GET", "/cgi-bin/runtime_error.py", 500, "CGI Runtime Error (Should be 500)"),
     ]
     
     passed = 0

@@ -1,9 +1,18 @@
 #include "Connection.hpp"
 
 Connection::Connection()
+    : _last_activity(time(NULL))
 { }
 
 Connection::~Connection() { }
+
+void    Connection::updateLastActivity() {
+    _last_activity = time(NULL);
+}
+
+bool    Connection::hasTimedOut(time_t timeout) const {
+    return (time(NULL) - _last_activity) > timeout;
+}
 
 void	Connection::setFd(int fd) { _fd = fd; }
 
@@ -26,6 +35,8 @@ ssize_t			Connection::receiveData() {
 	char	buf[40000];
 	int		nbytes = recv(_fd, buf, sizeof(buf), 0);
 	
+	updateLastActivity();
+
 	if (nbytes > 0) {
 		_request_buffer.append(buf, nbytes);
 	}

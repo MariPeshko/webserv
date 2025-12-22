@@ -8,6 +8,7 @@
 # include <sstream>
 # include <sys/socket.h>
 # include <netinet/in.h>
+# include <ctime>
 
 #define CON_DEBUG 0
 #define YELLOW "\033[33m"
@@ -33,11 +34,15 @@ class	Connection {
 		std::string &	getBuffer();
 
 		ssize_t			receiveData();
+		
+		void			updateLastActivity();
+		bool			hasTimedOut(time_t timeout) const;
 
 	private:
 		int 				_fd;
 		struct sockaddr_in	_client_address;
 		std::string			_request_buffer;
+		time_t				_last_activity;
 };
 
 #endif

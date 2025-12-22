@@ -97,6 +97,13 @@ std::string CgiHandler::executeCgi() {
         close(pipeIn[0]);
         close(pipeOut[1]);
 
+        // Close all other file descriptors to prevent leakage
+        int max_fd = sysconf(_SC_OPEN_MAX);
+        if (max_fd == -1) max_fd = 1024; // Fallback if sysconf fails
+        for (int i = 3; i < max_fd; ++i) {
+            close(i);
+        }
+
         char** env = getEnvArray();
         char* argv[] = {
             const_cast<char*>(_interpreterPath.c_str()),
