@@ -46,10 +46,12 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 }
 
 // Method DELETE and generation of the response
-// set status code to 200 (OK) or 204 (No Content).
+// set status code success 204 (No Content).
 void	Response::deleteAndGenerateResponse() {
 	if (D_POST) cout << BLUE << "DELETE method" << RESET << endl;
 	const Location*				loc = matchPrefixPathToLocation();
+	
+	// Check allowed methods
 	const std::vector<string>&	allowed = loc->getAllowedMethods();
 	if (!allowed.empty()) {
 		bool	methodAllowed = false;
@@ -65,6 +67,15 @@ void	Response::deleteAndGenerateResponse() {
 			return;
 		}
 	}
+	// Check for redirection
+	int	code = loc->getReturnCode();
+	if (code != 0) {
+		fillResponse(code, "<html><body><h1>" + toString(code) + " " + 
+						generateStatusMessage(code) + "</h1></body></html>");
+		_headers["Location"] = loc->getReturnUrl();
+		_headers["Content-Type"] = "text/html";
+		return;
+	}
 	if (D_POST) cout << ORANGE << "Constructing Path..." << RESET << endl;
 	string	root;
 	if (loc->getRoot().empty())
@@ -79,7 +90,28 @@ void	Response::deleteAndGenerateResponse() {
 	path = root + uri;
 	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
 	
-	fillResponse(501, getErrorPageContent(501)); // Not Implemented
+	// Check if the file/resource exists
+    PathType pathType = getPathType(path);
+    if (pathType == NOT_EXIST) {
+        if (D_POST) cout << RED << "Resource not found: " << path << RESET << endl;
+        fillResponse(404, getErrorPageContent(404));
+        return;
+    }
+	// Don't allow deleting directories (optional, depends on your requirements)
+    if (pathType == DIRECTORY_PATH) {
+        if (D_POST) cout << RED << "Cannot delete directory: " << path << RESET << endl;
+        fillResponse(403, getErrorPageContent(403)); // Forbidden
+        return;
+    }
+	// Attempt to delete the file
+    if (std::remove(path.c_str()) != 0) { // Deletion failed (permission denied, etc.)
+        if (D_POST) cout << RED << "Failed to delete file: " << path << RESET << endl;
+        fillResponse(403, getErrorPageContent(403)); // Forbidden
+        return;
+    }
+    if (D_POST) cout << GREEN << "File deleted successfully: " << path << RESET << endl;
+	// Success: 204 No Content
+    fillResponse(204, "");
 }
 
 // Method POST and generation of the response
@@ -90,6 +122,7 @@ void	Response::postAndGenerateResponse()
 {
 	if (D_POST) cout << BLUE << "POST method" << RESET << endl;
 	const Location*	loc = matchPrefixPathToLocation();
+
 	// Check for allowed methods
 	const std::vector<string>&	allowed = loc->getAllowedMethods();
 	if (!allowed.empty()) {
@@ -107,10 +140,10 @@ void	Response::postAndGenerateResponse()
 		}
 	}
 	// Check for redirection
-	if (loc->getReturnCode() != 0) {
-		fillResponse(loc->getReturnCode(),
-			"<html><body><h1>" + toString(loc->getReturnCode()) + " " +
-			generateStatusMessage(loc->getReturnCode()) + "</h1></body></html>");
+	int	code = loc->getReturnCode();
+	if (code != 0) {
+		fillResponse(code, "<html><body><h1>" + toString(code) + " " + 
+						generateStatusMessage(code) + "</h1></body></html>");
 		_headers["Location"] = loc->getReturnUrl();
 		_headers["Content-Type"] = "text/html";
 		return;
@@ -130,9 +163,9 @@ void	Response::postAndGenerateResponse()
 	path = root + uri;
 	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
 	// POST METHOD logic starts here
-	// Handle Directory
 	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
-	size_t path_separator = path.find_last_of('/');
+	// Handle Directory
+	size_t	path_separator = path.find_last_of('/');
 	if (path_separator != string::npos) {
 		string	dirPath = path.substr(0, path_separator);
 		if (!isDirectory(dirPath)) {
@@ -206,6 +239,7 @@ void	Response::postAndGenerateResponse()
 			_headers["Content-Type"] = "text/html"; */
 			// Instead of 201, send a 303 redirect back to the uploads page
 			fillResponse(303, ""); // 303 See Other, empty body
+			// TO DO not hard-code - use the path from the request
 			_headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
 			return;
 		} else {
@@ -394,9 +428,7 @@ Response::PathType Response::getPathType(string const path)
 void	Response::generateResponse()
 {
 	if (!_request) return;
-
 	fillResponse(200, "");
-
 	const Location	*loc = matchPathToLocation();
 
 	// Check for allowed methods
@@ -415,6 +447,7 @@ void	Response::generateResponse()
 			return;
 		}
 	}
+
 	// Check for redirection
 	if (loc->getReturnCode() != 0) {
 		fillResponse(loc->getReturnCode(),
@@ -425,9 +458,6 @@ void	Response::generateResponse()
 		return;
 	}
 	// Construct Path
-	// Standard NGINX 'root' logic:
-	// 1. If location has 'root', it replaces server 'root'. Location root takes precedence over server root
-	// 2. Path = root + URI (no stripping of location prefix).
 	string			root;
 	const string&	locationRoot = loc->getRoot();
 	if (!locationRoot.empty()) {
