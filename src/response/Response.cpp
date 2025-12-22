@@ -13,13 +13,11 @@ Response::Response(Server &server)
 	  _statusCode(200),
 	  _reasonPhrase(generateStatusMessage(200)),
 	  _contentLength(0)
-{
-}
+{ }
 
 Response &Response::operator=(const Response &other)
 {
-	if (this != &other)
-	{
+	if (this != &other)	{
 		_server_config = other._server_config;
 		_request = other._request;
 		_statusCode = other.getStatusCode();
@@ -32,8 +30,7 @@ Response &Response::operator=(const Response &other)
 Response::~Response() {}
 
 // call after parsing
-void	Response::bindRequest(const Request &req)
-{
+void	Response::bindRequest(const Request &req) {
 	_request = &req;
 }
 
@@ -162,6 +159,7 @@ void	Response::postAndGenerateResponse()
 	string	path;
 	path = root + uri;
 	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
+
 	// POST METHOD logic starts here
 	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
 	// Handle Directory
@@ -231,16 +229,33 @@ void	Response::postAndGenerateResponse()
 			file << fileData;
 			file.close();
 
-			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern" << uploadPath << RESET << endl;
-			// TO DELETE
-			/* fillResponse(201,
-				"<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>");
-			_headers["Location"] = _request->getUri() + filename;
-			_headers["Content-Type"] = "text/html"; */
+			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern: " << uploadPath << RESET << endl;
+
+			// go back to the form page (the Referer)
+			string	redirectTo;
+			string	referer = _request->getHeaderValue("referer");
+			if (!referer.empty()) { 		// extract of path from "http://host/path?..."
+				size_t	pos = referer.find("://");
+				if (pos != string::npos) {
+					pos = referer.find('/', pos + 3);
+				} else {
+					pos = referer.find('/');
+				}
+				if (pos != string::npos) {
+					redirectTo = referer.substr(pos);
+					if (D_POST) cout << GREEN << "Redirect to the Referer: " << redirectTo << RESET << endl;
+				}
+			}
+			if (redirectTo.empty()) {
+				fillResponse(201, "<html><body><h1>201 Created</h1><p>File uploaded successfully: " +
+					filename + "</p></body></html>");
+				_headers["Location"] = _request->getUri() + filename;
+				_headers["Content-Type"] = "text/html";
+			}
 			// Instead of 201, send a 303 redirect back to the uploads page
 			fillResponse(303, ""); // 303 See Other, empty body
-			// TO DO not hard-code - use the path from the request
-			_headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
+			_headers["Location"] = redirectTo;
+			// TO DELETE _headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
 			return;
 		} else {
 			fillResponse(400, getErrorPageContent(400));
@@ -370,17 +385,13 @@ const Location *Response::matchPrefixPathToLocation()
 // The character at index 6 of "/about-us/team.html" is a hyphen (-).
 bool Response::prefixMatching(const string &locPath, const string &RequestUri)
 {
-
 	// cout << RED << "RequestUri: " << RequestUri << "; LocPrefixPath: " << locPath << endl;
 	//  character in the URI right after the prefix
 	size_t index = locPath.length();
 
-	if (locPath.length() > 1 && RequestUri.length() > locPath.length() && RequestUri[index] != '/')
-	{
+	if (locPath.length() > 1 && RequestUri.length() > locPath.length() && RequestUri[index] != '/')	{
 		return true;
-	}
-	else
-	{
+	} else {
 		return false;
 	}
 }
@@ -391,15 +402,13 @@ string	Response::getIndexFromLocation()
 	for (std::vector<Location>::const_iterator it = _server_config.getLocations().begin();
 		 it != _server_config.getLocations().end(); ++it)
 	{
-		if (DEBUG)
-		{
+		if (DEBUG) {
 			cout << "Checking location for index: " << it->getPath() << endl;
 			cout << ORANGE << "Request URI: " << _request->getUri() << RESET << endl;
 			cout << ORANGE << "Location Path: " << it->getPath() << RESET << endl;
 			cout << ORANGE << "Location Index: " << it->getIndex() << RESET << endl;
 		}
-		if (_request->getUri() == it->getPath())
-		{
+		if (_request->getUri() == it->getPath()) {
 			return "/" + it->getIndex();
 		}
 	}
