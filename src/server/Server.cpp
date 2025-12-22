@@ -12,8 +12,38 @@ Server::Server()
 	_listen_fd = -1;			  // an invalid value
 }
 
-int Server::setupServer()
-{
+void	Location::printLocation() const {
+	std::cout << "    Location path: " << _path << std::endl;
+	if (!_root.empty()) std::cout << "      root: " << _root << std::endl;
+	if (!_alias.empty()) std::cout << "      alias: " << _alias << std::endl;
+	if (!_allowed_methods.empty()) {
+		std::cout << "      methods: ";
+		for (size_t i = 0; i < _allowed_methods.size(); i++) {
+			std::cout << _allowed_methods[i] << (i < _allowed_methods.size() - 1 ? ", " : "");
+		}
+		std::cout << std::endl;
+	}
+	if (!_index.empty()) std::cout << "      index: " << _index << std::endl;
+	if (!_client_max_body_size.empty()) std::cout << "      client_max_body_size: " << _client_max_body_size << std::endl;
+	std::cout << "      autoindex: " << (_autoindex ? "on" : "off") << std::endl;
+	if (_return_code != 0) {
+		std::cout << "      return: " << _return_code << " " << _return_url << std::endl;
+	}
+	if (!_cgi.empty()) {
+		std::cout << "      cgi:" << std::endl;
+		for (std::map<std::string, std::string>::const_iterator it = _cgi.begin(); it != _cgi.end(); ++it) {
+			std::cout << "        " << it->first << " -> " << it->second << std::endl;
+		}
+	}
+	if (!_locations.empty()) {
+		std::cout << "      Nested Locations:" << std::endl;
+		for (size_t i = 0; i < _locations.size(); ++i) {
+			_locations[i].printLocation();
+		}
+	}
+}
+
+int Server::setupServer() {
 	// create socket
 	_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (_listen_fd == -1)

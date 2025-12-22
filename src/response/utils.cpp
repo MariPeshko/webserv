@@ -15,6 +15,8 @@ const char *generateStatusMessage(short status_code)
 		return "Multiple Choices";
 	case 301:
 		return "Moved Permanently";
+	case 303:
+		return "See Other";
 	case 400:
 		return "Bad Request";
 	case 401:
@@ -25,25 +27,29 @@ const char *generateStatusMessage(short status_code)
 		return "Not Found";
 	case 405:
 		return "Method Not Allowed";
+	case 409:
+		return "Conflict";
+	case 415:
+		return "Unsupported Media Type";
 	case 500:
 		return "Internal Server Error";
+	case 501:
+		return "Not Implemented";
 	default:
 		return "Unknown Error";
 	}
 }
 
-int buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_len)
+int	buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_len)
 {
-	struct dirent *entityStruct;
-	DIR *directory;
-	std::string dirListPage;
+	struct dirent*	entityStruct;
+	DIR*			directory;
+	std::string		dirListPage;
 
-	if (DEBUG)
-		std::cout << GREEN << "Building HTML index for directory: " << dir_name << RESET << std::endl;
+	if (DEBUG) std::cout << GREEN << "Building HTML index for directory: " << dir_name << RESET << std::endl;
 
 	directory = opendir(dir_name.c_str());
-	if (directory == NULL)
-	{
+	if (directory == NULL) {
 		std::cerr << "opendir failed" << std::endl;
 		return (1);
 	}
@@ -60,8 +66,8 @@ int buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_l
 	dirListPage.append("<th style=\"text-align:left\"> Last Modification </th>\n");
 	dirListPage.append("<th style=\"text-align:left\"> File Size </th>\n");
 
-	struct stat file_stat;
-	std::string file_path;
+	struct stat	file_stat;
+	std::string	file_path;
 
 	while ((entityStruct = readdir(directory)) != NULL)
 	{
@@ -75,10 +81,8 @@ int buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_l
 		if (DEBUG)
 			std::cout << YELLOW << "Processing entity: " << file_path << RESET << std::endl;
 
-		if (stat(file_path.c_str(), &file_stat) != 0)
-		{
-			if (DEBUG)
-				std::cout << RED << "stat() failed for: " << file_path << RESET << std::endl;
+		if (stat(file_path.c_str(), &file_stat) != 0) {
+			if (DEBUG) std::cout << RED << "stat() failed for: " << file_path << RESET << std::endl;
 			continue;
 		}
 
@@ -108,7 +112,7 @@ int buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_l
 	return (0);
 }
 
-bool isDirectory(const std::string &path)
+bool	isDirectory(const std::string &path)
 {
 	struct stat s;
 	if (stat(path.c_str(), &s) == 0)

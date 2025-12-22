@@ -75,7 +75,11 @@ void	Request::setChunked(bool value) {
 	_bodyChunked = value;
 }
 
-std::string Request::getUri() const {
+std::string&		Request::getUri() {
+	return _uri;
+}
+
+const std::string&	Request::getUri() const {
 	return _uri;
 }
 

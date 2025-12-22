@@ -1,7 +1,8 @@
 # Custom ignores
 merge_no.md
-multiperson_chat_server/
 webserv
+
+*/uploaded_images/*
 
 # Prerequisites
 *.d

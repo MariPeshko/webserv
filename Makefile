@@ -2,7 +2,7 @@ NAME = webserv
 
 # - Source files
 SRCS =	src/main.cpp \
-		src/parser/Config.cpp \
+		src/server/Config.cpp \
 		src/server/Server.cpp \
 		src/server/ServerManager.cpp \
 		src/httpContext/Connection.cpp \

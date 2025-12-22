@@ -127,3 +127,11 @@ shutdown(client_fd, SHUT_WR);       // Shutdown writing side of socket
 send(client_fd, "Second message\n", 15, 0);  // Try to send to shutdown socket → SIGPIPE!```
 
 With MSG_NOSIGNAL - No signal generated, just returns -1 with errno
+
+
+## /.well-known/appspecific/com.chrome.devtools.json
+The request for /.well-known/appspecific/com.chrome.devtools.json is a standard behavior of Google Chrome's Developer Tools.
+
+When you have Chrome DevTools open, it automatically probes the web server for a special configuration file. This file is intended to help with source mapping, which allows the debugger to show you your original source code (e.g., TypeScript, unminified JavaScript) instead of the code that's actually running in the browser.
+
+Your server receives the request, looks for the file /www/web/.well-known/appspecific/com.chrome.devtools.json, and doesn't find it. It correctly responds with a 404 Not Found error.
