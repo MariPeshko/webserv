@@ -31,6 +31,7 @@ class	Connection {
 		// getters
 		int				getFd() const;
 		std::string &	getBuffer();
+		const sockaddr_in& getClientAddress() const;
 
 		ssize_t			receiveData();
 

@@ -5,11 +5,15 @@
 #include <string.h>
 #include <signal.h>
 #include "server/ServerManager.hpp"
+#include "logger/Logger.hpp"
 
 int	main(int ac, char **argv) {
 
 	// Ignore the SIGPIPE signal globally for this process
     signal(SIGPIPE, SIG_IGN);
+
+    Logger::init("webserv.log");
+    Logger::log(LOG_INFO, "Webserv started");
     
 	Config			config;
     ServerManager	server_manager;
@@ -27,11 +31,11 @@ int	main(int ac, char **argv) {
             server_manager.runServers();
 
         } else {
-            std::cout << "Error: wrong arguments. Usage: ./webserv [config_file]" << std::endl;
+			Logger::log(LOG_ERROR, "Wrong arguments. Usage: ./webserv [config_file]");
             return 1;
         }
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+		Logger::log(LOG_ERROR, "Exception: " + std::string(e.what()));
         return 1;
     }
     return 0;

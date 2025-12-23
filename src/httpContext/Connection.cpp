@@ -17,6 +17,11 @@ std::string &	Connection::getBuffer() {
 	return _request_buffer;
 }
 
+const sockaddr_in &Connection::getClientAddress() const
+{
+	return _client_address;
+}
+
 /**
  * Receives data from the client's socket and appends it to the internal request buffer.
  * @return The number of bytes received, 0 on connection close, -1 on error.

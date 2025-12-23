@@ -47,9 +47,10 @@ void ServerManager::setupServers(std::vector<Server> & server_configs ) {
 void	ServerManager::runServers() {
 	while (1) { // Later: signal handling
 		int	poll_count = poll(&_pfds[0], _pfds.size(), 1000);  // 1 second maximum time to wait
-		if (poll_count == -1) {
+		
+ if (poll_count == -1) {
 			// if (!g_running) break;  // Signal received
-			std::cerr << "Poll error: " << strerror(errno) << std::endl;
+			Logger::logErrno(LOG_ERROR, "Poll error");
 			break;
 		}
 		if (poll_count > 0) {
@@ -61,7 +62,7 @@ void	ServerManager::runServers() {
 	for (size_t i = 0; i < _pfds.size(); ++i) {
 		close(_pfds[i].fd);
 	}
-	std::cout << "Server shut down cleanly" << std::endl;
+	Logger::log(LOG_INFO, "Webserv stopped");
 }
 
 /** 
@@ -116,7 +117,7 @@ void	ServerManager::handleNewConnection(int listener) {
 	//                       ^^^^^^^^^^^^ Cast to base type for API
 
 	if (newfd == -1) {
-		std::cerr << "Accept failed: " << strerror(errno) << std::endl;
+		Logger::logErrno(LOG_ERROR, "Accept failed");
 		return;
 	}
 
@@ -140,28 +141,25 @@ void	ServerManager::handleNewConnection(int listener) {
 	std::string ip_str = ipv4_to_string(ip);
 	//uint16_t port = ntohs(remoteaddr.sin_port);
 		
-	std::cout << GREEN << "server: new connection";
-	//from " << ip_str << ":" << port
-	std::cout << " on socket " << newfd << " (accepted by listener ";
-	std::cout << listener << ")" << RESET << std::endl;
+	Logger::log(LOG_INFO, "New connection accepted from " + ip_str);
+	
 }
 
 void	ServerManager::handleErrorRevent(int fd, size_t i) {
 	
-	std::cerr << "Poll error on socket " << fd << std::endl;
+	Logger::logErrno(LOG_ERROR, "Poll error on socket " + std::to_string(fd));
 	removeClient(fd,i);
 }
 
 /** Client socket error. Error message and cleanup */
 void	ServerManager::handleClientError(int fd, size_t i) {
-	std::cout << "server: socket " << fd << " error after recv()" << std::endl;
+	Logger::logErrno(LOG_ERROR, "Socket error on fd " + std::to_string(fd));
 	removeClient(fd,i);
-	
 }
 
 /** Client socket is closed. Error message and cleanup */
 void	ServerManager::handleClientHungup(int fd, size_t i) {
-	std::cout << "server: socket " << fd << " hung up" << std::endl;
+	Logger::log(LOG_WARNING, "Socket " + std::to_string(fd) + " hung up");
 	removeClient(fd,i);
 }
 
@@ -186,7 +184,7 @@ void	ServerManager::handleClientData(size_t i) {
 	// Find HttpContext
 	std::map<int, HttpContext>::iterator it = _contexts.find(fd);
 	if (it == _contexts.end()) {
-		std::cerr << "Error: No contexts found for fd " << fd << std::endl;
+		Logger::logErrno(LOG_ERROR, "No context found for fd " + std::to_string(fd));
 		close(fd);
 		delFromPfds(i);
 		return ;
@@ -221,6 +219,13 @@ void	ServerManager::handleClientData(size_t i) {
 		}
 		ctx.buildResponseString();
 		_pfds[i].events |= POLLOUT;
+		Logger::logRequest(
+			ipv4_to_string(ntohl(ctx.connection().getClientAddress().sin_addr.s_addr)),
+			ctx.request().getMethod(),
+			ctx.request().getUri(),
+			ctx.response().getStatusCode(),
+			ctx.response().getContentLength()
+		);
 	}
 	// If request is not complete, we do nothing and wait for the next poll() event.
 }
@@ -254,7 +259,7 @@ void	ServerManager::handleClientWrite(size_t i) {
 	const int fd = _pfds[i].fd;
 	std::map<int, HttpContext>::iterator it = _contexts.find(fd);
 	if (it == _contexts.end()) {
-		std::cerr << "Error: No context found for fd " << fd << std::endl;
+		Logger::logErrno(LOG_ERROR, "No context found for fd " + std::to_string(fd));
 		close(fd);
 		delFromPfds(i);
 		return;
@@ -282,13 +287,13 @@ void	ServerManager::handleClientWrite(size_t i) {
 			return;
 		}
 		// Real error occurred
-		std::cerr << "Send error on socket " << fd << ": " << strerror(errno) << std::endl;
+		Logger::logErrno(LOG_ERROR, "Send error on socket " + std::to_string(fd));
 		removeClient(fd, i);
 		return;
 	}
 	if (bytes_sent == 0) {
 		// Connection closed by peer
-		std::cout << "Con_pfds[i].events &= ~POLLOUT;nection closed by peer on socket " << fd << std::endl;
+		Logger::log(LOG_INFO, "Connection closed by peer on socket " + std::to_string(fd));
 		removeClient(fd, i);
 		return;
 	}
@@ -297,7 +302,7 @@ void	ServerManager::handleClientWrite(size_t i) {
 	// Check if response is complete
 	if (ctx.isResponseComplete()) {
 		 if (ctx.request().getHeaderValue("connection") == "close") {
-            std::cout << "Connection: close. Closing socket " << fd << std::endl;
+            Logger::log(LOG_INFO, "Connection: close. Closing socket " + std::to_string(fd));
             removeClient(fd, i);
         } else {
             // Keep-alive: reset state for the next request and wait for POLLIN
