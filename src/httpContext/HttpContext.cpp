@@ -69,8 +69,10 @@ void	HttpContext::requestParsingStateMachine()
 			}
 			case READING_HEADERS : {
 				if (!findAndParseHeaders(buf)) {
+					request().ifConnNotPresent();
 					can_parse = false; break;
 				}
+
 				if (REQ_DEBUG) PrintUtils::printRequestHeaders(request());
 				if (isBodyToRead()) {
 					if (CTX_DEBUG) cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
@@ -322,7 +324,7 @@ void	HttpContext::buildResponseString()
 
 	// 1. Status Line
 	oss << _request.getVersion() << " " << status_code << " " << reason_phrase << "\r\n";
-	oss << "Connection: " <<  _request.getHeaderValue("connection") << "\r\n";
+	oss << "Connection: " << _request.getHeaderValue("connection") << "\r\n";
 
 	// 2. Headers
 	oss << "Content-Length: " << content_length << "\r\n";

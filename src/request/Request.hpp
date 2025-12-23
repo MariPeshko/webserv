@@ -31,6 +31,7 @@ class	Request {
 		void	setUri(const std::string &uri);
 		void	setVersion(const std::string &version);
 		void	addHeader(const std::string &key, const std::string &value);
+		void	ifConnNotPresent();
 		void	setBody(const std::string &body);
 		void	setChunked(bool value);
 
