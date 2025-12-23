@@ -249,7 +249,7 @@ void	Response::postAndGenerateResponse()
 			if (redirectTo.empty()) {
 				fillResponse(201, "<html><body><h1>201 Created</h1><p>File uploaded successfully: " +
 					filename + "</p></body></html>");
-				_headers["Location"] = _request->getUri() + filename;
+			_headers["Location"] = _request->getUri() + filename;
 				_headers["Content-Type"] = "text/html";
 			}
 			// Instead of 201, send a 303 redirect back to the uploads page
@@ -385,6 +385,7 @@ const Location *Response::matchPrefixPathToLocation()
 // The character at index 6 of "/about-us/team.html" is a hyphen (-).
 bool Response::prefixMatching(const string &locPath, const string &RequestUri)
 {
+
 	// cout << RED << "RequestUri: " << RequestUri << "; LocPrefixPath: " << locPath << endl;
 	//  character in the URI right after the prefix
 	size_t index = locPath.length();
@@ -437,7 +438,9 @@ Response::PathType Response::getPathType(string const path)
 void	Response::generateResponse()
 {
 	if (!_request) return;
+
 	fillResponse(200, "");
+
 	const Location	*loc = matchPathToLocation();
 
 	// Check for allowed methods
