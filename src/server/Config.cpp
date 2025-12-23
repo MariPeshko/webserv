@@ -46,17 +46,17 @@ std::vector<std::string> Config::tokenize(const std::string &content)
 }
 
 // Main parse function: orchestrates the tokenizing and parsing.
-void Config::parse(const std::string &config_file)
+void	Config::parse(const std::string &config_file)
 {
-	std::ifstream file(config_file.c_str());
+	std::ifstream		file(config_file.c_str());
 	if (!file.is_open()) {
 		throw std::runtime_error("Could not open config file: " + config_file);
 	}
-	std::stringstream buffer;
+	std::stringstream	buffer;
 	buffer << file.rdbuf();
 	file.close();
 
-	std::vector<std::string> tokens = tokenize(buffer.str());
+	std::vector<std::string>	tokens = tokenize(buffer.str());
 	std::reverse(tokens.begin(), tokens.end());
 
 	while (!tokens.empty())	{
@@ -83,9 +83,9 @@ void Config::parse(const std::string &config_file)
 }
 
 // Helper to check if a token is a known directive (to handle missing semicolons)
-static bool isDirective(const std::string &token)
+static bool	isDirective(const std::string &token)
 {
-	static const char *directives[] = {
+	static const char*	directives[] = {
 		"listen", "host", "server_name", "root", "error_page", "client_max_body_size",
 		"client_body_buffer_size", "location", "methods", "allow_methods", "index",
 		"autoindex", "return", "cgi", "cgi_pass", "alias", "}"};
@@ -98,7 +98,7 @@ static bool isDirective(const std::string &token)
 }
 
 // Helper to consume optional semicolon
-static void consumeSemiColon(std::vector<std::string> &tokens)
+static void	consumeSemiColon(std::vector<std::string> &tokens)
 {
 	if (!tokens.empty() && tokens.back() == ";") {
 		tokens.pop_back();
@@ -106,7 +106,7 @@ static void consumeSemiColon(std::vector<std::string> &tokens)
 }
 
 // Helper to parse array-like values e.g. [GET, POST, HEAD] or simple list GET POST
-static std::vector<std::string> parseValues(std::vector<std::string> &tokens)
+static std::vector<std::string>	parseValues(std::vector<std::string> &tokens)
 {
 	std::vector<std::string>	values;
 
@@ -137,7 +137,7 @@ static std::vector<std::string> parseValues(std::vector<std::string> &tokens)
 }
 
 // Parses a server block from the token stream.
-void Config::parseServer(Server &server, std::vector<std::string> &tokens)
+void	Config::parseServer(Server &server, std::vector<std::string> &tokens)
 {
 	if (tokens.empty() || tokens.back() != "{") {
 		throw std::runtime_error("Expected '{' after 'server'");
@@ -211,7 +211,7 @@ void Config::parseServer(Server &server, std::vector<std::string> &tokens)
 }
 
 // Parses a location block from the token stream.
-void Config::parseLocation(Location &location, std::vector<std::string> &tokens, const Server &server)
+void	Config::parseLocation(Location &location, std::vector<std::string> &tokens, const Server &server)
 {
 	if (tokens.empty() || tokens.back() != "{")	{
 		throw std::runtime_error("Expected '{' after location path");
