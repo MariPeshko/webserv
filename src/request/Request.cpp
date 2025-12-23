@@ -48,7 +48,7 @@ void	Request::ifConnNotPresent() {
 	}
 }
 
-void Request::setBody(const std::string &body) {
+void	Request::setBody(const std::string &body) {
 	_body = body;
 }
 
@@ -58,6 +58,10 @@ void	Request::setRequestLineFormatValid(bool value) {
 
 void	Request::setHeadersFormatValid(bool value) {
 	_validFormatHeaders = value;
+}
+
+void	Request::setHost(const std::string &host) {
+	_host = host;
 }
 
 /**
@@ -137,4 +141,8 @@ std::string&		Request::getBody() {
 
 const std::string&	Request::getBody() const {
 	return _body;
+}
+
+const std::string& Request::getHost() const {
+	return _host;
 }

@@ -87,6 +87,8 @@ class	Server {
 		const std::string&					getClientMaxBodySize() const;
 		const std::vector<std::string>&		getAllowedMethods() const;
 		int									getListenFd() const;
+		int									getPort() const;
+		const std::string&					getHost() const;
 		std::string							getRoot() const;
 		const std::string&					getIndex() const;
 		

@@ -198,6 +198,14 @@ void	Server::addAllowedMethod(const std::string& method) {
 	_allowed_methods.push_back(method);
 }
 
+int Server::getPort() const {
+	return _port;
+}
+
+const std::string& Server::getHost() const {
+	return _host;
+}
+
 size_t	Server::getLocationCount() const {
 	return _locations.size();
 }

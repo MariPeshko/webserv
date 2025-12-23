@@ -195,6 +195,13 @@ void	Config::parseServer(Server &server, std::vector<std::string> &tokens)
 
 			location.setPath(tokens.back());
 			tokens.pop_back();
+
+			// Maryna enhancement for tester format location /put_test/ {}
+			if (!tokens.empty() && tokens.back() == "/") {
+                location.setPath(location.getPath() + "/");
+                tokens.pop_back();
+            }
+
 			parseLocation(location, tokens, server);
 			server.addLocation(location);
 			continue; // location blocks don't have a trailing semicolon

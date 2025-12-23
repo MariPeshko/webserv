@@ -56,7 +56,9 @@ void	HttpContext::requestParsingStateMachine()
 		switch (_state) {
 			case REQUEST_LINE: {
 				if (!findAndParseReqLine(buf)) {
+					if (REQ_DEBUG) cout << RED << "ParseReqLine error" << RESET << endl;
 					if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
+					if (REQ_DEBUG) cout << RESET << endl;
 					if (!request().getRequestLineFormatValid()) {
 						_state = REQUEST_ERROR;
 						continue;
@@ -119,6 +121,52 @@ void	HttpContext::requestParsingStateMachine()
 	}
 }
 
+// Validate host from absolute URI if present
+// absolute URI is http://localhost:8080/
+bool	HttpContext::validateHost() {
+	if (CTX_DEBUG) cout << YELLOW << "ReqLineTrue: Validate host from absolute URI if present" << RESET << endl;
+	
+	const std::string&	req_host_full = request().getHost();
+	if (!req_host_full.empty()) {
+		std::string	req_hostname = req_host_full;
+		int req_port = -1;
+		// Separate hostname and port from the request's host string
+		size_t	colon_pos = req_host_full.find(':');
+		if (colon_pos != std::string::npos) {
+			req_hostname = req_host_full.substr(0, colon_pos);
+			std::stringstream	ss(req_host_full.substr(colon_pos + 1));
+			if (!(ss >> req_port)) {
+				if (CTX_DEBUG) cerr << "Invalid port in request host: " << req_host_full << endl;
+				return false;
+			}
+		}
+		// Check if the port matches the server's listening port
+		if (req_port != -1 && req_port != _server_config.getPort()) {
+			if (CTX_DEBUG) cerr << YELLOW << "Port mismatch. Request: " << req_port << ", Server: " << _server_config.getPort() << endl;
+			request().setUri("/" + req_hostname + request().getUri());
+			if (CTX_DEBUG) cerr << YELLOW << "New request URI is: " << request().getUri() << RESET << endl;
+			return false;
+		}
+		// Check if the hostname matches one of the server's names
+		const std::vector<std::string>&	server_names = _server_config.getServerNames();
+		bool							host_match = false;
+		for (size_t i = 0; i < server_names.size(); ++i) {
+			if (server_names[i] == req_hostname) {
+				host_match = true;
+				break;
+			}
+		}
+		if (!host_match) {
+			if (CTX_DEBUG) cerr << "Hostname mismatch, modifying URI: " << req_hostname << endl;
+			request().setUri("/" + req_hostname + request().getUri());
+			if (CTX_DEBUG) cerr << "New request URI is: " << request().getUri() << endl;
+			return false;
+		}
+	}
+	if (CTX_DEBUG) cout << YELLOW << "Host validated succesfully" << RESET << endl;
+	return true;
+}
+
 bool HttpContext::findAndParseReqLine(std::string &buf)
 {
 	size_t	pos = buf.find("\r\n");
@@ -129,8 +177,21 @@ bool HttpContext::findAndParseReqLine(std::string &buf)
 	string	line = buf.substr(0, pos);
 	buf.erase(0, pos + 2);
 	if (HttpParser::parseRequestLine(line, request()) == true) {
+		// Validate host from absolute URI if present
+		if (request().getHost().size() > 0) {
+			if (validateHost() == false) {
+				_state = REQUEST_ERROR;
+				return false;
+			}
+		}
 		return true;
 	} else {
+		if (request().getHost().size() > 0) {
+			if (validateHost() == false) {
+				_state = REQUEST_ERROR;
+				return false;
+			}
+		}
 		_state = REQUEST_ERROR;
 		return false;
 	}
@@ -360,9 +421,9 @@ size_t			HttpContext::getBytesSent() const {
 
 void			HttpContext::setResponseBuffer(const std::string &buffer) {
 	_responseBuffer = buffer;
-	if (RESP_DEBUG) cout << "setResponseBuffer():\n";
-	if (RESP_DEBUG) cout << "METHOD/URI: " << _request.getMethod() << " " << _request.getUri() << endl;
-	if (RESP_DEBUG) cout << "Response. 150 lines:\n";
+	if (RESP_DEBUG) cout << "setResponseBuffer(): ";
+	if (RESP_DEBUG) cout << "METHOD / URI: " << _request.getMethod() << " " << _request.getUri() << endl;
+	if (RESP_DEBUG) cout << "Response. 100 lines:\n";
 	if (RESP_DEBUG) cout << YELLOW << _responseBuffer.substr(0, 100) << RESET << endl;
 	if (RESP_DEBUG) cout << "|||" << endl;
 	_bytesSent = 0;

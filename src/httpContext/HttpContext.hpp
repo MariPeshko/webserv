@@ -89,6 +89,8 @@ class HttpContext
 		Response		_response;
 		e_parse_state	_state;
 
+		bool	validateHost();
+
 		// body members
 		size_t			_expectedBodyLen;
 		enum			e_chunk_state

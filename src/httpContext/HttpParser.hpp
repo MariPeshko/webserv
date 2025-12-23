@@ -9,6 +9,8 @@
 # include <sstream>
 # include <limits>
 
+#define DEBUG 0
+
 /**
  *  Stateless syntax helpers for HTTP request.
  */

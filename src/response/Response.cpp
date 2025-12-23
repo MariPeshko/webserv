@@ -47,8 +47,10 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 void	Response::deleteAndGenerateResponse() {
 	if (D_POST) cout << BLUE << "DELETE method" << RESET << endl;
 	const Location*				loc = matchPrefixPathToLocation();
-	
+	// TO DO
+	// if (!loc) ??? Bad request?
 	// Check allowed methods
+	
 	const std::vector<string>&	allowed = loc->getAllowedMethods();
 	if (!allowed.empty()) {
 		bool	methodAllowed = false;
@@ -119,6 +121,8 @@ void	Response::postAndGenerateResponse()
 {
 	if (D_POST) cout << BLUE << "POST method" << RESET << endl;
 	const Location*	loc = matchPrefixPathToLocation();
+	// TO DO
+	// if (!loc) ??? Bad request?
 
 	// Check for allowed methods
 	const std::vector<string>&	allowed = loc->getAllowedMethods();
@@ -442,7 +446,67 @@ void	Response::generateResponse()
 	fillResponse(200, "");
 
 	const Location	*loc = matchPathToLocation();
+	if (!loc) {
+		std::string	root = _server_config.getRoot();
+		if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << std::endl;
+		std::string uri = _request->getUri();
+		if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << std::endl;
+		std::string path = root + uri;
+		std::cout << YELLOW << "Constructed path: " << path << RESET << std::endl;
+		if (getPathType(path) == DIRECTORY_PATH) {
+			if (DEBUG) cout << BLUE << "Path is a directory." << RESET << std::endl;
+			if (path[path.length() - 1] != '/')
+				path += "/";
 
+			// Check for index file
+			std::string indexFile = "index.html";
+			std::string indexPath = path + indexFile;
+
+			if (DEBUG) cout << BLUE << "Checking index file: " << indexPath << RESET << std::endl;
+			if (DEBUG) cout << YELLOW << "Index to use: " << indexFile << RESET << std::endl;
+
+			if (getPathType(indexPath) == FILE_PATH) {
+				path = indexPath; // Index exists, serve this file
+				if (DEBUG) cout << GREEN << "Index file exists: " << path << RESET << std::endl;
+				std::ostringstream	ss;
+				std::ifstream file(path.c_str());
+				ss << file.rdbuf();
+				_responseBody = ss.str();
+				_contentLength = _responseBody.size();
+				file.close();
+				_statusCode = 200;
+				_reasonPhrase = generateStatusMessage(_statusCode);
+				return;
+			} else {
+				if (DEBUG) cout << BLUE << "Index file not found." << RESET << endl;
+				// Directory, no index, no autoindex -> Forbidden
+				if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off1)" << RESET << std::endl;
+				_statusCode = 403;
+				_reasonPhrase = generateStatusMessage(_statusCode);
+				_responseBody = getErrorPageContent(_statusCode);
+				_contentLength = _responseBody.size();
+				return;
+			}
+		} else if (getPathType(path) == FILE_PATH) {
+			if (DEBUG) cout << GREEN << "File exists at path: " << path << RESET << std::endl;
+			std::ostringstream	ss;
+			std::ifstream		file(path.c_str());
+			ss << file.rdbuf();
+			_responseBody = ss.str();
+			_contentLength = _responseBody.size();
+			file.close();
+			_statusCode = 200;
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			return;
+		} else {
+			if (DEBUG) cout << RED << "No location matched." << RESET << std::endl;
+			_statusCode = 404;
+			_reasonPhrase = generateStatusMessage(_statusCode);
+			_responseBody = getErrorPageContent(_statusCode);
+			_contentLength = _responseBody.size();
+		}
+		return;
+	}
 	// Check for allowed methods
 	const std::vector<string>	&allowed = loc->getAllowedMethods();
 	if (!allowed.empty()) {
@@ -459,7 +523,6 @@ void	Response::generateResponse()
 			return;
 		}
 	}
-
 	// Check for redirection
 	if (loc->getReturnCode() != 0) {
 		fillResponse(loc->getReturnCode(),

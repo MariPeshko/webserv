@@ -43,6 +43,8 @@ bool HttpParser::parseRequestLine(const std::string& line,
 
 	// false if the stream iss fails to extract all three strings.
 	if (!(iss >> method >> uri >> version) || !iss.eof()) {
+		if (DEBUG) cout << "parseRequestLine().\nmethod: " << method << "\nuri: ";
+		if (DEBUG) cout << uri << "\nversion: " << version << endl;
 		if(method.size() != 0)
 			req.setMethod(method);
 		else
@@ -52,10 +54,31 @@ bool HttpParser::parseRequestLine(const std::string& line,
 		req.setRequestLineFormatValid(false);
 		return false;
 	}
+	// Handle absolute URI (e.g., GET http://localhost:8080/ HTTP/1.0)
+    if (uri.rfind("http://", 0) == 0) {
+		if (DEBUG) cout << BLUE << "parseRequestLine. http:// is found" << RESET << endl;
+        size_t	host_start = 7; // "http://" is 7 chars
+        size_t	path_start = uri.find("/", host_start);
+        
+        if (path_start != std::string::npos) {
+            std::string host = uri.substr(host_start, path_start - host_start);
+            req.setHost(host);
+			if (DEBUG) cout << BLUE << "parseRequestLine. host: " << host << RESET << endl;
+            uri = uri.substr(path_start);
+        } else {
+            // Case: GET http://localhost:8080 HTTP/1.0 (no trailing slash)
+            std::string host = uri.substr(host_start);
+            req.setHost(host);
+			if (DEBUG) cout << BLUE << "parseRequestLine. host: " << host << RESET << endl;
+            uri = "/";
+        }
+    }
+	if (DEBUG) cout << BLUE << "parseRequestLine:\nmethod: " << method << "\nuri: ";
+	if (DEBUG) cout << BLUE << uri << "\nversion: " << version << RESET << endl;
 	req.setMethod(method);
 	req.setUri(uri);
 	req.setVersion(version);
-	if (method != "GET" && method != "POST" && method != "DELETE") {
+	if (method != "GET" && method != "HEAD" && method != "POST" && method != "DELETE") {
 		req.setRequestLineFormatValid(false);
 		req.setMethod("");
 		return false;
@@ -66,6 +89,7 @@ bool HttpParser::parseRequestLine(const std::string& line,
 	}
 	// Rudimentary URI check
 	if (uri.empty() || uri[0] != '/' || uri.find("..") != std::string::npos) {
+		if (DEBUG) cout << "parseRequestLine. URI check: invalid" << endl;
 		req.setRequestLineFormatValid(false);
 		return false;
 	}
