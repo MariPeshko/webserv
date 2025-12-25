@@ -7,32 +7,32 @@ using std::endl;
 using std::string;
 
 // Parametic constructor
-HttpContext::HttpContext(Connection &conn, Server &server) : _conn(conn),
-															 _server_config(server),
-															 _request(),
-															 _response(server),
-															 _state(REQUEST_LINE),
-															 _expectedBodyLen(0),
-															 _chunkState(READING_CHUNK_SIZE),
-															 _chunkSize(0),
-															 _responseBuffer(""),
-															 _bytesSent(0)
-{
-}
+HttpContext::HttpContext(Connection &conn, Server &server) :
+	_conn(conn),
+	_server_config(server),
+	_request(),
+	_response(server),
+	_state(REQUEST_LINE),
+	_expectedBodyLen(0),
+	_chunkState(READING_CHUNK_SIZE),
+	_chunkSize(0),
+	_responseBuffer(""),
+	_bytesSent(0)
+{ }
 
 // Copy constructor
-HttpContext::HttpContext(const HttpContext &other) : _conn(other._conn),
-													 _server_config(other._server_config),
-													 _request(other._request),
-													 _response(other._server_config),
-													 _state(other._state),
-													 _expectedBodyLen(other._expectedBodyLen),
-													 _chunkState(other._chunkState),
-													 _chunkSize(other._chunkSize),
-													 _responseBuffer(other._responseBuffer),
-													 _bytesSent(other._bytesSent)
-{
-}
+HttpContext::HttpContext(const HttpContext &other) :
+	_conn(other._conn),
+	_server_config(other._server_config),
+	_request(other._request),
+	_response(other._server_config),
+	_state(other._state),
+	_expectedBodyLen(other._expectedBodyLen),
+	_chunkState(other._chunkState),
+	_chunkSize(other._chunkSize),
+	_responseBuffer(other._responseBuffer),
+	_bytesSent(other._bytesSent)
+{ }
 
 HttpContext::~HttpContext() {}
 
@@ -49,8 +49,8 @@ Response	&HttpContext::response() { return _response; }
  */
 void	HttpContext::requestParsingStateMachine()
 {
-	string &buf = connection().getBuffer();
-	bool can_parse = true;
+	string&	buf = connection().getBuffer();
+	bool	can_parse = true;
 
 	while (can_parse) {
 		switch (_state) {
@@ -60,6 +60,7 @@ void	HttpContext::requestParsingStateMachine()
 					if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
 					if (REQ_DEBUG) cout << RESET << endl;
 					if (!request().getRequestLineFormatValid()) {
+						request().ifConnNotPresent();
 						_state = REQUEST_ERROR;
 						continue;
 					}
@@ -123,7 +124,8 @@ void	HttpContext::requestParsingStateMachine()
 
 // Validate host from absolute URI if present
 // absolute URI is http://localhost:8080/
-bool	HttpContext::validateHost() {
+bool	HttpContext::validateHost()
+{
 	if (CTX_DEBUG) cout << YELLOW << "ReqLineTrue: Validate host from absolute URI if present" << RESET << endl;
 	
 	const std::string&	req_host_full = request().getHost();
@@ -167,7 +169,7 @@ bool	HttpContext::validateHost() {
 	return true;
 }
 
-bool HttpContext::findAndParseReqLine(std::string &buf)
+bool	HttpContext::findAndParseReqLine(std::string &buf)
 {
 	size_t	pos = buf.find("\r\n");
 	if (pos == string::npos) {
@@ -197,9 +199,9 @@ bool HttpContext::findAndParseReqLine(std::string &buf)
 	}
 }
 
-bool HttpContext::findAndParseHeaders(string &buf)
+bool	HttpContext::findAndParseHeaders(string &buf)
 {
-	size_t pos = buf.find("\r\n\r\n");
+	size_t	pos = buf.find("\r\n\r\n");
 	if (pos == string::npos) {
 		return false;
 	}
@@ -223,7 +225,7 @@ bool HttpContext::findAndParseHeaders(string &buf)
  */
 bool	HttpContext::isBodyToRead()
 {
-	std::string method = request().getMethod();
+	string	method = request().getMethod();
 	if (method == "GET" || method == "DELETE") {
 		request().setChunked(false);
 		_state = REQUEST_COMPLETE;
@@ -239,7 +241,7 @@ bool	HttpContext::isBodyToRead()
 		_state = READING_CHUNKED_BODY;
 		return true;
 	} else if (request().isContentLengthHeader()) {
-		const string &cl = request().getHeaderValue("content-length");
+		const string&	cl = request().getHeaderValue("content-length");
 		if (cl.empty()) {
 			_state = REQUEST_COMPLETE;
 			return false;
@@ -291,14 +293,14 @@ bool	HttpContext::findAndParseFixBody(std::string &buf)
 	}
 }
 
-bool HttpContext::chunkedBodyStateMachine(std::string &buf)
+bool	HttpContext::chunkedBodyStateMachine(std::string &buf)
 {
 	if (_chunkState == READING_CHUNK_SIZE) {
-		size_t pos = buf.find("\r\n");
+		size_t	pos = buf.find("\r\n");
 		if (pos == string::npos) { // wait more data
 			return false;
 		}
-		string size_hex = buf.substr(0, pos);
+		string	size_hex = buf.substr(0, pos);
 		// Parse Chunk Size: Convert the hexadecimal string to an integer (chunk_size).
 		if (!HttpParser::cpp98_hexaStrToInt(size_hex, _chunkSize)) {
 			cerr << "Chunked body. Invalid Hexadecimal size" << endl;

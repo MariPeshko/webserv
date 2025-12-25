@@ -206,13 +206,16 @@ void	ServerManager::handleClientData(size_t i) {
 	}
 	ctx.requestParsingStateMachine();
 	if (ctx.isRequestComplete() || ctx.isRequestError()) {
+		
 		// Check if it is cgi
 		// HttpContext method for checking if server has a /cgi-bin
 		// If it's a CGI request: You trigger your CGI execution logic. 
 		// If it's NOT a CGI request: You proceed with 
 		// the normal static file handling logic
 		ctx.response().bindRequest(ctx.request());
-		if (ctx.request().getEnumMethod() == Request::POST) {
+		if (ctx.isRequestError()) {
+			ctx.response().badRequest();
+		} else if (ctx.request().getEnumMethod() == Request::POST) {
 			ctx.response().postAndGenerateResponse();
 		} else if (ctx.request().getEnumMethod() == Request::DELETE) {
 			ctx.response().deleteAndGenerateResponse();

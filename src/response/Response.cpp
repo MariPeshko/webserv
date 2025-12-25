@@ -277,17 +277,13 @@ void	Response::postAndGenerateResponse()
 	}
 }
 
-void printCurrentLocation(const Location *loc)
-{
-	if (loc)
-	{
+void	printCurrentLocation(const Location *loc) {
+	if (loc) {
 		cout << "Current matched location: " << loc->getPath() << endl;
 		cout << "  Root: " << loc->getRoot() << endl;
 		cout << "  Index: " << loc->getIndex() << endl;
 		cout << "  Autoindex: " << (loc->getAutoindex() ? "on" : "off") << endl;
-	}
-	else
-	{
+	} else {
 		cout << "No location matched." << endl;
 	}
 }
@@ -439,6 +435,18 @@ Response::PathType Response::getPathType(string const path)
 	return (NOT_EXIST);
 }
 
+void	Response::badRequest() {
+	if (DEBUG) cout << RED << "Response. Bad request" << RESET << endl; 
+	if (_request->getRequestLineFormatValid() == false) {
+		fillResponse(400, getErrorPageContent(400));
+	} else if (_request->getHeadersFormatValid() == false) {
+		if (DEBUG) cout << RED << "Response. Bad request. Invalid headers" << RESET << endl; 
+		fillResponse(400, getErrorPageContent(400));
+	} else {
+		fillResponse(400, getErrorPageContent(400));
+	}
+}
+
 void	Response::generateResponse()
 {
 	if (!_request) return;
@@ -447,20 +455,20 @@ void	Response::generateResponse()
 
 	const Location	*loc = matchPathToLocation();
 	if (!loc) {
-		std::string	root = _server_config.getRoot();
-		if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << std::endl;
-		std::string uri = _request->getUri();
-		if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << std::endl;
-		std::string path = root + uri;
-		std::cout << YELLOW << "Constructed path: " << path << RESET << std::endl;
+		string	root = _server_config.getRoot();
+		string	uri = _request->getUri();
+		string	path = root + uri;
+		if (DEBUG) cout << YELLOW << "Using root:       " << root << RESET << endl;
+		if (DEBUG) cout << YELLOW << "Using URI:        " << uri << RESET << endl;
+		if (DEBUG) cout << YELLOW << "Constructed path: " << path << RESET << endl;
 		if (getPathType(path) == DIRECTORY_PATH) {
-			if (DEBUG) cout << BLUE << "Path is a directory." << RESET << std::endl;
+			if (DEBUG) cout << BLUE << "Path is a directory." << RESET << endl;
 			if (path[path.length() - 1] != '/')
 				path += "/";
 
 			// Check for index file
-			std::string indexFile = "index.html";
-			std::string indexPath = path + indexFile;
+			string	indexFile = "index.html";
+			string	indexPath = path + indexFile;
 
 			if (DEBUG) cout << BLUE << "Checking index file: " << indexPath << RESET << std::endl;
 			if (DEBUG) cout << YELLOW << "Index to use: " << indexFile << RESET << std::endl;
@@ -469,7 +477,7 @@ void	Response::generateResponse()
 				path = indexPath; // Index exists, serve this file
 				if (DEBUG) cout << GREEN << "Index file exists: " << path << RESET << std::endl;
 				std::ostringstream	ss;
-				std::ifstream file(path.c_str());
+				std::ifstream		file(path.c_str());
 				ss << file.rdbuf();
 				_responseBody = ss.str();
 				_contentLength = _responseBody.size();
@@ -654,8 +662,7 @@ string							Response::getErrorPageContent(int code)
 	const std::map<int, string>&			errorPages = _server_config.getErrorPages();
 	std::map<int, string>::const_iterator	it = errorPages.find(code);
 
-	if (it != errorPages.end())
-	{
+	if (it != errorPages.end()) {
 		std::ifstream	file(it->second.c_str());
 		if (file.is_open())
 		{

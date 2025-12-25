@@ -32,6 +32,7 @@ class	Response
 		~Response();
 
 		void			bindRequest(const Request &req);
+		void			badRequest();
 		void			generateResponse();
 		void			postAndGenerateResponse();
 		void			deleteAndGenerateResponse();
