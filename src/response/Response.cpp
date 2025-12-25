@@ -46,7 +46,7 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 // set status code success 204 (No Content).
 void	Response::deleteAndGenerateResponse() {
 	if (D_POST) cout << BLUE << "DELETE method" << RESET << endl;
-	const Location*				loc = matchPrefixPathToLocation();
+	const Location*				loc = matchPathToLocation();
 	if (!loc) {
 		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
 		return fillResponse(404, getErrorPageContent(404));
@@ -121,7 +121,7 @@ void	Response::deleteAndGenerateResponse() {
 void	Response::postAndGenerateResponse()
 {
 	if (D_POST) cout << BLUE << "POST method" << RESET << endl;
-	const Location*				loc = matchPrefixPathToLocation();
+	const Location*				loc = matchPathToLocation();
 	if (!loc) {
 		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
 		return fillResponse(404, getErrorPageContent(404));
@@ -279,7 +279,8 @@ void	Response::postAndGenerateResponse()
 	}
 }
 
-void	printCurrentLocation(const Location *loc) {
+// Debugging purpose for matchPathToLocation()
+static void	printCurrentLocation(const Location *loc) {
 	if (loc) {
 		cout << "Current matched location: " << loc->getPath() << endl;
 		cout << "  Root: " << loc->getRoot() << endl;
@@ -290,9 +291,14 @@ void	printCurrentLocation(const Location *loc) {
 	}
 }
 
-// Helper to find the best matching location
-// Returns a pointer to the Location object, or NULL if none found
-// Any valid request starts with "/", the default mathing is "/" - a root
+/**
+ * Helper to find the best matching location
+ * 
+ * Checks if request URI starts with a certain location path (proper prefix match)
+ * Returns a pointer to the Location object, or NULL if none found
+ * Special case: "/" matches everything starting with "/"
+ * Looks for the longest match (location /images/ vs location /)
+ */
 const Location*	Response::matchPathToLocation()
 {
 	if (!_request) return NULL;
@@ -305,34 +311,26 @@ const Location*	Response::matchPathToLocation()
 	if (DEBUG_PATH) cout << locations.size() << " locations." << RESET << endl;
 
 	for (size_t i = 0; i < locations.size(); ++i) {
-		const string &locPath = locations[i].getPath();
+		const string&	locPath = locations[i].getPath();
+		const string&	uri = _request->getUri();
+		const string	html_ext = ".html";
+		
 		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
-
-		// Check if request URI starts with this location path (proper prefix match)
-		const string &uri = _request->getUri();
 		if (DEBUG_PATH) cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << endl;
-		const string html_ext = ".html";
 
 		if (uri.compare(0, locPath.length(), locPath) == 0)
 		{
-			// Verify it's a proper path prefix (not just substring match)
-			// Special case: "/" matches everything starting with "/"
-			// Other locations: character after match must be '/' or end-of-string
-			bool isValidPrefix = false;
+			bool	isValidPrefix = false;
 
-			if (locPath == "/") {
-				// Root location matches all URIs starting with "/"
+			if (locPath == "/") { // Root location matches all URIs starting with "/"
 				isValidPrefix = true;
-			} else if (uri.length() == locPath.length()) {
-				// Exact match (e.g., /about matches /about)
+			} else if (uri.length() == locPath.length()) { // Exact match (/about matches /about)
 				isValidPrefix = true;
-			} else if (uri[locPath.length()] == '/') {
-				// Path continues with '/' (e.g., /about matches /about/page)
+			} else if (uri[locPath.length()] == '/') { // Path continues with '/' (/about matches /about/page)
 				isValidPrefix = true;
 			}
 			if (isValidPrefix) {
 				if (DEBUG_PATH) cout << GREEN << "    -> Match found!" << RESET << endl;
-				// We want the longest match (e.g. location /images/ vs location /)
 				if (locPath.length() > bestMatchLen) {
 					bestMatch = &locations[i];
 					bestMatchLen = locPath.length();
@@ -348,57 +346,6 @@ const Location*	Response::matchPathToLocation()
 	}
 	if (DEBUG_PATH) printCurrentLocation(bestMatch);
 	return bestMatch;
-}
-
-// Helper to find the location that is the longest matching prefix of the request URI.
-// Any valid request starts with "/", the default mathing is "/" - a root
-const Location*	Response::matchPrefixPathToLocation()
-{
-	const std::vector<Location>&	locations = _server_config.getLocations();
-	const Location*					bestMatch = NULL;
-	size_t							bestMatchLen = 0;
-	const string&					RequestUri = _request->getUri();
-
-	if (DEBUG_PATH) cout << GREEN << "Matching URI: [" << RequestUri << "] against ";
-	if (DEBUG_PATH) cout << locations.size() << " locations." << RESET << endl;
-
-	for (size_t i = 0; i < locations.size(); ++i) {
-		const string&	locPath = locations[i].getPath();
-		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
-
-		if (RequestUri.rfind(locPath, 0) == 0) {
-			if (DEBUG_PATH) cout << BLUE << "    Request URI starts with the location path" << RESET << endl;
-			if (prefixMatching(locPath, RequestUri)) {
-				continue;
-			}
-			if (DEBUG_PATH) cout << GREEN << "    -> Prefix Match found!" << RESET << endl;
-			// We want the longest match (e.g. location /images/ vs location /)
-			if (locPath.length() > bestMatchLen) {
-				bestMatch = &locations[i];
-				bestMatchLen = locPath.length();
-				if (DEBUG_PATH) cout << GREEN << "    -> New best match (length " << bestMatchLen;
-				if (DEBUG_PATH) cout << ")" << RESET << endl;
-			}
-		}
-	}
-	return bestMatch;
-}
-
-// It should only match if there's a "/" after the match.
-// e.g. URI "/about-us/team.html" should not match location "/about"
-// The character at index 6 of "/about-us/team.html" is a hyphen (-).
-bool			Response::prefixMatching(const string &locPath, const string &RequestUri)
-{
-
-	// cout << RED << "RequestUri: " << RequestUri << "; LocPrefixPath: " << locPath << endl;
-	//  character in the URI right after the prefix
-	size_t index = locPath.length();
-
-	if (locPath.length() > 1 && RequestUri.length() > locPath.length() && RequestUri[index] != '/')	{
-		return true;
-	} else {
-		return false;
-	}
 }
 
 // returns the index file name for the matched location or an empty string if none found

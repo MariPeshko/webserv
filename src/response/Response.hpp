@@ -73,8 +73,6 @@ class	Response
 		std::map<std::string, std::string>	_headers;
 
 		const Location*		matchPathToLocation();
-		const Location*		matchPrefixPathToLocation();
-		bool				prefixMatching(const std::string &locPath, const std::string &RequestUri);
 		std::string			getIndexFromLocation();
 		PathType			getPathType(std::string const path);
 		static std::string	getMimeType(const std::string &filePath);
