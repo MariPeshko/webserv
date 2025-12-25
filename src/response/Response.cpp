@@ -47,9 +47,10 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 void	Response::deleteAndGenerateResponse() {
 	if (D_POST) cout << BLUE << "DELETE method" << RESET << endl;
 	const Location*				loc = matchPrefixPathToLocation();
-	// TO DO
-	// if (!loc) ??? Bad request?
-	// Check allowed methods
+	if (!loc) {
+		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
+		return fillResponse(404, getErrorPageContent(404));
+	}
 	
 	const std::vector<string>&	allowed = loc->getAllowedMethods();
 	if (!allowed.empty()) {
@@ -90,27 +91,27 @@ void	Response::deleteAndGenerateResponse() {
 	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
 	
 	// Check if the file/resource exists
-    PathType pathType = getPathType(path);
-    if (pathType == NOT_EXIST) {
-        if (D_POST) cout << RED << "Resource not found: " << path << RESET << endl;
-        fillResponse(404, getErrorPageContent(404));
-        return;
-    }
+	PathType pathType = getPathType(path);
+	if (pathType == NOT_EXIST) {
+		if (D_POST) cout << RED << "Resource not found: " << path << RESET << endl;
+		fillResponse(404, getErrorPageContent(404));
+		return;
+	}
 	// Don't allow deleting directories (optional, depends on your requirements)
-    if (pathType == DIRECTORY_PATH) {
-        if (D_POST) cout << RED << "Cannot delete directory: " << path << RESET << endl;
-        fillResponse(403, getErrorPageContent(403)); // Forbidden
-        return;
-    }
+	if (pathType == DIRECTORY_PATH) {
+		if (D_POST) cout << RED << "Cannot delete directory: " << path << RESET << endl;
+		fillResponse(403, getErrorPageContent(403)); // Forbidden
+		return;
+	}
 	// Attempt to delete the file
-    if (std::remove(path.c_str()) != 0) { // Deletion failed (permission denied, etc.)
-        if (D_POST) cout << RED << "Failed to delete file: " << path << RESET << endl;
-        fillResponse(403, getErrorPageContent(403)); // Forbidden
-        return;
-    }
-    if (D_POST) cout << GREEN << "File deleted successfully: " << path << RESET << endl;
+	if (std::remove(path.c_str()) != 0) { // Deletion failed (permission denied, etc.)
+		if (D_POST) cout << RED << "Failed to delete file: " << path << RESET << endl;
+		fillResponse(403, getErrorPageContent(403)); // Forbidden
+		return;
+	}
+	if (D_POST) cout << GREEN << "File deleted successfully: " << path << RESET << endl;
 	// Success: 204 No Content
-    fillResponse(204, "");
+	fillResponse(204, "");
 }
 
 // Method POST and generation of the response
@@ -120,10 +121,11 @@ void	Response::deleteAndGenerateResponse() {
 void	Response::postAndGenerateResponse()
 {
 	if (D_POST) cout << BLUE << "POST method" << RESET << endl;
-	const Location*	loc = matchPrefixPathToLocation();
-	// TO DO
-	// if (!loc) ??? Bad request?
-
+	const Location*				loc = matchPrefixPathToLocation();
+	if (!loc) {
+		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
+		return fillResponse(404, getErrorPageContent(404));
+	}
 	// Check for allowed methods
 	const std::vector<string>&	allowed = loc->getAllowedMethods();
 	if (!allowed.empty()) {
@@ -290,6 +292,7 @@ void	printCurrentLocation(const Location *loc) {
 
 // Helper to find the best matching location
 // Returns a pointer to the Location object, or NULL if none found
+// Any valid request starts with "/", the default mathing is "/" - a root
 const Location*	Response::matchPathToLocation()
 {
 	if (!_request) return NULL;
@@ -348,7 +351,8 @@ const Location*	Response::matchPathToLocation()
 }
 
 // Helper to find the location that is the longest matching prefix of the request URI.
-const Location *Response::matchPrefixPathToLocation()
+// Any valid request starts with "/", the default mathing is "/" - a root
+const Location*	Response::matchPrefixPathToLocation()
 {
 	const std::vector<Location>&	locations = _server_config.getLocations();
 	const Location*					bestMatch = NULL;
@@ -383,7 +387,7 @@ const Location *Response::matchPrefixPathToLocation()
 // It should only match if there's a "/" after the match.
 // e.g. URI "/about-us/team.html" should not match location "/about"
 // The character at index 6 of "/about-us/team.html" is a hyphen (-).
-bool Response::prefixMatching(const string &locPath, const string &RequestUri)
+bool			Response::prefixMatching(const string &locPath, const string &RequestUri)
 {
 
 	// cout << RED << "RequestUri: " << RequestUri << "; LocPrefixPath: " << locPath << endl;
@@ -450,70 +454,12 @@ void	Response::badRequest() {
 void	Response::generateResponse()
 {
 	if (!_request) return;
-
 	fillResponse(200, "");
 
 	const Location	*loc = matchPathToLocation();
 	if (!loc) {
-		string	root = _server_config.getRoot();
-		string	uri = _request->getUri();
-		string	path = root + uri;
-		if (DEBUG) cout << YELLOW << "Using root:       " << root << RESET << endl;
-		if (DEBUG) cout << YELLOW << "Using URI:        " << uri << RESET << endl;
-		if (DEBUG) cout << YELLOW << "Constructed path: " << path << RESET << endl;
-		if (getPathType(path) == DIRECTORY_PATH) {
-			if (DEBUG) cout << BLUE << "Path is a directory." << RESET << endl;
-			if (path[path.length() - 1] != '/')
-				path += "/";
-
-			// Check for index file
-			string	indexFile = "index.html";
-			string	indexPath = path + indexFile;
-
-			if (DEBUG) cout << BLUE << "Checking index file: " << indexPath << RESET << std::endl;
-			if (DEBUG) cout << YELLOW << "Index to use: " << indexFile << RESET << std::endl;
-
-			if (getPathType(indexPath) == FILE_PATH) {
-				path = indexPath; // Index exists, serve this file
-				if (DEBUG) cout << GREEN << "Index file exists: " << path << RESET << std::endl;
-				std::ostringstream	ss;
-				std::ifstream		file(path.c_str());
-				ss << file.rdbuf();
-				_responseBody = ss.str();
-				_contentLength = _responseBody.size();
-				file.close();
-				_statusCode = 200;
-				_reasonPhrase = generateStatusMessage(_statusCode);
-				return;
-			} else {
-				if (DEBUG) cout << BLUE << "Index file not found." << RESET << endl;
-				// Directory, no index, no autoindex -> Forbidden
-				if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off1)" << RESET << std::endl;
-				_statusCode = 403;
-				_reasonPhrase = generateStatusMessage(_statusCode);
-				_responseBody = getErrorPageContent(_statusCode);
-				_contentLength = _responseBody.size();
-				return;
-			}
-		} else if (getPathType(path) == FILE_PATH) {
-			if (DEBUG) cout << GREEN << "File exists at path: " << path << RESET << std::endl;
-			std::ostringstream	ss;
-			std::ifstream		file(path.c_str());
-			ss << file.rdbuf();
-			_responseBody = ss.str();
-			_contentLength = _responseBody.size();
-			file.close();
-			_statusCode = 200;
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			return;
-		} else {
-			if (DEBUG) cout << RED << "No location matched." << RESET << std::endl;
-			_statusCode = 404;
-			_reasonPhrase = generateStatusMessage(_statusCode);
-			_responseBody = getErrorPageContent(_statusCode);
-			_contentLength = _responseBody.size();
-		}
-		return;
+		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
+		return fillResponse(404, getErrorPageContent(404));
 	}
 	// Check for allowed methods
 	const std::vector<string>	&allowed = loc->getAllowedMethods();
@@ -543,19 +489,18 @@ void	Response::generateResponse()
 	// Construct Path
 	string			root;
 	const string&	locationRoot = loc->getRoot();
-	if (!locationRoot.empty()) {
+	if (!locationRoot.empty())
 		root = loc->getRoot();				// Use location-specific root
-	} else {
+	else 
 		root = _server_config.getRoot();	// Fall back to server root
-	}
 	// Safety. Fallback if root is empty: use current directory.
 	if (root.empty()) root = "."; // the current working directory
+	
+	string			uri = _request->getUri();
+	string			path = root + uri;
+	
 	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
-
-	string		uri = _request->getUri();
 	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
-
-	string	path = root + uri;
 	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
 
 	// Check if path exists
