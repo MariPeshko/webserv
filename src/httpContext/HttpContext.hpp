@@ -56,18 +56,18 @@ class HttpContext
 			REQUEST_ERROR
 		};
 
-		void requestParsingStateMachine();
-		bool findAndParseReqLine(std::string &buf);
-		bool findAndParseHeaders(std::string &buf);
-		bool isBodyToRead();
-		bool findAndParseFixBody(std::string &buf);
-		bool chunkedBodyStateMachine(std::string &buf);
+		void	requestParsingStateMachine();
+		bool	findAndParseReqLine(std::string &buf);
+		bool	findAndParseHeaders(std::string &buf);
+		bool	isBodyToRead();
+		bool	findAndParseFixBody(std::string &buf);
+		bool	chunkedBodyStateMachine(std::string &buf);
 
-		bool isRequestComplete() const;
-		bool isRequestError() const;
+		bool	isRequestComplete() const;
+		bool	isRequestError() const;
 
-		void buildResponseString();
-		void resetState();
+		void	buildResponseString();
+		void	resetState();
 
 		// getters
 		e_parse_state getParserState() const;
