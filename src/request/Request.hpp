@@ -21,16 +21,19 @@ class	Request {
 			GET,
 			POST,
 			DELETE,
+			HEAD,
 			INVALID
 		};
 
 		// setters
 		void	setRequestLineFormatValid(bool value);
 		void	setHeadersFormatValid(bool value);
+		void	setHost(const std::string &host);
 		void	setMethod(const std::string &method);
 		void	setUri(const std::string &uri);
 		void	setVersion(const std::string &version);
 		void	addHeader(const std::string &key, const std::string &value);
+		void	ifConnNotPresent();
 		void	setBody(const std::string &body);
 		void	setChunked(bool value);
 
@@ -48,6 +51,7 @@ class	Request {
 		const std::string&	getBody() const;
 		std::map<std::string, std::string>	getHeaders() const;
 		const std::string &	getHeaderValue(const std::string header_name) const;
+		const std::string &	getHost() const;
 
 	private:
 		bool						_validFormatReqLine;
@@ -58,6 +62,7 @@ class	Request {
 		std::map<std::string, std::string>	_headers;
 		std::string					_body;
 		bool						_bodyChunked;
+		std::string					_host;
 };
 
 #endif

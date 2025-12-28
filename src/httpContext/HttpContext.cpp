@@ -7,32 +7,32 @@ using std::endl;
 using std::string;
 
 // Parametic constructor
-HttpContext::HttpContext(Connection &conn, Server &server) : _conn(conn),
-															 _server_config(server),
-															 _request(),
-															 _response(server),
-															 _state(REQUEST_LINE),
-															 _expectedBodyLen(0),
-															 _chunkState(READING_CHUNK_SIZE),
-															 _chunkSize(0),
-															 _responseBuffer(""),
-															 _bytesSent(0)
-{
-}
+HttpContext::HttpContext(Connection &conn, Server &server) :
+	_conn(conn),
+	_server_config(server),
+	_request(),
+	_response(server),
+	_state(REQUEST_LINE),
+	_expectedBodyLen(0),
+	_chunkState(READING_CHUNK_SIZE),
+	_chunkSize(0),
+	_responseBuffer(""),
+	_bytesSent(0)
+{ }
 
 // Copy constructor
-HttpContext::HttpContext(const HttpContext &other) : _conn(other._conn),
-													 _server_config(other._server_config),
-													 _request(other._request),
-													 _response(other._server_config),
-													 _state(other._state),
-													 _expectedBodyLen(other._expectedBodyLen),
-													 _chunkState(other._chunkState),
-													 _chunkSize(other._chunkSize),
-													 _responseBuffer(other._responseBuffer),
-													 _bytesSent(other._bytesSent)
-{
-}
+HttpContext::HttpContext(const HttpContext &other) :
+	_conn(other._conn),
+	_server_config(other._server_config),
+	_request(other._request),
+	_response(other._server_config),
+	_state(other._state),
+	_expectedBodyLen(other._expectedBodyLen),
+	_chunkState(other._chunkState),
+	_chunkSize(other._chunkSize),
+	_responseBuffer(other._responseBuffer),
+	_bytesSent(other._bytesSent)
+{ }
 
 HttpContext::~HttpContext() {}
 
@@ -49,15 +49,18 @@ Response	&HttpContext::response() { return _response; }
  */
 void	HttpContext::requestParsingStateMachine()
 {
-	string &buf = connection().getBuffer();
-	bool can_parse = true;
+	string&	buf = connection().getBuffer();
+	bool	can_parse = true;
 
 	while (can_parse) {
 		switch (_state) {
 			case REQUEST_LINE: {
 				if (!findAndParseReqLine(buf)) {
+					if (REQ_DEBUG) cout << RED << "ParseReqLine error" << RESET << endl;
 					if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
+					if (REQ_DEBUG) cout << RESET << endl;
 					if (!request().getRequestLineFormatValid()) {
+						request().ifConnNotPresent();
 						_state = REQUEST_ERROR;
 						continue;
 					}
@@ -69,8 +72,10 @@ void	HttpContext::requestParsingStateMachine()
 			}
 			case READING_HEADERS : {
 				if (!findAndParseHeaders(buf)) {
+					request().ifConnNotPresent();
 					can_parse = false; break;
 				}
+
 				if (REQ_DEBUG) PrintUtils::printRequestHeaders(request());
 				if (isBodyToRead()) {
 					if (CTX_DEBUG) cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
@@ -117,7 +122,54 @@ void	HttpContext::requestParsingStateMachine()
 	}
 }
 
-bool HttpContext::findAndParseReqLine(std::string &buf)
+// Validate host from absolute URI if present
+// absolute URI is http://localhost:8080/
+bool	HttpContext::validateHost()
+{
+	if (CTX_DEBUG) cout << YELLOW << "ReqLineTrue: Validate host from absolute URI if present" << RESET << endl;
+	
+	const std::string&	req_host_full = request().getHost();
+	if (!req_host_full.empty()) {
+		std::string	req_hostname = req_host_full;
+		int req_port = -1;
+		// Separate hostname and port from the request's host string
+		size_t	colon_pos = req_host_full.find(':');
+		if (colon_pos != std::string::npos) {
+			req_hostname = req_host_full.substr(0, colon_pos);
+			std::stringstream	ss(req_host_full.substr(colon_pos + 1));
+			if (!(ss >> req_port)) {
+				if (CTX_DEBUG) cerr << "Invalid port in request host: " << req_host_full << endl;
+				return false;
+			}
+		}
+		// Check if the port matches the server's listening port
+		if (req_port != -1 && req_port != _server_config.getPort()) {
+			if (CTX_DEBUG) cerr << YELLOW << "Port mismatch. Request: " << req_port << ", Server: " << _server_config.getPort() << endl;
+			request().setUri("/" + req_hostname + request().getUri());
+			if (CTX_DEBUG) cerr << YELLOW << "New request URI is: " << request().getUri() << RESET << endl;
+			return false;
+		}
+		// Check if the hostname matches one of the server's names
+		const std::vector<std::string>&	server_names = _server_config.getServerNames();
+		bool							host_match = false;
+		for (size_t i = 0; i < server_names.size(); ++i) {
+			if (server_names[i] == req_hostname) {
+				host_match = true;
+				break;
+			}
+		}
+		if (!host_match) {
+			if (CTX_DEBUG) cerr << "Hostname mismatch, modifying URI: " << req_hostname << endl;
+			request().setUri("/" + req_hostname + request().getUri());
+			if (CTX_DEBUG) cerr << "New request URI is: " << request().getUri() << endl;
+			return false;
+		}
+	}
+	if (CTX_DEBUG) cout << YELLOW << "Host validated succesfully" << RESET << endl;
+	return true;
+}
+
+bool	HttpContext::findAndParseReqLine(std::string &buf)
 {
 	size_t	pos = buf.find("\r\n");
 	if (pos == string::npos) {
@@ -127,16 +179,29 @@ bool HttpContext::findAndParseReqLine(std::string &buf)
 	string	line = buf.substr(0, pos);
 	buf.erase(0, pos + 2);
 	if (HttpParser::parseRequestLine(line, request()) == true) {
+		// Validate host from absolute URI if present
+		if (request().getHost().size() > 0) {
+			if (validateHost() == false) {
+				_state = REQUEST_ERROR;
+				return false;
+			}
+		}
 		return true;
 	} else {
+		if (request().getHost().size() > 0) {
+			if (validateHost() == false) {
+				_state = REQUEST_ERROR;
+				return false;
+			}
+		}
 		_state = REQUEST_ERROR;
 		return false;
 	}
 }
 
-bool HttpContext::findAndParseHeaders(string &buf)
+bool	HttpContext::findAndParseHeaders(string &buf)
 {
-	size_t pos = buf.find("\r\n\r\n");
+	size_t	pos = buf.find("\r\n\r\n");
 	if (pos == string::npos) {
 		return false;
 	}
@@ -160,7 +225,7 @@ bool HttpContext::findAndParseHeaders(string &buf)
  */
 bool	HttpContext::isBodyToRead()
 {
-	std::string method = request().getMethod();
+	string	method = request().getMethod();
 	if (method == "GET" || method == "DELETE") {
 		request().setChunked(false);
 		_state = REQUEST_COMPLETE;
@@ -176,7 +241,7 @@ bool	HttpContext::isBodyToRead()
 		_state = READING_CHUNKED_BODY;
 		return true;
 	} else if (request().isContentLengthHeader()) {
-		const string &cl = request().getHeaderValue("content-length");
+		const string&	cl = request().getHeaderValue("content-length");
 		if (cl.empty()) {
 			_state = REQUEST_COMPLETE;
 			return false;
@@ -228,14 +293,14 @@ bool	HttpContext::findAndParseFixBody(std::string &buf)
 	}
 }
 
-bool HttpContext::chunkedBodyStateMachine(std::string &buf)
+bool	HttpContext::chunkedBodyStateMachine(std::string &buf)
 {
 	if (_chunkState == READING_CHUNK_SIZE) {
-		size_t pos = buf.find("\r\n");
+		size_t	pos = buf.find("\r\n");
 		if (pos == string::npos) { // wait more data
 			return false;
 		}
-		string size_hex = buf.substr(0, pos);
+		string	size_hex = buf.substr(0, pos);
 		// Parse Chunk Size: Convert the hexadecimal string to an integer (chunk_size).
 		if (!HttpParser::cpp98_hexaStrToInt(size_hex, _chunkSize)) {
 			cerr << "Chunked body. Invalid Hexadecimal size" << endl;
@@ -322,26 +387,20 @@ void	HttpContext::buildResponseString()
 
 	// 1. Status Line
 	oss << _request.getVersion() << " " << status_code << " " << reason_phrase << "\r\n";
+	oss << "Connection: " << _request.getHeaderValue("connection") << "\r\n";
 
 	// 2. Headers
-	//oss << "Content-Type: text/html\r\n";
 	oss << "Content-Length: " << content_length << "\r\n";
-	oss << "Connection: keep-alive\r\n"; // Optional
-
-	// Add custom headers (like Content-Type and Location)
 	const std::map<string, string>&	headers = response().getHeaders();
 	for (std::map<string, string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
 	{
 		oss << it->first << ": " << it->second << "\r\n";
 	}
-
 	// 3. Empty Line (End of headers)
 	oss << "\r\n";
 	oss << body;
 
 	setResponseBuffer(oss.str());
-
-	// return oss.str();
 }
 
 HttpContext::e_parse_state	HttpContext::getParserState() const {
@@ -364,9 +423,9 @@ size_t			HttpContext::getBytesSent() const {
 
 void			HttpContext::setResponseBuffer(const std::string &buffer) {
 	_responseBuffer = buffer;
-	if (RESP_DEBUG) cout << "setResponseBuffer():\n";
-	if (RESP_DEBUG) cout << "METHOD/URI: " << _request.getMethod() << " " << _request.getUri() << endl;
-	if (RESP_DEBUG) cout << "Response. 150 lines:\n";
+	if (RESP_DEBUG) cout << "setResponseBuffer(): ";
+	if (RESP_DEBUG) cout << "METHOD / URI: " << _request.getMethod() << " " << _request.getUri() << endl;
+	if (RESP_DEBUG) cout << "Response. 100 lines:\n";
 	if (RESP_DEBUG) cout << YELLOW << _responseBuffer.substr(0, 100) << RESET << endl;
 	if (RESP_DEBUG) cout << "|||" << endl;
 	_bytesSent = 0;

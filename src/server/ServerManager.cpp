@@ -177,6 +177,8 @@ void	ServerManager::removeClient(int fd, size_t i) {
  * Reads the available chunk of data (which might be an incomplete 
  * request). Stores that chunk in the corresponding HttpContext object's 
  * internal buffer.
+ * 
+ * If request is not complete, we do nothing and wait for the next poll() event.
  */
 void	ServerManager::handleClientData(size_t i) {
 	const int fd = _pfds[i].fd;
@@ -200,20 +202,23 @@ void	ServerManager::handleClientData(size_t i) {
 		handleClientError(fd, i);
 		return ;
 	}
-
 	ctx.requestParsingStateMachine();
-	// Only parse and respond if the request is complete
 	if (ctx.isRequestComplete() || ctx.isRequestError()) {
+		
 		// Check if it is cgi
 		// HttpContext method for checking if server has a /cgi-bin
 		// If it's a CGI request: You trigger your CGI execution logic. 
 		// If it's NOT a CGI request: You proceed with 
 		// the normal static file handling logic
-
-		// Generate response
 		ctx.response().bindRequest(ctx.request());
-		if (ctx.request().getEnumMethod() == Request::POST) {
+		if (ctx.isRequestError()) {
+			ctx.response().badRequest();
+		} else if (ctx.request().getEnumMethod() == Request::POST) {
 			ctx.response().postAndGenerateResponse();
+		} else if (ctx.request().getEnumMethod() == Request::DELETE) {
+			ctx.response().deleteAndGenerateResponse();
+		} else if (ctx.request().getEnumMethod() == Request::INVALID) {
+			ctx.response().fillResponse(400, ctx.response().getErrorPageContent(400));
 		} else {
 			ctx.response().generateResponse();
 		}
@@ -227,7 +232,6 @@ void	ServerManager::handleClientData(size_t i) {
 			ctx.response().getContentLength()
 		);
 	}
-	// If request is not complete, we do nothing and wait for the next poll() event.
 }
 
 bool	ServerManager::isListener(int fd) {
@@ -256,18 +260,18 @@ void	ServerManager::delFromPfds(size_t index) {
 
 /** Handle POLLOUT event - send response data when socket is ready */
 void	ServerManager::handleClientWrite(size_t i) {
-	const int fd = _pfds[i].fd;
-	std::map<int, HttpContext>::iterator it = _contexts.find(fd);
+	const int								fd = _pfds[i].fd;
+	std::map<int, HttpContext>::iterator	it = _contexts.find(fd);
 	if (it == _contexts.end()) {
 		Logger::logErrno(LOG_ERROR, "No context found for fd " + std::to_string(fd));
 		close(fd);
 		delFromPfds(i);
 		return;
 	}
-	HttpContext& ctx = it->second;
+	HttpContext&		ctx = it->second;
 	// Get remaining data to send
-	const std::string& buffer = ctx.getResponseBuffer();
-	size_t already_sent = ctx.getBytesSent();
+	const std::string&	buffer = ctx.getResponseBuffer();
+	size_t				already_sent = ctx.getBytesSent();
 	
 	if (buffer.size() <= already_sent) { // a safeguard
 		// Response fully sent, switch off POLLOUT
@@ -275,11 +279,10 @@ void	ServerManager::handleClientWrite(size_t i) {
 		ctx.resetState();
 		return;
 	}
-	
 	// Send remaining data
-	size_t remaining = buffer.size() - already_sent;
-	const char* data_ptr = buffer.c_str() + already_sent;
-	ssize_t bytes_sent = send(fd, data_ptr, remaining, 0); /// ? last parameter NON_BLOCK
+	size_t		remaining = buffer.size() - already_sent;
+	const char*	data_ptr = buffer.c_str() + already_sent;
+	ssize_t		bytes_sent = send(fd, data_ptr, remaining, 0); /// ? last parameter NON_BLOCK
 
 	if (bytes_sent == -1) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {

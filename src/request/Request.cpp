@@ -25,19 +25,30 @@ void Request::setMethod(const std::string &method) {
 	}
 }
 
-void Request::setUri(const std::string &uri) {
+void	Request::setUri(const std::string &uri) {
 	_uri = uri;
 }
 
-void Request::setVersion(const std::string &version) {
+void	Request::setVersion(const std::string &version) {
 	_httpVersion = version;
 }
 
-void Request::addHeader(const std::string &key, const std::string &value) {
+void	Request::addHeader(const std::string &key, const std::string &value) {
 	_headers[key] = value;
 }
 
-void Request::setBody(const std::string &body) {
+// Set default Connection header based on HTTP version if not present
+void	Request::ifConnNotPresent() {
+	if (getHeaderValue("connection").empty()) {
+		if (getVersion() == "HTTP/1.1") {
+			addHeader("connection", "keep-alive");
+		} else {
+			addHeader("connection", "close");
+		}
+	}
+}
+
+void	Request::setBody(const std::string &body) {
 	_body = body;
 }
 
@@ -47,6 +58,10 @@ void	Request::setRequestLineFormatValid(bool value) {
 
 void	Request::setHeadersFormatValid(bool value) {
 	_validFormatHeaders = value;
+}
+
+void	Request::setHost(const std::string &host) {
+	_host = host;
 }
 
 /**
@@ -126,4 +141,8 @@ std::string&		Request::getBody() {
 
 const std::string&	Request::getBody() const {
 	return _body;
+}
+
+const std::string& Request::getHost() const {
+	return _host;
 }

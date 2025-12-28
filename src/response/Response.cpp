@@ -13,13 +13,11 @@ Response::Response(Server &server)
 	  _statusCode(200),
 	  _reasonPhrase(generateStatusMessage(200)),
 	  _contentLength(0)
-{
-}
+{ }
 
 Response &Response::operator=(const Response &other)
 {
-	if (this != &other)
-	{
+	if (this != &other)	{
 		_server_config = other._server_config;
 		_request = other._request;
 		_statusCode = other.getStatusCode();
@@ -32,8 +30,7 @@ Response &Response::operator=(const Response &other)
 Response::~Response() {}
 
 // call after parsing
-void	Response::bindRequest(const Request &req)
-{
+void	Response::bindRequest(const Request &req) {
 	_request = &req;
 }
 
@@ -44,14 +41,91 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 	_responseBody = bodyContent;
 	_contentLength = _responseBody.size();
 }
+
+// Method DELETE and generation of the response
+// set status code success 204 (No Content).
+void	Response::deleteAndGenerateResponse() {
+	if (D_POST) cout << BLUE << "DELETE method" << RESET << endl;
+	const Location*				loc = matchPathToLocation();
+	if (!loc) {
+		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
+		return fillResponse(404, getErrorPageContent(404));
+	}
+	
+	const std::vector<string>&	allowed = loc->getAllowedMethods();
+	if (!allowed.empty()) {
+		bool	methodAllowed = false;
+		for (size_t i = 0; i < allowed.size(); ++i) {
+			if (allowed[i] == _request->getMethod()) {
+				methodAllowed = true;
+				break;
+			}
+		}
+		if (!methodAllowed) {
+			if (D_POST) cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
+			fillResponse(405, getErrorPageContent(405));
+			return;
+		}
+	}
+	// Check for redirection
+	int	code = loc->getReturnCode();
+	if (code != 0) {
+		fillResponse(code, "<html><body><h1>" + toString(code) + " " + 
+						generateStatusMessage(code) + "</h1></body></html>");
+		_headers["Location"] = loc->getReturnUrl();
+		_headers["Content-Type"] = "text/html";
+		return;
+	}
+	if (D_POST) cout << ORANGE << "Constructing Path..." << RESET << endl;
+	string	root;
+	if (loc->getRoot().empty())
+		root = _server_config.getRoot();
+	else
+		root = loc->getRoot();
+	if (D_POST) cout << YELLOW << "Using root: " << root << RESET << endl;
+	string	uri = _request->getUri();
+	if (D_POST) cout << YELLOW << "Using URI: " << uri << RESET << endl;
+
+	string	path;
+	path = root + uri;
+	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
+	
+	// Check if the file/resource exists
+	PathType pathType = getPathType(path);
+	if (pathType == NOT_EXIST) {
+		if (D_POST) cout << RED << "Resource not found: " << path << RESET << endl;
+		fillResponse(404, getErrorPageContent(404));
+		return;
+	}
+	// Don't allow deleting directories (optional, depends on your requirements)
+	if (pathType == DIRECTORY_PATH) {
+		if (D_POST) cout << RED << "Cannot delete directory: " << path << RESET << endl;
+		fillResponse(403, getErrorPageContent(403)); // Forbidden
+		return;
+	}
+	// Attempt to delete the file
+	if (std::remove(path.c_str()) != 0) { // Deletion failed (permission denied, etc.)
+		if (D_POST) cout << RED << "Failed to delete file: " << path << RESET << endl;
+		fillResponse(403, getErrorPageContent(403)); // Forbidden
+		return;
+	}
+	if (D_POST) cout << GREEN << "File deleted successfully: " << path << RESET << endl;
+	// Success: 204 No Content
+	fillResponse(204, "");
+}
+
 // Method POST and generation of the response
 // To Do refactor code that ised in generateResponse():
-// 1. matchPrefixPathToLocation()(); 2. if (!loc) 3. allowed = loc->getAllowedMethods();
-// 4. if (!allowed.empty()) 5. Check for redirection if (loc->getReturnCode() != 0)
+// 1. matchPrefixPathToLocation()(); 2. allowed = loc->getAllowedMethods();
+// 3. if (!allowed.empty()) 4. Check for redirection if (loc->getReturnCode() != 0)
 void	Response::postAndGenerateResponse()
 {
 	if (D_POST) cout << BLUE << "POST method" << RESET << endl;
-	const Location*	loc = matchPrefixPathToLocation();
+	const Location*				loc = matchPathToLocation();
+	if (!loc) {
+		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
+		return fillResponse(404, getErrorPageContent(404));
+	}
 	// Check for allowed methods
 	const std::vector<string>&	allowed = loc->getAllowedMethods();
 	if (!allowed.empty()) {
@@ -69,18 +143,17 @@ void	Response::postAndGenerateResponse()
 		}
 	}
 	// Check for redirection
-	if (loc->getReturnCode() != 0) {
-		fillResponse(loc->getReturnCode(),
-			"<html><body><h1>" + toString(loc->getReturnCode()) + " " +
-			generateStatusMessage(loc->getReturnCode()) + "</h1></body></html>");
+	int	code = loc->getReturnCode();
+	if (code != 0) {
+		fillResponse(code, "<html><body><h1>" + toString(code) + " " + 
+						generateStatusMessage(code) + "</h1></body></html>");
 		_headers["Location"] = loc->getReturnUrl();
 		_headers["Content-Type"] = "text/html";
 		return;
 	}
-	// POST METHOD logic starts here
-	// 1. Construct Path
+	// Construct Path
 	if (D_POST) cout << ORANGE << "Constructing Path..." << RESET << endl;
-	string root;
+	string	root;
 	if (loc->getRoot().empty())
 		root = _server_config.getRoot();
 	else
@@ -92,9 +165,11 @@ void	Response::postAndGenerateResponse()
 	string	path;
 	path = root + uri;
 	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
-	// Handle Directory
+
+	// POST METHOD logic starts here
 	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
-	size_t path_separator = path.find_last_of('/');
+	// Handle Directory
+	size_t	path_separator = path.find_last_of('/');
 	if (path_separator != string::npos) {
 		string	dirPath = path.substr(0, path_separator);
 		if (!isDirectory(dirPath)) {
@@ -136,7 +211,6 @@ void	Response::postAndGenerateResponse()
 	// --- Multipart Form Data Logic (File Upload) ---
 	else if (contentType.find("multipart/form-data") != string::npos) {
 		// Parse multipart data to extract the file
-		// You'll need to implement parseMultipartData() method
 		string	filename, fileData;
 
 		string	boundary = HttpParser::extractBoundary(_request->getHeaderValue("content-type"));
@@ -161,15 +235,33 @@ void	Response::postAndGenerateResponse()
 			file << fileData;
 			file.close();
 
-			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern" << uploadPath << RESET << endl;
-			// TO DELETE
-			/* fillResponse(201,
-				"<html><body><h1>201 Created</h1><p>File uploaded successfully: " + filename + "</p></body></html>");
+			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern: " << uploadPath << RESET << endl;
+
+			// go back to the form page (the Referer)
+			string	redirectTo;
+			string	referer = _request->getHeaderValue("referer");
+			if (!referer.empty()) { 		// extract of path from "http://host/path?..."
+				size_t	pos = referer.find("://");
+				if (pos != string::npos) {
+					pos = referer.find('/', pos + 3);
+				} else {
+					pos = referer.find('/');
+				}
+				if (pos != string::npos) {
+					redirectTo = referer.substr(pos);
+					if (D_POST) cout << GREEN << "Redirect to the Referer: " << redirectTo << RESET << endl;
+				}
+			}
+			if (redirectTo.empty()) {
+				fillResponse(201, "<html><body><h1>201 Created</h1><p>File uploaded successfully: " +
+					filename + "</p></body></html>");
 			_headers["Location"] = _request->getUri() + filename;
-			_headers["Content-Type"] = "text/html"; */
+				_headers["Content-Type"] = "text/html";
+			}
 			// Instead of 201, send a 303 redirect back to the uploads page
 			fillResponse(303, ""); // 303 See Other, empty body
-			_headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
+			_headers["Location"] = redirectTo;
+			// TO DELETE _headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
 			return;
 		} else {
 			fillResponse(400, getErrorPageContent(400));
@@ -187,23 +279,26 @@ void	Response::postAndGenerateResponse()
 	}
 }
 
-void printCurrentLocation(const Location *loc)
-{
-	if (loc)
-	{
+// Debugging purpose for matchPathToLocation()
+static void	printCurrentLocation(const Location *loc) {
+	if (loc) {
 		cout << "Current matched location: " << loc->getPath() << endl;
 		cout << "  Root: " << loc->getRoot() << endl;
 		cout << "  Index: " << loc->getIndex() << endl;
 		cout << "  Autoindex: " << (loc->getAutoindex() ? "on" : "off") << endl;
-	}
-	else
-	{
+	} else {
 		cout << "No location matched." << endl;
 	}
 }
 
-// Helper to find the best matching location
-// Returns a pointer to the Location object, or NULL if none found
+/**
+ * Helper to find the best matching location
+ * 
+ * Checks if request URI starts with a certain location path (proper prefix match)
+ * Returns a pointer to the Location object, or NULL if none found
+ * Special case: "/" matches everything starting with "/"
+ * Looks for the longest match (location /images/ vs location /)
+ */
 const Location*	Response::matchPathToLocation()
 {
 	if (!_request) return NULL;
@@ -216,34 +311,26 @@ const Location*	Response::matchPathToLocation()
 	if (DEBUG_PATH) cout << locations.size() << " locations." << RESET << endl;
 
 	for (size_t i = 0; i < locations.size(); ++i) {
-		const string &locPath = locations[i].getPath();
+		const string&	locPath = locations[i].getPath();
+		const string&	uri = _request->getUri();
+		const string	html_ext = ".html";
+		
 		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
-
-		// Check if request URI starts with this location path (proper prefix match)
-		const string &uri = _request->getUri();
 		if (DEBUG_PATH) cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << endl;
-		const string html_ext = ".html";
 
 		if (uri.compare(0, locPath.length(), locPath) == 0)
 		{
-			// Verify it's a proper path prefix (not just substring match)
-			// Special case: "/" matches everything starting with "/"
-			// Other locations: character after match must be '/' or end-of-string
-			bool isValidPrefix = false;
+			bool	isValidPrefix = false;
 
-			if (locPath == "/") {
-				// Root location matches all URIs starting with "/"
+			if (locPath == "/") { // Root location matches all URIs starting with "/"
 				isValidPrefix = true;
-			} else if (uri.length() == locPath.length()) {
-				// Exact match (e.g., /about matches /about)
+			} else if (uri.length() == locPath.length()) { // Exact match (/about matches /about)
 				isValidPrefix = true;
-			} else if (uri[locPath.length()] == '/') {
-				// Path continues with '/' (e.g., /about matches /about/page)
+			} else if (uri[locPath.length()] == '/') { // Path continues with '/' (/about matches /about/page)
 				isValidPrefix = true;
 			}
 			if (isValidPrefix) {
 				if (DEBUG_PATH) cout << GREEN << "    -> Match found!" << RESET << endl;
-				// We want the longest match (e.g. location /images/ vs location /)
 				if (locPath.length() > bestMatchLen) {
 					bestMatch = &locations[i];
 					bestMatchLen = locPath.length();
@@ -261,74 +348,19 @@ const Location*	Response::matchPathToLocation()
 	return bestMatch;
 }
 
-// Helper to find the location that is the longest matching prefix of the request URI.
-const Location *Response::matchPrefixPathToLocation()
-{
-	const std::vector<Location>&	locations = _server_config.getLocations();
-	const Location*					bestMatch = NULL;
-	size_t							bestMatchLen = 0;
-	const string&					RequestUri = _request->getUri();
-
-	if (D_POST) cout << GREEN << "Matching URI: [" << RequestUri << "] against ";
-	if (D_POST) cout << locations.size() << " locations." << RESET << endl;
-
-	for (size_t i = 0; i < locations.size(); ++i) {
-		const string&	locPath = locations[i].getPath();
-		if (D_POST) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
-
-		if (RequestUri.rfind(locPath, 0) == 0) {
-			if (D_POST) cout << BLUE << "    Request URI starts with the location path" << RESET << endl;
-			if (prefixMatching(locPath, RequestUri)) {
-				continue;
-			}
-			if (D_POST) cout << GREEN << "    -> Prefix Match found!" << RESET << endl;
-			// We want the longest match (e.g. location /images/ vs location /)
-			if (locPath.length() > bestMatchLen) {
-				bestMatch = &locations[i];
-				bestMatchLen = locPath.length();
-				if (D_POST) cout << GREEN << "    -> New best match (length " << bestMatchLen;
-				if (D_POST) cout << ")" << RESET << endl;
-			}
-		}
-	}
-	return bestMatch;
-}
-
-// It should only match if there's a "/" after the match.
-// e.g. URI "/about-us/team.html" should not match location "/about"
-// The character at index 6 of "/about-us/team.html" is a hyphen (-).
-bool Response::prefixMatching(const string &locPath, const string &RequestUri)
-{
-
-	// cout << RED << "RequestUri: " << RequestUri << "; LocPrefixPath: " << locPath << endl;
-	//  character in the URI right after the prefix
-	size_t index = locPath.length();
-
-	if (locPath.length() > 1 && RequestUri.length() > locPath.length() && RequestUri[index] != '/')
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
 // returns the index file name for the matched location or an empty string if none found
 string	Response::getIndexFromLocation()
 {
 	for (std::vector<Location>::const_iterator it = _server_config.getLocations().begin();
 		 it != _server_config.getLocations().end(); ++it)
 	{
-		if (DEBUG)
-		{
+		if (DEBUG) {
 			cout << "Checking location for index: " << it->getPath() << endl;
 			cout << ORANGE << "Request URI: " << _request->getUri() << RESET << endl;
 			cout << ORANGE << "Location Path: " << it->getPath() << RESET << endl;
 			cout << ORANGE << "Location Index: " << it->getIndex() << RESET << endl;
 		}
-		if (_request->getUri() == it->getPath())
-		{
+		if (_request->getUri() == it->getPath()) {
 			return "/" + it->getIndex();
 		}
 	}
@@ -354,14 +386,28 @@ Response::PathType Response::getPathType(string const path)
 	return (NOT_EXIST);
 }
 
+void	Response::badRequest() {
+	if (DEBUG) cout << RED << "Response. Bad request" << RESET << endl; 
+	if (_request->getRequestLineFormatValid() == false) {
+		fillResponse(400, getErrorPageContent(400));
+	} else if (_request->getHeadersFormatValid() == false) {
+		if (DEBUG) cout << RED << "Response. Bad request. Invalid headers" << RESET << endl; 
+		fillResponse(400, getErrorPageContent(400));
+	} else {
+		fillResponse(400, getErrorPageContent(400));
+	}
+}
+
 void	Response::generateResponse()
 {
 	if (!_request) return;
-
 	fillResponse(200, "");
 
 	const Location	*loc = matchPathToLocation();
-
+	if (!loc) {
+		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
+		return fillResponse(404, getErrorPageContent(404));
+	}
 	// Check for allowed methods
 	const std::vector<string>	&allowed = loc->getAllowedMethods();
 	if (!allowed.empty()) {
@@ -388,24 +434,20 @@ void	Response::generateResponse()
 		return;
 	}
 	// Construct Path
-	// Standard NGINX 'root' logic:
-	// 1. If location has 'root', it replaces server 'root'. Location root takes precedence over server root
-	// 2. Path = root + URI (no stripping of location prefix).
 	string			root;
 	const string&	locationRoot = loc->getRoot();
-	if (!locationRoot.empty()) {
+	if (!locationRoot.empty())
 		root = loc->getRoot();				// Use location-specific root
-	} else {
+	else 
 		root = _server_config.getRoot();	// Fall back to server root
-	}
 	// Safety. Fallback if root is empty: use current directory.
 	if (root.empty()) root = "."; // the current working directory
+	
+	string			uri = _request->getUri();
+	string			path = root + uri;
+	
 	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
-
-	string		uri = _request->getUri();
 	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
-
-	string	path = root + uri;
 	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
 
 	// Check if path exists
@@ -478,14 +520,6 @@ void	Response::generateResponse()
 	_contentLength = _responseBody.size();
 	file.close();
 }
-/* else if (_request->getEnumMethod() == Request::DELETE) {
-	// TODO: Add your logic for handling DELETE requests here.
-	// For example, deleting a resource from the server.
-	// You might set status code to 200 (OK) or 204 (No Content).
-	fillResponse(501, getErrorPageContent(501)); // Not Implemented
-} else if (_request->getEnumMethod() == Request::INVALID) {
-	fillResponse(400, getErrorPageContent(400)); // Bad Request
-} */
 
 short			Response::getStatusCode() const { return _statusCode; }
 
@@ -520,8 +554,7 @@ string							Response::getErrorPageContent(int code)
 	const std::map<int, string>&			errorPages = _server_config.getErrorPages();
 	std::map<int, string>::const_iterator	it = errorPages.find(code);
 
-	if (it != errorPages.end())
-	{
+	if (it != errorPages.end()) {
 		std::ifstream	file(it->second.c_str());
 		if (file.is_open())
 		{
@@ -555,6 +588,8 @@ string			Response::getMimeType(const string &filePath)
 		return "image/png";
 	} else if (extension == ".gif") {
 		return "image/gif";
+	} else if (extension == ".ico") {
+		return "image/x-icon";
 	} else if (extension == ".html" || extension == ".htm") {
 		return "text/html";
 	} else if (extension == ".css") {
@@ -563,6 +598,8 @@ string			Response::getMimeType(const string &filePath)
 		return "application/javascript";
 	} else if (extension == ".txt") {
 		return "text/plain";
+	} else if (extension == ".svg") {
+		return "image/svg+xml";
 	}
 	return "application/octet-stream";
 }

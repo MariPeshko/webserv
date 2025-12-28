@@ -1,5 +1,8 @@
 #include "HttpParser.hpp"
 #include "PrintUtils.hpp"
+#include <iostream>
+#include <cctype>	// For std::isdigit
+#include <algorithm>	// For std::all_of
 #include <limits>
 #include <cstdio>
 #include <ctime>    // For time functions
@@ -13,6 +16,16 @@ using std::string;
 HttpParser::HttpParser() { }
 
 HttpParser::~HttpParser() { }
+
+static bool	is_only_digits(const std::string& str) {
+	if (str.empty())
+        return false;
+    for (std::string::const_iterator it = str.begin(); it != str.end(); ++it) {
+        if (!std::isdigit(static_cast<unsigned char>(*it)))
+            return false;
+    }
+    return true;
+}
 
 void	HttpParser::appendToBody(const std::string & buffer, const size_t n, Request& req) {
 	if (n == 0 || buffer.empty()) {
@@ -43,6 +56,8 @@ bool HttpParser::parseRequestLine(const std::string& line,
 
 	// false if the stream iss fails to extract all three strings.
 	if (!(iss >> method >> uri >> version) || !iss.eof()) {
+		if (DEBUG_HTTP_PARSER) cout << "parseRequestLine().\nmethod: " << method << "\nuri: ";
+		if (DEBUG_HTTP_PARSER) cout << uri << "\nversion: " << version << endl;
 		if(method.size() != 0)
 			req.setMethod(method);
 		else
@@ -52,10 +67,31 @@ bool HttpParser::parseRequestLine(const std::string& line,
 		req.setRequestLineFormatValid(false);
 		return false;
 	}
+	// Handle absolute URI (e.g., GET http://localhost:8080/ HTTP/1.0)
+    if (uri.rfind("http://", 0) == 0) {
+		if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine. http:// is found" << RESET << endl;
+        size_t	host_start = 7; // "http://" is 7 chars
+        size_t	path_start = uri.find("/", host_start);
+        
+        if (path_start != std::string::npos) {
+            std::string host = uri.substr(host_start, path_start - host_start);
+            req.setHost(host);
+			if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine. host: " << host << RESET << endl;
+            uri = uri.substr(path_start);
+        } else {
+            // Case: GET http://localhost:8080 HTTP/1.0 (no trailing slash)
+            std::string host = uri.substr(host_start);
+            req.setHost(host);
+			if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine. host: " << host << RESET << endl;
+            uri = "/";
+        }
+    }
+	if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine:\nmethod: " << method << "\nuri: ";
+	if (DEBUG_HTTP_PARSER) cout << BLUE << uri << "\nversion: " << version << RESET << endl;
 	req.setMethod(method);
 	req.setUri(uri);
 	req.setVersion(version);
-	if (method != "GET" && method != "POST" && method != "DELETE") {
+	if (method != "GET" && method != "HEAD" && method != "POST" && method != "DELETE") {
 		req.setRequestLineFormatValid(false);
 		req.setMethod("");
 		return false;
@@ -66,6 +102,7 @@ bool HttpParser::parseRequestLine(const std::string& line,
 	}
 	// Rudimentary URI check
 	if (uri.empty() || uri[0] != '/' || uri.find("..") != std::string::npos) {
+		if (DEBUG_HTTP_PARSER) cout << "parseRequestLine. URI check: invalid" << endl;
 		req.setRequestLineFormatValid(false);
 		return false;
 	}
@@ -86,11 +123,11 @@ bool HttpParser::parseRequestLine(const std::string& line,
  * @param req The Request object to populate with headers.
  * @return true if all headers were parsed successfully, false otherwise.
  */
-bool HttpParser::parseHeaders(const std::string& headersBlock,
+bool	HttpParser::parseHeaders(const std::string& headersBlock,
 									Request& req) {
+	if (DEBUG_HTTP_PARSER) cout << "HttpParser::parseHeaders" << endl;
 	if (headersBlock.empty()) {
-		req.setHeadersFormatValid(false);
-		return false;
+		return true; // no headers, it's ok for GET. TODO for POST?
 	}
 
 	std::istringstream	iss(headersBlock);
@@ -110,9 +147,8 @@ bool HttpParser::parseHeaders(const std::string& headersBlock,
 			req.setHeadersFormatValid(false);
 			return false; // Malformed header line
 		}
-		
-		std::string	name = line.substr(0, pos_colon);
-		std::string	value = line.substr(pos_colon +1);
+		string	name = line.substr(0, pos_colon);
+		string	value = line.substr(pos_colon +1);
 
 		//Trim leading whitespace from name
 		size_t start = name.find_first_not_of(" \t");
@@ -124,24 +160,23 @@ bool HttpParser::parseHeaders(const std::string& headersBlock,
 		if (end != std::string::npos) {
 			name = name.substr(0, end + 1);
 		}
-
 		// Normalize header name to lowercase
 		for (size_t i = 0; i < name.length(); ++i) {
 			name[i] = std::tolower(name[i]);
 		}
-
 		// Trim leading whitespace from value
 		start = value.find_first_not_of(" \t");
 		if (start != std::string::npos) {
 			value = value.substr(start);
 		}
-
 		if (name.empty()) {
 			return false; // Header name cannot be empty
 		}
-
+		if (name == "content-length" && !is_only_digits(value)) {
+			req.setHeadersFormatValid(false);
+			return false;
+		}
 		req.addHeader(name, value);
-
 	}
 	return true;
 }

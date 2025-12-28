@@ -25,23 +25,20 @@
 #include <unistd.h>
 #include <dirent.h>
 
-// TODO:
-//  - if error - build error response
-//  - set up status code during response generation (code could be changed due to errors, file not found, etc.)
-//  - build html response based on request and server config
-
-class Response
+class	Response
 {
 	public:
 		Response(Server &server);
 		~Response();
 
 		void			bindRequest(const Request &req);
+		void			badRequest();
 		void			generateResponse();
 		void			postAndGenerateResponse();
-		const Location*	matchPathToLocation();
-		const Location*	matchPrefixPathToLocation();
-		bool			prefixMatching(const std::string &locPath, const std::string &RequestUri);
+		void			deleteAndGenerateResponse();
+		
+		void			fillResponse(short statusCode, const std::string &bodyContent);
+		std::string		getErrorPageContent(int code);
 
 		short				getStatusCode() const;
 		size_t				getContentLength() const;
@@ -49,7 +46,6 @@ class Response
 		const std::string&	getReasonPhrase() const;
 		Server&				getServerConfig();
 		void				reset();
-		static std::string							getMimeType(const std::string &filePath);
 		const std::map<std::string, std::string>&	getHeaders() const;
 
 		std::string		finalResponseContent;
@@ -76,10 +72,11 @@ class Response
 		std::string			_resourcePath;
 		std::map<std::string, std::string>	_headers;
 
-		std::string		getIndexFromLocation();
-		std::string		getErrorPageContent(int code);
-		PathType		getPathType(std::string const path);
-		void			fillResponse(short statusCode, const std::string &bodyContent);
+		const Location*		matchPathToLocation();
+		std::string			getIndexFromLocation();
+		PathType			getPathType(std::string const path);
+		static std::string	getMimeType(const std::string &filePath);
+
 };
 
 #endif
