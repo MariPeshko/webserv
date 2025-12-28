@@ -66,12 +66,19 @@ void Logger::logRequest(const std::string &clientIp, const std::string &method, 
 {
 	if (!IS_LOGGER_ENABLED)
 		return;
+	std::string statusCodeColor;
+	if (statusCode >= 200 && statusCode < 300)
+		statusCodeColor = GREEN;
+	else if (statusCode >= 300 && statusCode < 400)
+		statusCodeColor = YELLOW;
+	else if (statusCode >= 400)
+		statusCodeColor = RED;
 	std::string timestamp = getTimestamp();
 	std::stringstream ss;
 	ss << "[" << timestamp << "] [REQUEST] "
 	   << clientIp << " - "
 	   << "\"" << method << " " << uri << "\" "
-	   << statusCode << " "
+	   << statusCodeColor << statusCode << RESET << " "
 	   << "- " << bytesSent << " bytes sent";
 
 	std::string logMsg = ss.str();
