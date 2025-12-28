@@ -588,6 +588,8 @@ string			Response::getMimeType(const string &filePath)
 		return "image/png";
 	} else if (extension == ".gif") {
 		return "image/gif";
+	} else if (extension == ".ico") {
+		return "image/x-icon";
 	} else if (extension == ".html" || extension == ".htm") {
 		return "text/html";
 	} else if (extension == ".css") {
@@ -596,6 +598,8 @@ string			Response::getMimeType(const string &filePath)
 		return "application/javascript";
 	} else if (extension == ".txt") {
 		return "text/plain";
+	} else if (extension == ".svg") {
+		return "image/svg+xml";
 	}
 	return "application/octet-stream";
 }
