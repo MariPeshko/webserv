@@ -44,38 +44,14 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 
 // Method DELETE and generation of the response
 // set status code success 204 (No Content).
-void	Response::deleteAndGenerateResponse() {
-	if (D_POST) cout << BLUE << "DELETE method" << RESET << endl;
-	const Location*				loc = matchPathToLocation();
+void	Response::deleteAndGenerateResponse()
+{
+	const Location*	loc = validateRequestAndGetLocation();
 	if (!loc) {
-		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
-		return fillResponse(404, getErrorPageContent(404));
+		return; // Response is already filled by the validation function
 	}
 	
-	const std::vector<string>&	allowed = loc->getAllowedMethods();
-	if (!allowed.empty()) {
-		bool	methodAllowed = false;
-		for (size_t i = 0; i < allowed.size(); ++i) {
-			if (allowed[i] == _request->getMethod()) {
-				methodAllowed = true;
-				break;
-			}
-		}
-		if (!methodAllowed) {
-			if (D_POST) cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
-			fillResponse(405, getErrorPageContent(405));
-			return;
-		}
-	}
-	// Check for redirection
-	int	code = loc->getReturnCode();
-	if (code != 0) {
-		fillResponse(code, "<html><body><h1>" + toString(code) + " " + 
-						generateStatusMessage(code) + "</h1></body></html>");
-		_headers["Location"] = loc->getReturnUrl();
-		_headers["Content-Type"] = "text/html";
-		return;
-	}
+	// Construct Path
 	if (D_POST) cout << ORANGE << "Constructing Path..." << RESET << endl;
 	string	root;
 	if (loc->getRoot().empty())
@@ -120,37 +96,11 @@ void	Response::deleteAndGenerateResponse() {
 // 3. if (!allowed.empty()) 4. Check for redirection if (loc->getReturnCode() != 0)
 void	Response::postAndGenerateResponse()
 {
-	if (D_POST) cout << BLUE << "POST method" << RESET << endl;
-	const Location*				loc = matchPathToLocation();
+	const Location*	loc = validateRequestAndGetLocation();
 	if (!loc) {
-		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
-		return fillResponse(404, getErrorPageContent(404));
+		return; // Response is already filled by the validation function
 	}
-	// Check for allowed methods
-	const std::vector<string>&	allowed = loc->getAllowedMethods();
-	if (!allowed.empty()) {
-		bool	methodAllowed = false;
-		for (size_t i = 0; i < allowed.size(); ++i) {
-			if (allowed[i] == _request->getMethod()) {
-				methodAllowed = true;
-				break;
-			}
-		}
-		if (!methodAllowed) {
-			if (DEBUG) cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
-			fillResponse(405, getErrorPageContent(405));
-			return;
-		}
-	}
-	// Check for redirection
-	int	code = loc->getReturnCode();
-	if (code != 0) {
-		fillResponse(code, "<html><body><h1>" + toString(code) + " " + 
-						generateStatusMessage(code) + "</h1></body></html>");
-		_headers["Location"] = loc->getReturnUrl();
-		_headers["Content-Type"] = "text/html";
-		return;
-	}
+
 	// Construct Path
 	if (D_POST) cout << ORANGE << "Constructing Path..." << RESET << endl;
 	string	root;
@@ -403,36 +353,11 @@ void	Response::generateResponse()
 	if (!_request) return;
 	fillResponse(200, "");
 
-	const Location	*loc = matchPathToLocation();
+	const Location*	loc = validateRequestAndGetLocation();
 	if (!loc) {
-		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
-		return fillResponse(404, getErrorPageContent(404));
+		return; // Response is already filled by the validation function
 	}
-	// Check for allowed methods
-	const std::vector<string>	&allowed = loc->getAllowedMethods();
-	if (!allowed.empty()) {
-		bool	methodAllowed = false;
-		for (size_t i = 0; i < allowed.size(); ++i) {
-			if (allowed[i] == _request->getMethod()) {
-				methodAllowed = true;
-				break;
-			}
-		}
-		if (!methodAllowed) {
-			if (DEBUG) cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
-			fillResponse(405, getErrorPageContent(405));
-			return;
-		}
-	}
-	// Check for redirection
-	if (loc->getReturnCode() != 0) {
-		fillResponse(loc->getReturnCode(),
-			"<html><body><h1>" + toString(loc->getReturnCode()) + " " +
-			generateStatusMessage(loc->getReturnCode()) + "</h1></body></html>");
-		_headers["Location"] = loc->getReturnUrl();
-		_headers["Content-Type"] = "text/html";
-		return;
-	}
+
 	// Construct Path
 	string			root;
 	const string&	locationRoot = loc->getRoot();
@@ -521,6 +446,56 @@ void	Response::generateResponse()
 	file.close();
 }
 
+/**
+ * @brief Performs common request validation checks.
+ * 
+ * This function validates the request against the server configuration.
+ * It checks for:
+ * 1. A matching location.
+ * 2. If the request method is allowed in that location.
+ * 3. If the location has a redirection configured.
+ * 
+ * If any of these checks result in a final response (404, 405, 3xx),
+ * it fills the response and returns NULL.
+ * 
+ * @return A const pointer to the matched Location on success, 
+ * or NULL on failure.
+ */
+const Location*	Response::validateRequestAndGetLocation() {
+	const Location*	loc = matchPathToLocation();
+	if (!loc) {
+		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
+		fillResponse(404, getErrorPageContent(404));
+		return NULL;
+	}
+	// Check for allowed methods
+	const std::vector<string>&	allowed = loc->getAllowedMethods();
+	if (!allowed.empty()) {
+		bool	methodAllowed = false;
+		for (size_t i = 0; i < allowed.size(); ++i) {
+			if (allowed[i] == _request->getMethod()) {
+				methodAllowed = true;
+				break;
+			}
+		}
+		if (!methodAllowed) {
+			if (DEBUG) cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
+			fillResponse(405, getErrorPageContent(405));
+			return NULL;
+		}
+	}
+	// Check for redirection
+	int	code = loc->getReturnCode();
+	if (code != 0) {
+		fillResponse(code, "<html><body><h1>" + toString(code) + " " +
+						generateStatusMessage(code) + "</h1></body></html>");
+		_headers["Location"] = loc->getReturnUrl();
+		_headers["Content-Type"] = "text/html";
+		return NULL;
+	}
+	return loc;
+}
+
 short			Response::getStatusCode() const { return _statusCode; }
 
 size_t			Response::getContentLength() const { return _contentLength; }
@@ -549,7 +524,7 @@ void			Response::reset()
 	_headers.clear();
 }
 
-string							Response::getErrorPageContent(int code)
+string			Response::getErrorPageContent(int code)
 {
 	const std::map<int, string>&			errorPages = _server_config.getErrorPages();
 	std::map<int, string>::const_iterator	it = errorPages.find(code);
