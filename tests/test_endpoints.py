@@ -11,11 +11,11 @@ GREEN = "\033[92m"
 RED = "\033[91m"
 RESET = "\033[0m"
 
-def run_test(method, path, expected_status, description, check_header=None, port=PORT):
-    print(f"Testing {description} [{method} {path}]...", end=" ")
+def run_test(index, total, method, path, expected_status, description, check_header=None, port=PORT, body=None, headers={}):
+    print(f"[{index}] Testing {description} [{method} {path}]...", end=" ")
     try:
         conn = http.client.HTTPConnection(HOST, port)
-        conn.request(method, path)
+        conn.request(method, path, body, headers)
         response = conn.getresponse()
         data = response.read() # Read body to clear channel
         conn.close()
@@ -39,6 +39,14 @@ def run_test(method, path, expected_status, description, check_header=None, port
 def main():
     print(f"Running tests against {HOST}:{PORT}...\n")
     
+    # Read test image
+    image_data = None
+    try:
+        with open("tests/test-image.png", "rb") as f:
+            image_data = f.read()
+    except FileNotFoundError:
+        print(f"{RED}Warning: tests/test-image.png not found. Upload tests might fail.{RESET}")
+
     tests = [
         # Basic Static Files
         ("GET", "/", 200, "Root Index Page"),
@@ -73,6 +81,12 @@ def main():
         
         # Gallery
         ("GET", "/gallery", 200, "Gallery Page (Index)"),
+		
+        # Uploads
+        ("POST", "/uploaded_images/test-image.png", 201, "Upload Image", None, PORT, image_data, {"Content-Type": "image/png"}),
+        ("GET", "/uploaded_images/test-image.png", 200, "Get Uploaded Image"),
+        ("DELETE", "/uploaded_images/test-image.png", 204, "Delete Uploaded Image"),
+        ("GET", "/uploaded_images/test-image.png", 404, "Get Deleted Image (Should be 404)"),
 
         # Second Server (Port 8081)
         ("GET", "/", 301, "Server 2: Redirect Root -> /additional", None, 8081),
@@ -80,17 +94,23 @@ def main():
     ]
     
     passed = 0
-    for test in tests:
+    for i, test in enumerate(tests):
         # Handle optional header check and port
         header_check = None
         port = PORT
+        body = None
+        headers = {}
         
         if len(test) > 4:
             header_check = test[4]
         if len(test) > 5:
             port = test[5]
+        if len(test) > 6:
+            body = test[6]
+        if len(test) > 7:
+            headers = test[7]
             
-        if run_test(test[0], test[1], test[2], test[3], header_check, port):
+        if run_test(i + 1, len(tests), test[0], test[1], test[2], test[3], header_check, port, body, headers):
             passed += 1
             
     print(f"\nSummary: {passed}/{len(tests)} tests passed.")
