@@ -56,19 +56,23 @@ void	HttpContext::requestParsingStateMachine()
 		switch (_state) {
 			case REQUEST_LINE: {
 				if (!findAndParseReqLine(buf)) {
-					if (REQ_DEBUG) cout << RED << "ParseReqLine error" << RESET << endl;
-					if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
-					if (REQ_DEBUG) cout << RESET << endl;
-					if (!request().getRequestLineFormatValid()) {
+					if (_state == REQUEST_ERROR) {
+                        if (CTX_DEBUG) cout << RED << "ParseReqLine error" << RESET << endl;
+						if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
+						if (REQ_DEBUG) cout << RESET << endl;
 						request().ifConnNotPresent();
-						_state = REQUEST_ERROR;
-						continue;
-					}
-					can_parse = false; break;
+						can_parse = false;
+                        break;
+                    }
+					// Otherwise, we just need more data, so we wait.
+					can_parse = false;
+                    break;
+				} else {
+					// If successful, the state is READING_HEADERS, continue parsing.
+					if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
+					_state = READING_HEADERS;
+					continue; // Continue to READING_HEADERS case
 				}
-				if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
-				_state = READING_HEADERS;
-				continue;
 			}
 			case READING_HEADERS : {
 				if (!findAndParseHeaders(buf)) {
@@ -123,14 +127,14 @@ void	HttpContext::requestParsingStateMachine()
 }
 
 // Validate host from absolute URI if present
-// absolute URI is http://localhost:8080/
+// absolute URI is http://localhost:8080/ or http://127.0.0.1:8080/
 bool	HttpContext::validateHost()
 {
 	if (CTX_DEBUG) cout << YELLOW << "ReqLineTrue: Validate host from absolute URI if present" << RESET << endl;
 	
-	const std::string&	req_host_full = request().getHost();
+	const string&	req_host_full = request().getHost();
 	if (!req_host_full.empty()) {
-		std::string	req_hostname = req_host_full;
+		string	req_hostname = req_host_full;
 		int req_port = -1;
 		// Separate hostname and port from the request's host string
 		size_t	colon_pos = req_host_full.find(':');
@@ -172,12 +176,12 @@ bool	HttpContext::validateHost()
 bool	HttpContext::findAndParseReqLine(std::string &buf)
 {
 	size_t	pos = buf.find("\r\n");
-	if (pos == string::npos) {
+	if (pos == string::npos)
 		return false;
-	}
 
 	string	line = buf.substr(0, pos);
 	buf.erase(0, pos + 2);
+
 	if (HttpParser::parseRequestLine(line, request()) == true) {
 		// Validate host from absolute URI if present
 		if (request().getHost().size() > 0) {
@@ -186,14 +190,9 @@ bool	HttpContext::findAndParseReqLine(std::string &buf)
 				return false;
 			}
 		}
+		_state = READING_HEADERS;
 		return true;
 	} else {
-		if (request().getHost().size() > 0) {
-			if (validateHost() == false) {
-				_state = REQUEST_ERROR;
-				return false;
-			}
-		}
 		_state = REQUEST_ERROR;
 		return false;
 	}

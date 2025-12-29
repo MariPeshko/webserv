@@ -72,6 +72,7 @@ class	Response
 		std::string			_resourcePath;
 		std::map<std::string, std::string>	_headers;
 
+		const Location*		validateRequestAndGetLocation();
 		const Location*		matchPathToLocation();
 		std::string			getIndexFromLocation();
 		PathType			getPathType(std::string const path);

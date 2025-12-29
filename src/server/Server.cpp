@@ -107,6 +107,7 @@ Server::Server() {
 	_port = 8080;
 	_host = "127.0.0.1";
 	_server_names.push_back("localhost");
+	_server_names.push_back("127.0.0.1");
 	_root = "www/web";
 	_index = "index.html";
 	_error_pages[404] = "/var/www/errors/404.html";
