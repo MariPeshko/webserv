@@ -1,5 +1,6 @@
 #include "Response.hpp"
 #include "../httpContext/HttpParser.hpp"
+#include "../cgi/CgiHandler.hpp"
 
 using std::cerr;
 using std::cout;
@@ -161,6 +162,32 @@ void	Response::postAndGenerateResponse()
 	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
 
 	// POST METHOD logic starts here
+	// Check for CGI first
+	const std::map<std::string, std::string>& cgiMap = loc->getCgi();
+	if (!cgiMap.empty()) {
+		size_t dotPos = path.find_last_of('.');
+		if (dotPos != string::npos) {
+			string ext = path.substr(dotPos + 1);
+			std::map<std::string, std::string>::const_iterator it = cgiMap.find(ext);
+			if (it != cgiMap.end()) {
+				// For POST, the script must exist
+				if (getPathType(path) == FILE_PATH) {
+					if (DEBUG) cout << GREEN << "Executing CGI (POST): " << path << RESET << endl;
+					try {
+						CgiHandler cgi(*_request, path, it->second);
+						string output = cgi.executeCgi();
+						fillResponse(200, output);
+						return;
+					} catch (std::exception &e) {
+						if (DEBUG) cout << RED << "CGI execution failed: " << e.what() << RESET << endl;
+						fillResponse(500, getErrorPageContent(500));
+						return;
+					}
+				}
+			}
+		}
+	}
+
 	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
 	// Handle Directory
 	size_t	path_separator = path.find_last_of('/');
@@ -537,6 +564,29 @@ void	Response::generateResponse()
 		}
 	}
 	// 3. Serve File
+	// Check for CGI
+	const std::map<std::string, std::string>& cgiMap = loc->getCgi();
+	if (!cgiMap.empty()) {
+		size_t dotPos = path.find_last_of('.');
+		if (dotPos != string::npos) {
+			string ext = path.substr(dotPos + 1);
+			std::map<std::string, std::string>::const_iterator it = cgiMap.find(ext);
+			if (it != cgiMap.end()) {
+				if (DEBUG) cout << GREEN << "Executing CGI: " << path << RESET << endl;
+				try {
+					CgiHandler cgi(*_request, path, it->second);
+					string output = cgi.executeCgi();
+					fillResponse(200, output);
+					return;
+				} catch (std::exception &e) {
+					if (DEBUG) cout << RED << "CGI execution failed: " << e.what() << RESET << endl;
+					fillResponse(500, getErrorPageContent(500));
+					return;
+				}
+			}
+		}
+	}
+
 	if (DEBUG) cout << BLUE << "Serving file: " << path << RESET << endl;
 	std::ifstream	file(path.c_str());
 	if (!file.is_open()) {
