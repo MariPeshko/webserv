@@ -24,13 +24,15 @@ class	ServerManager {
 		
 		void	setupServers(std::vector<Server> & server_configs);
 		void	runServers();
-
 		void	removeClient(int fd, size_t i);
+		bool	isShutdownRequested() const;
+		void	requestShutdown();
 		
 	private:
 		std::vector<pollfd>			_pfds;
 		std::map<int, Server*>		_map_servers;
 		std::map<int, HttpContext>	_contexts;
+		volatile bool				shutdown;
 		
 		void	addToPfds(std::vector<pollfd>& pfds, int newfd);
 		void	delFromPfds(size_t index);

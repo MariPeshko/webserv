@@ -63,6 +63,21 @@ Escape character is '^]'.
 
 ## SIGNALS
 
+**Basic**
+
+You can find information about Unix signals in terminal with a command "man 7 signal"
+
+Signal       Keyboard Shortcut
+
+> SIGINT       Ctrl + C
+Terminates the process gracefully, but can be caught or ignored by the program for cleanup.
+
+> SIGTERM      None (sent via kill command)
+Requests the process to terminate gracefully. It is the default signal sent by the kill command (kill [pid]), allowing the program to perform clean-up operations before exiting.
+
+> SIGQUIT      Ctrl + \\
+Terminates the process and, by default, produces a core dump
+
 **Properly terminate the suspended process:**
 
 Check for suspended/running processes on port 8080

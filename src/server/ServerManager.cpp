@@ -1,13 +1,21 @@
 #include "ServerManager.hpp"
 
-ServerManager::ServerManager() {
+ServerManager::ServerManager() : shutdown(false) {}
+
+ServerManager::~ServerManager() {}
+
+bool		ServerManager::isShutdownRequested() const {
+	return shutdown;
 }
 
-ServerManager::~ServerManager() {
+// Signal-safe method to request shutdown
+// TO DO
+void		ServerManager::requestShutdown() {
+	shutdown = true;
 }
 
 /** Convert IPv4 address to string manually (C++98 compatible) */
-std::string ipv4_to_string(uint32_t ip) {
+std::string	ipv4_to_string(uint32_t ip) {
 	std::ostringstream oss;
 	oss << ((ip >> 24) & 0xFF) << "."
 		<< ((ip >> 16) & 0xFF) << "."
@@ -20,7 +28,7 @@ std::string ipv4_to_string(uint32_t ip) {
  * After each server's listening socket is successfully created, 
  * it is immediately registered for polling.
  */
-void ServerManager::setupServers(std::vector<Server> & server_configs ) {
+void		ServerManager::setupServers(std::vector<Server> & server_configs ) {
 	//_servers = server_configs;
 	for (std::vector<Server>::iterator it = server_configs.begin(); it != server_configs.end(); it++) {
 		//socket setup
@@ -43,12 +51,14 @@ void ServerManager::setupServers(std::vector<Server> & server_configs ) {
  * poll() reports revent(s).
  * poll() returns the number of elements in the pfds array 
  * for which events have occurred.
+ * 
+ * isShutdownRequested() method checks for the incoming signals
  */
 void	ServerManager::runServers() {
-	while (1) { // Later: signal handling
+	while (!isShutdownRequested()) {
 		int	poll_count = poll(&_pfds[0], _pfds.size(), 1000);  // 1 second maximum time to wait
 		if (poll_count == -1) {
-			// if (!g_running) break;  // Signal received
+			// it shoud be in LOG
 			std::cerr << "Poll error: " << strerror(errno) << std::endl;
 			break;
 		}
@@ -56,12 +66,14 @@ void	ServerManager::runServers() {
 			processConnections();
 		}
 	}
-	//Loop is broken. Cleanup
 	std::cout << "Closing all connections..." << std::endl;
 	for (size_t i = 0; i < _pfds.size(); ++i) {
 		close(_pfds[i].fd);
 	}
-	std::cout << "Server shut down cleanly" << std::endl;
+	_pfds.clear();
+	_contexts.clear();
+
+	std::cout << GREEN << "Server shut down cleanly" << RESET << std::endl;
 }
 
 /** 
@@ -300,13 +312,13 @@ void	ServerManager::handleClientWrite(size_t i) {
 	// Check if response is complete
 	if (ctx.isResponseComplete()) {
 		 if (ctx.request().getHeaderValue("connection") == "close") {
-            std::cout << "Connection: close. Closing socket " << fd << std::endl;
-            removeClient(fd, i);
-        } else {
-            // Keep-alive: reset state for the next request and wait for POLLIN
-            _pfds[i].events = POLLIN;
-            ctx.resetState();
-        }
+			std::cout << "Connection: close. Closing socket " << fd << std::endl;
+			removeClient(fd, i);
+		} else {
+			// Keep-alive: reset state for the next request and wait for POLLIN
+			_pfds[i].events = POLLIN;
+			ctx.resetState();
+		}
 	}
 	// Otherwise, wait for next POLLOUT event
 }
