@@ -2,8 +2,91 @@
 <html>
 <head>
     <title>CGI Form Test</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<style>
+		.container {
+			max-width: 900px;
+			margin: 3rem auto;
+			padding: 1.5rem;
+		}
+		body {
+			font-family: Arial, sans-serif;
+			margin: 2em;
+			background-color: #f4f4f4;
+		}
+		form {
+			background: #fff;
+			padding: 2em;
+			border-radius: 5px;
+			box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+		}
+		label {
+			display: block;
+			margin-bottom: .5em;
+			color: #333;
+		}
+		input[type="text"], textarea {
+			width: 100%;
+			padding: .5em;
+			margin-bottom: 1em;
+			border: 1px solid #ccc;
+			border-radius: 3px;
+		}
+		input[type="submit"] {
+			background: #2563eb;
+			color: #fff;
+			border: none;
+			padding: .7em 1.5em;
+			border-radius: 3px;
+			cursor: pointer;
+		}
+		input[type="submit"]:hover {
+			background: #1e40af;
+		}
+		nav a {
+			margin-left: 0.75rem;
+			text-decoration: none;
+			color: var(--accent);
+			font-weight: 600;
+		}
+		header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+		}
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+			background: var(--bg);
+			color: var(--text);
+		}
+		:root {
+			--bg: #f7fafc;
+			--card: #ffffff;
+			--accent: #2563eb;
+			--text: #0f172a;
+		}
+	</style>
 </head>
 <body>
+	<div class="container">
+	<header>
+			<div>
+				<strong>MySite</strong>
+				<div style="color:#475569;font-size:.9rem">A minimal starter page</div>
+			</div>
+			<nav aria-label="Main navigation">
+				<a href="/">Home</a>
+				<a href="/test_cases.html">Test Cases</a>
+				<a href="/uploads/uploads.html">Uploads</a>
+				<a href="/additional/additional.html">Additional</a>
+				<a href="/form.html">Form</a>
+			</nav>
+		</header>
     <h1>Submit a Message</h1>
     <form action="/cgi-bin/form_handler.py" method="POST">
         <label for="name">Name:</label><br>
@@ -14,5 +97,6 @@
         
         <input type="submit" value="Submit">
     </form>
+</div>
 </body>
 </html>
