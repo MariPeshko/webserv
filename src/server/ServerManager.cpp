@@ -4,12 +4,12 @@ ServerManager::ServerManager() : shutdown(false) {}
 
 ServerManager::~ServerManager() {}
 
+// Checker for the main server loop
 bool		ServerManager::isShutdownRequested() const {
 	return shutdown;
 }
 
-// Signal-safe method to request shutdown
-// TO DO
+// Signal-safe method to request shutdown, triggered by signals.
 void		ServerManager::requestShutdown() {
 	shutdown = true;
 }
@@ -58,22 +58,20 @@ void	ServerManager::runServers() {
 	while (!isShutdownRequested()) {
 		int	poll_count = poll(&_pfds[0], _pfds.size(), 1000);  // 1 second maximum time to wait
 		if (poll_count == -1) {
-			// it shoud be in LOG
+			if (errno == EINTR) { // a signal occurred
+				// TO DO it shoud be in LOG
+				std::cout << RED << "Signal interrupted poll()\n";
+				continue;
+			}
+			// TO DO it shoud be in LOG
 			std::cerr << "Poll error: " << strerror(errno) << std::endl;
 			break;
 		}
-		if (poll_count > 0) {
+		if (poll_count > 0)
 			processConnections();
-		}
 	}
-	std::cout << "Closing all connections..." << std::endl;
-	for (size_t i = 0; i < _pfds.size(); ++i) {
-		close(_pfds[i].fd);
-	}
-	_pfds.clear();
-	_contexts.clear();
-
-	std::cout << GREEN << "Server shut down cleanly" << RESET << std::endl;
+	cleanup();
+	std::cout << GREEN << "Server shuts down cleanly" << RESET << std::endl;
 }
 
 /** 
@@ -150,11 +148,11 @@ void	ServerManager::handleNewConnection(int listener) {
 
 	uint32_t ip = ntohl(remoteaddr.sin_addr.s_addr);
 	std::string ip_str = ipv4_to_string(ip);
-	//uint16_t port = ntohs(remoteaddr.sin_port);
+	uint16_t port = ntohs(remoteaddr.sin_port);
 		
-	std::cout << GREEN << "server: new connection";
-	//from " << ip_str << ":" << port
-	std::cout << " on socket " << newfd << " (accepted by listener ";
+	std::cout << GREEN << "server: new connection ";
+	std::cout << "from " << ip_str << ":" << port;
+	std::cout << "\non socket " << newfd << " (accepted by listener ";
 	std::cout << listener << ")" << RESET << std::endl;
 }
 
@@ -321,6 +319,20 @@ void	ServerManager::handleClientWrite(size_t i) {
 		}
 	}
 	// Otherwise, wait for next POLLOUT event
+}
+
+void	ServerManager::cleanup() {
+	std::cout << "Closing all connections..." << std::endl;
+	for (size_t i = 0; i < _pfds.size(); ++i) {
+		if (close(_pfds[i].fd) == -1) {
+			// TO DO to logger
+			std::cerr << RED << "Error closing fd " << _pfds[i].fd << ": " << strerror(errno) << std::endl;
+		}
+	}
+	// TO DO to logger
+	std::cout << "Cleared " << _pfds.size() << " pfds and " << _contexts.size() << " contexts" << std::endl;
+	_pfds.clear();
+	_contexts.clear();
 }
 
 

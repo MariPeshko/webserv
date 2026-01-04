@@ -21,7 +21,7 @@ class	ServerManager {
 	public:
 		ServerManager();
 		~ServerManager();
-		
+
 		void	setupServers(std::vector<Server> & server_configs);
 		void	runServers();
 		void	removeClient(int fd, size_t i);
@@ -44,6 +44,7 @@ class	ServerManager {
 		void	handleClientError(int fd, size_t i);
 		void	handleClientHungup(int fd, size_t i);
 		bool	isListener(int fd);
+		void	cleanup();
 };
 
 #endif

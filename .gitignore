@@ -1,6 +1,7 @@
 # Custom ignores
 merge_no.md
 webserv
+valgrind.log
 
 */uploaded_images/*
 

@@ -1,0 +1,18 @@
+# Clean up any existing log file
+rm -f valgrind.log
+
+# Terminal 1: Run with valgrind
+valgrind --leak-check=full --show-leak-kinds=all --track-fds=yes --log-file=valgrind.log ./webserv
+
+# Terminal 2: Test different signals
+ps aux | grep webserv          # Find the PID
+
+# Replace [PID] with actual number
+sleep 5 && kill -SIGINT [PID]   # Test Ctrl+C
+# or
+sleep 5 && kill -SIGTERM [PID]  # Test kill command
+# or  
+sleep 5 && kill -SIGQUIT [PID]  # Test Ctrl+\
+
+# Check results
+cat valgrind.log

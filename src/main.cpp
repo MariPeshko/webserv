@@ -6,20 +6,21 @@
 #include <signal.h>
 #include "server/ServerManager.hpp"
 
-static volatile bool	g_shutdown = false;
 static ServerManager*	g_server_manager = NULL;
 
+/**
+ * Note: Same scenario for all three signals. It' a fall-through 
+ * in C/C++ switch statements. When there is no break; between cases,
+ * they all execute the same code.
+ */
 void	signalHandler(int signal_num) {
 	switch (signal_num) {
 		case SIGINT:
 		case SIGTERM:
-			g_shutdown = true;
+		case SIGQUIT:
 			if (g_server_manager) {
 				g_server_manager->requestShutdown();
 			}
-			break;
-		case SIGQUIT:
-			g_shutdown = true;
 			break;
 		default:
 			break;
@@ -47,11 +48,8 @@ int		main(int ac, char **argv) {
 			std::string config_file = (ac == 1 ? "configs/default.conf" : argv[1]);
 			// parse config file and save parsed data
 			config.parse(config_file);
-			// set up servers
 			server_manager.setupServers(config.getServerConfigs());
-			// Run the main server loop.
 			server_manager.runServers();
-
 		} else {
 			std::cout << "Error: wrong arguments. Usage: ./webserv [config_file]" << std::endl;
 			g_server_manager = NULL;
@@ -62,6 +60,6 @@ int		main(int ac, char **argv) {
 		g_server_manager = NULL;
 		return 1;
 	}
-    g_server_manager = NULL; // Clean up global pointer
+    g_server_manager = NULL;
 	return 0;
 }

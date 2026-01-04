@@ -81,7 +81,7 @@ Terminates the process and, by default, produces a core dump
 **Properly terminate the suspended process:**
 
 Check for suspended/running processes on port 8080
-> ps aux | grep webserv
+> ps aux | grep webserv   # Find the PID
 
 Or check what's using port 8080
 > lsof -i :8080
@@ -90,6 +90,15 @@ Kill the suspended process
 > kill %1    # Kill job 1 (the suspended process)
 or
 > kill 4169  # Kill by PID
+
+## Test memory leaks and fds
+
+valgrind --leak-check=full --show-leak-kinds=all --track-fds=yes ./webserv
+
+# In another terminal, send signals to test cleanup
+kill -SIGTERM [PID]
+# or 
+kill -SIGINT [PID]
 
 ## DEBUGGING SOCKETS
 
