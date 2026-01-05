@@ -183,3 +183,6 @@ CGI is a protocol that acts as a translator between a Web Server (like NGINX or 
 `http://localhost:8080/cgi-bin/test.py`
 
 `http://localhost:8080/cgi-bin/form_handler.py`
+
+Error cases:
+`http://localhost:8080/cgi-bin/empty.py`

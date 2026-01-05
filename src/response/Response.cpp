@@ -116,35 +116,10 @@ void	Response::postAndGenerateResponse()
 	string	path;
 	path = root + uri;
 	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
-
-	// Check for CGI first
-	const std::map<string, string>& cgiMap = loc->getCgi();
-	if (!cgiMap.empty()) {
-		size_t	dotPos = path.find_last_of('.');
-		if (dotPos != string::npos) {
-			string		ext = path.substr(dotPos + 1);
-			std::map<string, string>::const_iterator	it = cgiMap.find(ext);
-			if (it != cgiMap.end()) {
-				// For POST, the script must exist
-				if (getPathType(path) == FILE_PATH) {
-					if (DEBUG) cout << GREEN << "Executing CGI (POST): " << path << RESET << endl;
-					try {
-						CgiHandler	cgi(*_request, path, it->second);
-						string		output = cgi.executeCgi();
-						if (!applyCgiOutput(output)) {
-							fillResponse(502, getErrorPageContent(502)); // Bad Gateway
-							return;
-						}
-						return;
-					} catch (std::exception &e) {
-						if (DEBUG) cout << RED << "CGI Post execution failed: " << e.what() << RESET << endl;
-						fillResponse(500, getErrorPageContent(500));
-						return;
-					}
-				}
-			}
-		}
-	}
+	
+	// Check for CGI
+	if (tryServeCgi(loc, path))
+		return;
 
 	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
 	// Handle Directory
@@ -457,30 +432,9 @@ void	Response::generateResponse()
 		}
 	}
 	// Check for CGI
-	const std::map<string, string>&	cgiMap = loc->getCgi();
-	if (!cgiMap.empty()) {
-		size_t	dotPos = path.find_last_of('.');
-		if (dotPos != string::npos) {
-			string		ext = path.substr(dotPos + 1);
-			std::map<string, string>::const_iterator	it = cgiMap.find(ext);
-			if (it != cgiMap.end()) {
-				if (DEBUG) cout << GREEN << "Executing CGI: " << path << RESET << endl;
-				try {
-					CgiHandler	cgi(*_request, path, it->second);
-					string		output = cgi.executeCgi();
-					if (!applyCgiOutput(output)) {
-						fillResponse(502, getErrorPageContent(502)); // Bad Gateway
-						return;
-					}
-					return;
-				} catch (std::exception &e) {
-					if (DEBUG) cout << RED << "CGI Get execution failed: " << e.what() << RESET << endl;
-					fillResponse(500, getErrorPageContent(500));
-					return;
-				}
-			}
-		}
-	}
+	if (tryServeCgi(loc, path))
+		return;
+
 	// 3. Serve File
 	if (DEBUG) cout << BLUE << "Serving file: " << path << RESET << endl;
 	std::ifstream	file(path.c_str());
@@ -633,6 +587,38 @@ string			Response::getMimeType(const string &filePath)
 	return "application/octet-stream";
 }
 
+// Returns true if the request was handled by CGI (success or error response set)
+// Returns false if not a CGI request or script not found (caller should proceed)
+bool		Response::tryServeCgi(const Location* loc, const std::string& path)
+{
+	const std::map<string, string>&	cgiMap = loc->getCgi();
+	if (cgiMap.empty())
+		return false;
+	size_t	dotPos = path.find_last_of('.');
+	if (dotPos == string::npos)
+		return false;
+
+	string										ext = path.substr(dotPos + 1);
+	std::map<string, string>::const_iterator	it = cgiMap.find(ext);
+	if (it == cgiMap.end())
+		return false;
+	if (getPathType(path) != FILE_PATH)
+		return false;
+	if (DEBUG) cout << GREEN << "Executing CGI: " << path << RESET << endl;
+	try {
+		CgiHandler	cgi(*_request, path, it->second);
+		string		output = cgi.executeCgi();
+		if (!applyCgiOutput(output)) {
+			fillResponse(502, getErrorPageContent(502)); // 502 Bad Gateway
+		}
+		return true; // Request handled (success or 502)
+	} catch (std::exception &e) {
+		if (DEBUG) cout << RED << "CGI execution failed: " << e.what() << RESET << endl;
+		fillResponse(500, getErrorPageContent(500));
+		return true; // Request handled (with 500)
+	}
+}
+
 bool		Response::applyCgiOutput(const std::string &output) {
 	if (output.empty())
 		return false; // invalid CGI response
@@ -642,8 +628,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
 	if (headerEnd == string::npos)
 		headerEnd = output.find("\n\n");
 
-	if (headerEnd == string::npos) {
-		// No headers found, treat entire output as body
+	if (headerEnd == string::npos) { // No headers found, treat entire output as body
 		fillResponse(200, output);
 		return true;
 	}
@@ -652,7 +637,6 @@ bool		Response::applyCgiOutput(const std::string &output) {
 	string	body    = output.substr(headerEnd + ((output[headerEnd] == '\r') ? 4 : 2));
 
 	if (DEBUG) cout << "CGI. Output headers:\n" << headers << endl;
-
 	size_t	start = 0;
 	size_t	end   = headers.find('\n');
 	int		statusCode = 200;
@@ -694,7 +678,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
 			while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
 				value.erase(0, 1);
 
-			if (key == "Status") {
+			if (key == "Status" || key == "status") {
 				std::istringstream	iss(value);
 				int					tmp;
 				if (iss >> tmp)
