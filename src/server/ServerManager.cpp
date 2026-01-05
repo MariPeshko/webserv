@@ -6,15 +6,6 @@ ServerManager::ServerManager() {
 ServerManager::~ServerManager() {
 }
 
-/** Convert IPv4 address to string manually (C++98 compatible) */
-std::string ipv4_to_string(uint32_t ip) {
-	std::ostringstream oss;
-	oss << ((ip >> 24) & 0xFF) << "."
-		<< ((ip >> 16) & 0xFF) << "."
-		<< ((ip >> 8) & 0xFF) << "."
-		<< (ip & 0xFF);
-	return oss.str();
-}
 
 /**
  * After each server's listening socket is successfully created, 
@@ -138,7 +129,7 @@ void	ServerManager::handleNewConnection(int listener) {
 	_contexts.insert(std::make_pair(newfd, HttpContext(conn, *server)));
 
 	uint32_t ip = ntohl(remoteaddr.sin_addr.s_addr);
-	std::string ip_str = ipv4_to_string(ip);
+	std::string ip_str = toString(ip);
 	//uint16_t port = ntohs(remoteaddr.sin_port);
 		
 	Logger::log(LOG_INFO, "New connection accepted from " + ip_str);
@@ -147,19 +138,19 @@ void	ServerManager::handleNewConnection(int listener) {
 
 void	ServerManager::handleErrorRevent(int fd, size_t i) {
 	
-	Logger::logErrno(LOG_ERROR, "Poll error on socket " + std::to_string(fd));
+	Logger::logErrno(LOG_ERROR, "Poll error on socket " + toString(fd));
 	removeClient(fd,i);
 }
 
 /** Client socket error. Error message and cleanup */
 void	ServerManager::handleClientError(int fd, size_t i) {
-	Logger::logErrno(LOG_ERROR, "Socket error on fd " + std::to_string(fd));
+	Logger::logErrno(LOG_ERROR, "Socket error on fd " + toString(fd));
 	removeClient(fd,i);
 }
 
 /** Client socket is closed. Error message and cleanup */
 void	ServerManager::handleClientHungup(int fd, size_t i) {
-	Logger::log(LOG_WARNING, "Socket " + std::to_string(fd) + " hung up");
+	Logger::log(LOG_WARNING, "Socket " + toString(fd) + " hung up");
 	removeClient(fd,i);
 }
 
@@ -186,7 +177,7 @@ void	ServerManager::handleClientData(size_t i) {
 	// Find HttpContext
 	std::map<int, HttpContext>::iterator it = _contexts.find(fd);
 	if (it == _contexts.end()) {
-		Logger::logErrno(LOG_ERROR, "No context found for fd " + std::to_string(fd));
+		Logger::logErrno(LOG_ERROR, "No context found for fd " + toString(fd));
 		close(fd);
 		delFromPfds(i);
 		return ;
@@ -225,7 +216,7 @@ void	ServerManager::handleClientData(size_t i) {
 		ctx.buildResponseString();
 		_pfds[i].events |= POLLOUT;
 		Logger::logRequest(
-			ipv4_to_string(ntohl(ctx.connection().getClientAddress().sin_addr.s_addr)),
+			toString(ntohl(ctx.connection().getClientAddress().sin_addr.s_addr)),
 			ctx.request().getMethod(),
 			ctx.request().getUri(),
 			ctx.response().getStatusCode(),
@@ -263,7 +254,7 @@ void	ServerManager::handleClientWrite(size_t i) {
 	const int								fd = _pfds[i].fd;
 	std::map<int, HttpContext>::iterator	it = _contexts.find(fd);
 	if (it == _contexts.end()) {
-		Logger::logErrno(LOG_ERROR, "No context found for fd " + std::to_string(fd));
+		Logger::logErrno(LOG_ERROR, "No context found for fd " + toString(fd));
 		close(fd);
 		delFromPfds(i);
 		return;
@@ -290,13 +281,13 @@ void	ServerManager::handleClientWrite(size_t i) {
 			return;
 		}
 		// Real error occurred
-		Logger::logErrno(LOG_ERROR, "Send error on socket " + std::to_string(fd));
+		Logger::logErrno(LOG_ERROR, "Send error on socket " + toString(fd));
 		removeClient(fd, i);
 		return;
 	}
 	if (bytes_sent == 0) {
 		// Connection closed by peer
-		Logger::log(LOG_INFO, "Connection closed by peer on socket " + std::to_string(fd));
+		Logger::log(LOG_INFO, "Connection closed by peer on socket " + toString(fd));
 		removeClient(fd, i);
 		return;
 	}
@@ -305,7 +296,7 @@ void	ServerManager::handleClientWrite(size_t i) {
 	// Check if response is complete
 	if (ctx.isResponseComplete()) {
 		 if (ctx.request().getHeaderValue("connection") == "close") {
-            Logger::log(LOG_INFO, "Connection: close. Closing socket " + std::to_string(fd));
+            Logger::log(LOG_INFO, "Connection: close. Closing socket " + toString(fd));
             removeClient(fd, i);
         } else {
             // Keep-alive: reset state for the next request and wait for POLLIN

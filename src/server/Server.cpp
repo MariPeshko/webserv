@@ -171,7 +171,7 @@ int	Server::setupServer() {
 		Logger::logErrno(LOG_ERROR, "Failed to listen on socket");
 		return -1;
 	}
-	Logger::log(LOG_INFO, "Server listening on " + _host + ":" + std::to_string(_port));
+	Logger::log(LOG_INFO, "Server listening on " + _host + ":" + toString(_port));
 	return 0;
 }
 
