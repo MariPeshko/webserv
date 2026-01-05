@@ -1,5 +1,6 @@
 #include "Response.hpp"
 #include "../httpContext/HttpParser.hpp"
+#include "../cgi/CgiHandler.hpp"
 
 using std::cerr;
 using std::cout;
@@ -116,7 +117,73 @@ void	Response::postAndGenerateResponse()
 	path = root + uri;
 	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
 
-	// POST METHOD logic starts here
+	// Check for CGI first
+	const std::map<std::string, std::string>& cgiMap = loc->getCgi();
+	if (!cgiMap.empty()) {
+		size_t dotPos = path.find_last_of('.');
+		if (dotPos != string::npos) {
+			string ext = path.substr(dotPos + 1);
+			std::map<std::string, std::string>::const_iterator it = cgiMap.find(ext);
+			if (it != cgiMap.end()) {
+				// For POST, the script must exist
+				if (getPathType(path) == FILE_PATH) {
+					if (DEBUG) cout << GREEN << "Executing CGI (POST): " << path << RESET << endl;
+					try {
+						CgiHandler cgi(*_request, path, it->second);
+						string output = cgi.executeCgi();
+						
+						// Separate Headers and Body from CGI output
+						size_t headerEnd = output.find("\r\n\r\n");
+						if (headerEnd == string::npos) {
+							headerEnd = output.find("\n\n");
+						}
+
+						if (headerEnd != string::npos) {
+							string headers = output.substr(0, headerEnd);
+							string body = output.substr(headerEnd + ((output[headerEnd] == '\r') ? 4 : 2));
+
+							// Simple parsing of headers
+							size_t start = 0;
+							size_t end = headers.find('\n');
+							while (end != string::npos) {
+								string line = headers.substr(start, end - start);
+								if (!line.empty() && line[line.length() - 1] == '\r') line.erase(line.length() - 1);
+								size_t colon = line.find(':');
+								if (colon != string::npos) {
+									string key = line.substr(0, colon);
+									string value = line.substr(colon + 1);
+									while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
+									_headers[key] = value;
+								}
+								start = end + 1;
+								end = headers.find('\n', start);
+							}
+							if (start < headers.length()) {
+								string line = headers.substr(start);
+								if (!line.empty() && line[line.length() - 1] == '\r') line.erase(line.length() - 1);
+								size_t colon = line.find(':');
+								if (colon != string::npos) {
+									string key = line.substr(0, colon);
+									string value = line.substr(colon + 1);
+									while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
+									_headers[key] = value;
+								}
+							}
+							fillResponse(200, body);
+						} else {
+							fillResponse(200, output);
+						}
+						return;
+					} catch (std::exception &e) {
+						if (DEBUG) cout << RED << "CGI execution failed: " << e.what() << RESET << endl;
+						fillResponse(500, getErrorPageContent(500));
+						return;
+					}
+				}
+			}
+		}
+	}
+
 	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
 	// Handle Directory
 	size_t	path_separator = path.find_last_of('/');
@@ -428,6 +495,77 @@ void	Response::generateResponse()
 		}
 	}
 	// 3. Serve File
+	// Check for CGI
+	const std::map<std::string, std::string>& cgiMap = loc->getCgi();
+	if (!cgiMap.empty()) {
+		size_t dotPos = path.find_last_of('.');
+		if (dotPos != string::npos) {
+			string ext = path.substr(dotPos + 1);
+			std::map<std::string, std::string>::const_iterator it = cgiMap.find(ext);
+			if (it != cgiMap.end()) {
+				if (DEBUG) cout << GREEN << "Executing CGI: " << path << RESET << endl;
+				try {
+					CgiHandler cgi(*_request, path, it->second);
+					string output = cgi.executeCgi();
+					
+					// Separate Headers and Body from CGI output
+					size_t headerEnd = output.find("\r\n\r\n");
+					if (headerEnd == string::npos) {
+						headerEnd = output.find("\n\n");
+					}
+
+					if (headerEnd != string::npos) {
+						string headers = output.substr(0, headerEnd);
+						string body = output.substr(headerEnd + ((output[headerEnd] == '\r') ? 4 : 2));
+
+						// Simple parsing of headers (can be improved)
+						size_t start = 0;
+						size_t end = headers.find('\n');
+						while (end != string::npos) {
+							string line = headers.substr(start, end - start);
+							// Remove \r if present
+							if (!line.empty() && line[line.length() - 1] == '\r') {
+								line.erase(line.length() - 1);
+							}
+							size_t colon = line.find(':');
+							if (colon != string::npos) {
+								string key = line.substr(0, colon);
+								string value = line.substr(colon + 1);
+								// Trim whitespace
+								while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
+								_headers[key] = value;
+							}
+							start = end + 1;
+							end = headers.find('\n', start);
+						}
+						// Process last line
+						if (start < headers.length()) {
+							string line = headers.substr(start);
+							if (!line.empty() && line[line.length() - 1] == '\r') line.erase(line.length() - 1);
+							size_t colon = line.find(':');
+							if (colon != string::npos) {
+								string key = line.substr(0, colon);
+								string value = line.substr(colon + 1);
+								while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
+								_headers[key] = value;
+							}
+						}
+						
+						fillResponse(200, body);
+					} else {
+						// No headers found, treat entire output as body
+						fillResponse(200, output);
+					}
+					return;
+				} catch (std::exception &e) {
+					if (DEBUG) cout << RED << "CGI execution failed: " << e.what() << RESET << endl;
+					fillResponse(500, getErrorPageContent(500));
+					return;
+				}
+			}
+		}
+	}
+
 	if (DEBUG) cout << BLUE << "Serving file: " << path << RESET << endl;
 	std::ifstream	file(path.c_str());
 	if (!file.is_open()) {

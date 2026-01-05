@@ -60,7 +60,7 @@ void	ServerManager::runServers() {
 		if (poll_count == -1) {
 			if (errno == EINTR) { // a signal occurred
 				// TO DO it shoud be in LOG
-				std::cout << RED << "Signal interrupted poll()\n";
+				std::cout << RED << "Signal interrupted poll()\n" << RESET;
 				continue;
 			}
 			// TO DO it shoud be in LOG
@@ -69,6 +69,7 @@ void	ServerManager::runServers() {
 		}
 		if (poll_count > 0)
 			processConnections();
+		checkTimeouts();
 	}
 	cleanup();
 	std::cout << GREEN << "Server shuts down cleanly" << RESET << std::endl;
@@ -263,7 +264,19 @@ void	ServerManager::delFromPfds(size_t index) {
 	}
 }
 
-/** Handle POLLOUT event - send response data when socket is ready */
+/** Handle POLLOUT event - send response data when socket is ready 
+ * 
+ * - Get remaining data to send
+ * - A safeguard: If response fully sent, switch off POLLOUT
+ * - Send remaining data
+ * - Check send() return value
+ * - Updates the last activity timestamp on each successful send
+ * - Updates bytes sent counter
+ * - Check if response is complete
+ *   - If yes and it's "close" connection - close it
+ * 	 - If yes and it's "keep-alive" connection: reset state for the next request and wait for POLLIN
+ *   - Otherwise, response isn't complete - wait for next POLLOUT event
+*/
 void	ServerManager::handleClientWrite(size_t i) {
 	const int								fd = _pfds[i].fd;
 	std::map<int, HttpContext>::iterator	it = _contexts.find(fd);
@@ -274,51 +287,44 @@ void	ServerManager::handleClientWrite(size_t i) {
 		return;
 	}
 	HttpContext&		ctx = it->second;
-	// Get remaining data to send
+
 	const std::string&	buffer = ctx.getResponseBuffer();
 	size_t				already_sent = ctx.getBytesSent();
 	
-	if (buffer.size() <= already_sent) { // a safeguard
-		// Response fully sent, switch off POLLOUT
+	if (buffer.size() <= already_sent) { // A safeguard
 		_pfds[i].events = POLLIN;
 		ctx.resetState();
 		return;
 	}
-	// Send remaining data
 	size_t		remaining = buffer.size() - already_sent;
 	const char*	data_ptr = buffer.c_str() + already_sent;
-	ssize_t		bytes_sent = send(fd, data_ptr, remaining, 0); /// ? last parameter NON_BLOCK
+	ssize_t		bytes_sent = send(fd, data_ptr, remaining, 0);
 
-	if (bytes_sent == -1) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			// Socket buffer full, wait for next POLLOUT
-			return;
-		}
-		// Real error occurred
+	if (bytes_sent < 0) {
+		// TO DO DELTE - this is forbidden by subject
+		//if (errno == EAGAIN || errno == EWOULDBLOCK)
+		// TO DO - add to logger
 		std::cerr << "Send error on socket " << fd << ": " << strerror(errno) << std::endl;
 		removeClient(fd, i);
 		return;
 	}
 	if (bytes_sent == 0) {
-		// Connection closed by peer
-		std::cout << "Con_pfds[i].events &= ~POLLOUT;nection closed by peer on socket " << fd << std::endl;
+		// // TO DO - add to logger: Connection closed by peer
+		std::cout << "_pfds[i].events &= ~POLLOUT connection closed by peer on socket " << fd << std::endl;
 		removeClient(fd, i);
 		return;
 	}
-	// Update bytes sent counter
+	ctx.connection().updateLastActivity();
 	ctx.addBytesSent(static_cast<size_t>(bytes_sent));
-	// Check if response is complete
 	if (ctx.isResponseComplete()) {
 		 if (ctx.request().getHeaderValue("connection") == "close") {
 			std::cout << "Connection: close. Closing socket " << fd << std::endl;
 			removeClient(fd, i);
 		} else {
-			// Keep-alive: reset state for the next request and wait for POLLIN
 			_pfds[i].events = POLLIN;
 			ctx.resetState();
 		}
 	}
-	// Otherwise, wait for next POLLOUT event
 }
 
 void	ServerManager::cleanup() {
@@ -335,4 +341,38 @@ void	ServerManager::cleanup() {
 	_contexts.clear();
 }
 
-
+/**
+ * Scan all active client connections and close those that have been idle
+ * longer than the configured inactivity timeout.
+ *
+ * This is mainly used to enforce a keep‑alive timeout: if a client keeps
+ * the TCP connection open but does not send any data for `timeout` seconds,
+ * the connection is considered stale and is closed to free resources.
+ *
+ * Algorithm:
+ *  - Iterate over all fds in `_pfds`.
+ *  - Skip listener sockets.
+ *  - For each client fd, find its `HttpContext` and call
+ *    `connection().hasTimedOut(timeout)`.
+ *  - If the connection has timed out, log it and call `removeClient(fd, i)`.
+ *    Do not increment `i` when an element is removed, because `_pfds` shrinks
+ *    and the next element moves into the current index.
+ */
+void	ServerManager::checkTimeouts() {
+	time_t	timeout = 10; // 10 seconds timeout
+	for (size_t i = 0; i < _pfds.size(); ) {
+		int	fd = _pfds[i].fd;
+		if (!isListener(fd)) {
+			std::map<int, HttpContext>::iterator it = _contexts.find(fd);
+			if (it != _contexts.end()) {
+				 if (it->second.connection().hasTimedOut(timeout)) {
+					//TO DO - add it to logger
+					 std::cout << "Connection timed out on socket " << fd << std::endl;
+					 removeClient(fd, i);
+					 continue; 
+				 }
+			}
+		}
+		i++;
+	}
+}
