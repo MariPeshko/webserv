@@ -159,3 +159,27 @@ The request for /.well-known/appspecific/com.chrome.devtools.json is a standard 
 When you have Chrome DevTools open, it automatically probes the web server for a special configuration file. This file is intended to help with source mapping, which allows the debugger to show you your original source code (e.g., TypeScript, unminified JavaScript) instead of the code that's actually running in the browser.
 
 Your server receives the request, looks for the file /www/web/.well-known/appspecific/com.chrome.devtools.json, and doesn't find it. It correctly responds with a 404 Not Found error.
+
+## CGI - Common Gateway Interface
+
+CGI is a protocol that acts as a translator between a Web Server (like NGINX or our C++ project) and an External Script (like Python, PHP, or C++).
+
+### How it works (The 3-Step Loop)
+
+1. **The Trigger:** A user requests a specific file (e.g., `test.py`). The server sees the extension and knows it shouldn't just send the file text; it needs to **run** it.
+
+2. **The Hand-off (Fork & Exec):**
+    - The server pauses and creates a copy of itself (Fork).
+    - It prepares "Environment Variables" (Meta-data like `WHO_IS_ASKING`, `WHAT_METHOD`, `QUERY_DATA`).
+    - It replaces the copy with the Python script (Exec).
+    - **Input:** If the user sent data (like a password), the server passes it to the script via a "Pipe" (Standard Input).
+
+3. **The Output:**
+    - The script runs, does its math or logic, and "prints" the result (Standard Output).
+    - The server catches this printout, adds a "200 OK" sticker to it, and sends it back to the browser.
+
+### How to test CGI
+
+`http://localhost:8080/cgi-bin/test.py`
+
+`http://localhost:8080/cgi-bin/form_handler.py`

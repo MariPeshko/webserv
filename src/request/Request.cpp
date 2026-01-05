@@ -122,6 +122,10 @@ bool	Request::isTransferEncodingHeader() const {
 		return true;
 }
 
+/**
+ * Warning: header map is case‑normalized so parameter must be lowercase to
+ * retrieve a value.
+ */
 const std::string&	Request::getHeaderValue(const std::string header_name) const {
 	
 	static const std::string	empty = "";
