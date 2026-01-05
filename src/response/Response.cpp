@@ -622,12 +622,10 @@ bool		Response::tryServeCgi(const Location* loc, const std::string& path)
 bool		Response::applyCgiOutput(const std::string &output) {
 	if (output.empty())
 		return false; // invalid CGI response
-
 	// Separate Headers and Body from CGI output
 	size_t	headerEnd = output.find("\r\n\r\n");
 	if (headerEnd == string::npos)
 		headerEnd = output.find("\n\n");
-
 	if (headerEnd == string::npos) { // No headers found, treat entire output as body
 		fillResponse(200, output);
 		return true;
@@ -635,57 +633,34 @@ bool		Response::applyCgiOutput(const std::string &output) {
 
 	string	headers = output.substr(0, headerEnd);
 	string	body    = output.substr(headerEnd + ((output[headerEnd] == '\r') ? 4 : 2));
-
 	if (DEBUG) cout << "CGI. Output headers:\n" << headers << endl;
-	size_t	start = 0;
-	size_t	end   = headers.find('\n');
-	int		statusCode = 200;
+    std::istringstream	iss(headers);
+    std::string			line;
+    int					statusCode = 200;
+	
+	while (std::getline(iss, line)) {
+		if (!line.empty() && line[line.length() - 1] == '\r') {
+            line.erase(line.length() - 1);
+        }
+		if (line.empty()) continue;
 
-	while (end != string::npos) {
-		string	line = headers.substr(start, end - start);
-		if (!line.empty() && line[line.length() - 1] == '\r')
-			line.erase(line.length() - 1);
-
-		size_t	colon = line.find(':');
+		size_t colon = line.find(':');
 		if (colon != string::npos) {
-			string	key   = line.substr(0, colon);
-			string	value = line.substr(colon + 1);
+            string key = line.substr(0, colon);
+            string value = line.substr(colon + 1);
+
 			// Trim whitespace
 			while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
 				value.erase(0, 1);
-
-			if (key == "Status" || key == "status") {
-				std::istringstream	iss(value);
-				int					tmp;
-				if (iss >> tmp)
-					statusCode = tmp;
-			} else {
-				_headers[key] = value;
-			}
-		}
-		start = end + 1;
-		end   = headers.find('\n', start);
-	}
-	// Process last line
-	if (start < headers.length()) {
-		string	line = headers.substr(start);
-		if (!line.empty() && line[line.length() - 1] == '\r')
-			line.erase(line.length() - 1);
-		size_t	colon = line.find(':');
-		if (colon != string::npos) {
-			string	key   = line.substr(0, colon);
-			string	value = line.substr(colon + 1);
-			while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
-				value.erase(0, 1);
-
-			if (key == "Status" || key == "status") {
-				std::istringstream	iss(value);
-				int					tmp;
-				if (iss >> tmp)
-					statusCode = tmp;
-			} else {
-				_headers[key] = value;
-			}
+			if (key == "Status" || key == "status" || key == "STATUS") {
+                std::istringstream	statusIss(value);
+                int					tempCode;
+                if (statusIss >> tempCode)
+                    statusCode = tempCode;
+            }
+            else if (!key.empty()) { // Store other headers
+                _headers[key] = value;
+            }
 		}
 	}
 	fillResponse(statusCode, body);
