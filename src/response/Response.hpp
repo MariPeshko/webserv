@@ -77,6 +77,7 @@ class	Response
 		std::string			getIndexFromLocation();
 		PathType			getPathType(std::string const path);
 		static std::string	getMimeType(const std::string &filePath);
+		bool				applyCgiOutput(const std::string &output);
 
 };
 

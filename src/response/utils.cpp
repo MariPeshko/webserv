@@ -35,8 +35,10 @@ const char *generateStatusMessage(short status_code)
 		return "Internal Server Error";
 	case 501:
 		return "Not Implemented";
+	case 502:
+		return "Bad Gateway";
 	default:
-		return "Unknown Error";
+		return "Unknown Status";
 	}
 }
 
