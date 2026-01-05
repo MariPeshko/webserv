@@ -178,6 +178,18 @@ CGI is a protocol that acts as a translator between a Web Server (like NGINX or 
     - The script runs, does its math or logic, and "prints" the result (Standard Output).
     - The server catches this printout, adds a "200 OK" sticker to it, and sends it back to the browser.
 
+### What is a query string?
+
+A query string is the part of a URL that comes after the ? character, containing key-value pairs of data passed to the CGI script.
+
+Examples:
+http://example.com/cgi-bin/search.py?name=John&age=25&city=NYC
+                   ─────────────────  ──────────────────────────
+                   Script Path         Query String
+
+Format:
+key1=value1&key2=value2&key3=value3
+
 ### How to test CGI
 
 `http://localhost:8080/cgi-bin/test.py`

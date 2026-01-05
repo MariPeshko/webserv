@@ -3,8 +3,11 @@
 #include <cstdio>
 #include <cctype> // Required for std::toupper
 
-CgiHandler::CgiHandler(const Request& request, const std::string& scriptPath, 
-						const std::string& interpreterPath) :
+using std::string;
+using std::map;
+
+CgiHandler::CgiHandler(const Request& request, const string& scriptPath, 
+						const string& interpreterPath) :
 	_request(request),
 	_scriptPath(scriptPath),
 	_interpreterPath(interpreterPath)
@@ -14,19 +17,41 @@ CgiHandler::CgiHandler(const Request& request, const std::string& scriptPath,
 
 CgiHandler::~CgiHandler() {}
 
+/** 
+ * Info: CGI scripts are separate programs that our web server executes. 
+ * They don't have direct access to the HTTP request data. The CGI 
+ * specification defines that request information must be passed 
+ * via environment variables.
+ * 
+ * execve() passes them in executeCgi() method
+ * 
+ * HTTP Headers Conversion because CGI standard requires HTTP headers to be prefixed 
+ * with HTTP_ and use underscores.
+ * */
 void	CgiHandler::setupEnv() {
 	_env["REQUEST_METHOD"] = _request.getMethod();
 	_env["SCRIPT_FILENAME"] = _scriptPath;
 	_env["SERVER_PROTOCOL"] = _request.getVersion();
 	_env["REDIRECT_STATUS"] = "200"; // Required by some CGI engines (like php-cgi)
 
+	/* // Add these missing variables:
+    _env["GATEWAY_INTERFACE"] = "CGI/1.1";
+    _env["SERVER_SOFTWARE"] = "webserv/1.0";
+    // _env["SERVER_NAME"] = // From Host header or config
+    // _env["SERVER_PORT"] = // From socket or config
+    // _env["REMOTE_ADDR"] = // Client IP
+    // _env["REMOTE_HOST"] = // Client hostname (optional)
+    _env["SCRIPT_NAME"] = _request.getUri().substr(0, _request.getUri().find('?')); */
+
 	// Parse Query String
-	std::string uri = _request.getUri();
-	size_t queryPos = uri.find('?');
-	if (queryPos != std::string::npos) {
+	string	uri = _request.getUri();
+	size_t	queryPos = uri.find('?');
+	if (queryPos != string::npos) {
+		if (CGI_DEBUG) std::cout << "CGI: QUERY_STRING: " << uri.substr(queryPos + 1) << std::endl;
 		_env["QUERY_STRING"] = uri.substr(queryPos + 1);
 		_env["PATH_INFO"] = uri.substr(0, queryPos);
 	} else {
+		if (CGI_DEBUG) std::cout << "CGI: QUERY_STRING is empty string" << std::endl;
 		_env["QUERY_STRING"] = "";
 		_env["PATH_INFO"] = uri;
 	}
@@ -40,26 +65,30 @@ void	CgiHandler::setupEnv() {
 		_env["CONTENT_TYPE"] = _request.getHeaderValue("content-type");
 	}
 	
-	// Convert headers to HTTP_ format
-	std::map<std::string, std::string> headers = _request.getHeaders();
-	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
-		std::string	key = it->first;
-		std::string	value = it->second;
-		// Convert "User-Agent" to "HTTP_USER_AGENT"
-		std::string	envKey = "HTTP_";
+	// Convert headers to HTTP_ format. Convert "User-Agent" to "HTTP_USER_AGENT"
+	map<string, string>	headers = _request.getHeaders();
+	for (map<string, string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
+		string	key = it->first;
+		string	value = it->second;
+		string	envKey = "HTTP_";
+
 		for (size_t i = 0; i < key.length(); ++i) {
-			if (key[i] == '-') envKey += '_';
-			else envKey += std::toupper(key[i]);
+			if (key[i] == '-')
+				envKey += '_';
+			else
+				envKey += std::toupper(key[i]);
 		}
 		_env[envKey] = value;
 	}
 }
 
-char**	CgiHandler::getEnvArray() {
+char**	CgiHandler::getEnvArray()
+{
 	char**	env = new char*[_env.size() + 1];
 	size_t	i = 0;
-	for (std::map<std::string, std::string>::const_iterator it = _env.begin(); it != _env.end(); ++it) {
-		std::string element = it->first + "=" + it->second;
+	for (map<string, string>::const_iterator it = _env.begin(); it != _env.end(); ++it)
+	{
+		string	element = it->first + "=" + it->second;
 		env[i] = new char[element.size() + 1];
 		std::strcpy(env[i], element.c_str());
 		i++;
@@ -68,15 +97,17 @@ char**	CgiHandler::getEnvArray() {
 	return env;
 }
 
-void	CgiHandler::freeEnvArray(char** envArray) {
+void	CgiHandler::freeEnvArray(char** envArray)
+{
 	if (!envArray) return;
+
 	for (size_t i = 0; envArray[i]; ++i) {
 		delete[] envArray[i];
 	}
 	delete[] envArray;
 }
 
-std::string	CgiHandler::executeCgi()
+string	CgiHandler::executeCgi()
 {
 	int		pipeIn[2];  // To send Body to script
 	int		pipeOut[2]; // To read Output from script
@@ -134,7 +165,7 @@ std::string	CgiHandler::executeCgi()
 		close(pipeIn[1]); // Finished writing
 
 		// Read script's stdout
-		std::string	result;
+		string	result;
 		char		buffer[4096];
 		ssize_t		bytesRead;
 		while ((bytesRead = read(pipeOut[0], buffer, sizeof(buffer))) > 0) {
@@ -142,7 +173,12 @@ std::string	CgiHandler::executeCgi()
 		}
 		close(pipeOut[0]);
 		
-		waitpid(pid, NULL, 0); // Wait for child
+		int	status;
+		waitpid(pid, &status, 0); // Wait for child
+		if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+			if (CGI_DEBUG) std::cout << "executeCgi(): Child process failed" << std::endl;
+    		return "Status: 500\r\n\r\nCGI Script Error";
+		}
 		return result;
 	}
 }

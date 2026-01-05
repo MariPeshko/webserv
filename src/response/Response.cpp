@@ -61,6 +61,11 @@ void	Response::deleteAndGenerateResponse()
 		root = loc->getRoot();
 	if (D_POST) cout << YELLOW << "Using root: " << root << RESET << endl;
 	string	uri = _request->getUri();
+	// **FIX for CGI: Strip query string from URI before constructing path**
+	size_t	queryPos = uri.find('?');
+	if (queryPos != string::npos) {
+		uri = uri.substr(0, queryPos);  // Remove everything after '?'
+	}
 	if (D_POST) cout << YELLOW << "Using URI: " << uri << RESET << endl;
 
 	string	path;
@@ -111,6 +116,13 @@ void	Response::postAndGenerateResponse()
 		root = loc->getRoot();
 	if (D_POST) cout << YELLOW << "Using root: " << root << RESET << endl;
 	string	uri = _request->getUri();
+
+	// **FIX for CGI: Strip query string from URI before constructing path**
+	size_t	queryPos = uri.find('?');
+	if (queryPos != string::npos) {
+		uri = uri.substr(0, queryPos);  // Remove everything after '?'
+	}
+
 	if (D_POST) cout << YELLOW << "Using URI: " << uri << RESET << endl;
 
 	string	path;
@@ -373,6 +385,13 @@ void	Response::generateResponse()
 	if (root.empty()) root = "."; // the current working directory
 	
 	string			uri = _request->getUri();
+
+	// **FIX for CGI: Strip query string from URI before constructing path**
+	size_t	queryPos = uri.find('?');
+	if (queryPos != string::npos) {
+		uri = uri.substr(0, queryPos);  // Remove everything after '?'
+	}
+
 	string			path = root + uri;
 	
 	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
@@ -587,8 +606,14 @@ string			Response::getMimeType(const string &filePath)
 	return "application/octet-stream";
 }
 
-// Returns true if the request was handled by CGI (success or error response set)
-// Returns false if not a CGI request or script not found (caller should proceed)
+/**
+ * Returns true if the request was handled by CGI (success or error response set)
+ * Returns false if not a CGI request or script not found (caller should proceed)
+ * 
+ * - Extract extension from request path
+ * - Look up the interpreter for this extension
+ * - Calls CgiHandler constructor
+ */
 bool		Response::tryServeCgi(const Location* loc, const std::string& path)
 {
 	const std::map<string, string>&	cgiMap = loc->getCgi();
@@ -597,8 +622,8 @@ bool		Response::tryServeCgi(const Location* loc, const std::string& path)
 	size_t	dotPos = path.find_last_of('.');
 	if (dotPos == string::npos)
 		return false;
+	string	ext = path.substr(dotPos + 1);
 
-	string										ext = path.substr(dotPos + 1);
 	std::map<string, string>::const_iterator	it = cgiMap.find(ext);
 	if (it == cgiMap.end())
 		return false;
@@ -634,33 +659,33 @@ bool		Response::applyCgiOutput(const std::string &output) {
 	string	headers = output.substr(0, headerEnd);
 	string	body    = output.substr(headerEnd + ((output[headerEnd] == '\r') ? 4 : 2));
 	if (DEBUG) cout << "CGI. Output headers:\n" << headers << endl;
-    std::istringstream	iss(headers);
-    std::string			line;
-    int					statusCode = 200;
+	std::istringstream	iss(headers);
+	std::string			line;
+	int					statusCode = 200;
 	
 	while (std::getline(iss, line)) {
 		if (!line.empty() && line[line.length() - 1] == '\r') {
-            line.erase(line.length() - 1);
-        }
+			line.erase(line.length() - 1);
+		}
 		if (line.empty()) continue;
 
 		size_t colon = line.find(':');
 		if (colon != string::npos) {
-            string key = line.substr(0, colon);
-            string value = line.substr(colon + 1);
+			string key = line.substr(0, colon);
+			string value = line.substr(colon + 1);
 
 			// Trim whitespace
 			while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
 				value.erase(0, 1);
 			if (key == "Status" || key == "status" || key == "STATUS") {
-                std::istringstream	statusIss(value);
-                int					tempCode;
-                if (statusIss >> tempCode)
-                    statusCode = tempCode;
-            }
-            else if (!key.empty()) { // Store other headers
-                _headers[key] = value;
-            }
+				std::istringstream	statusIss(value);
+				int					tempCode;
+				if (statusIss >> tempCode)
+					statusCode = tempCode;
+			}
+			else if (!key.empty()) { // Store other headers
+				_headers[key] = value;
+			}
 		}
 	}
 	fillResponse(statusCode, body);
