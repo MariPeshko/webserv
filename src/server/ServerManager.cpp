@@ -56,12 +56,10 @@ void	ServerManager::runServers() {
 		int	poll_count = poll(&_pfds[0], _pfds.size(), 1000);  // 1 second maximum time to wait
 		if (poll_count == -1) {
 			if (errno == EINTR) { // a signal occurred
-				// TO DO it shoud be in LOG
-				cout << RED << "Signal interrupted poll()\n" << RESET;
+				Logger::logErrno(LOG_ERROR, "Poll error");
 				continue;
 			}
-			// TO DO it shoud be in LOG
-			std::cerr << "Poll error: " << strerror(errno) << endl;
+			Logger::logErrno(LOG_ERROR, "Poll error");
 			break;
 		}
 		if (poll_count > 0)
@@ -69,7 +67,7 @@ void	ServerManager::runServers() {
 		checkTimeouts();
 	}
 	cleanup();
-	cout << GREEN << "Server shuts down cleanly" << RESET << endl;
+	Logger::log(LOG_INFO, "Webserv stopped");
 }
 
 /** 
@@ -130,7 +128,7 @@ void	ServerManager::handleNewConnection(int listener) {
 	newfd = accept(listener, reinterpret_cast<struct sockaddr*>(&remoteaddr), &addrlen);
 	//                       ^^^^^^^^^^^^ Cast to base type for API
 	if (newfd == -1) {
-		std::cerr << "Accept failed: " << strerror(errno) << endl;
+		Logger::logErrno(LOG_ERROR, "Accept failed");
 		return;
 	}
 	int	flags = fcntl(newfd, F_GETFL, 0);
@@ -151,9 +149,7 @@ void	ServerManager::handleNewConnection(int listener) {
 	std::string	ip_str = ipv4_to_string(ip);
 	uint16_t	port = ntohs(remoteaddr.sin_port);
 		
-	cout << GREEN << "server: new connection: " << ip_str << ":" << port;
-	cout << " on socket " << newfd << " (by listener ";
-	cout << listener << ")" << RESET << endl;
+	Logger::log(LOG_INFO, "New connection accepted from " + ip_str + ":" + toString(port) + " by listener " + toString(newfd));
 }
 
 /**
@@ -172,7 +168,7 @@ void	ServerManager::handleClientData(size_t i) {
 	// Find HttpContext
 	map<int, HttpContext>::iterator	it = _contexts.find(fd);
 	if (it == _contexts.end()) {
-		std::cerr << "Error: No contexts found for fd " << fd << endl;
+		Logger::logErrno(LOG_ERROR, "No context found for fd " + toString(fd));
 		close(fd);
 		delFromPfds(i);
 		return ;
@@ -198,6 +194,13 @@ void	ServerManager::handleClientData(size_t i) {
 		}
 		ctx.buildResponseString();
 		_pfds[i].events |= POLLOUT;
+		Logger::logRequest(
+			toString(ntohl(ctx.connection().getClientAddress().sin_addr.s_addr)),
+			ctx.request().getMethod(),
+			ctx.request().getUri(),
+			ctx.response().getStatusCode(),
+			ctx.response().getContentLength()
+		);
 	}
 }
 
@@ -219,7 +222,7 @@ void	ServerManager::handleClientWrite(size_t i) {
 	const int								fd = _pfds[i].fd;
 	map<int, HttpContext>::iterator	it = _contexts.find(fd);
 	if (it == _contexts.end()) {
-		std::cerr << "Error: No context found for fd " << fd << endl;
+		Logger::logErrno(LOG_ERROR, "No context found for fd " + toString(fd));
 		close(fd);
 		delFromPfds(i);
 		return;
@@ -239,17 +242,12 @@ void	ServerManager::handleClientWrite(size_t i) {
 	ssize_t		bytes_sent = send(fd, data_ptr, remaining, 0);
 
 	if (bytes_sent < 0) {
-		// TO DO DELTE - this is forbidden by subject
-		//if (errno == EAGAIN || errno == EWOULDBLOCK)
-		// TO DO - add to logger
-		std::cerr << "Send error on socket " << fd << ": " << strerror(errno) << endl;
+		Logger::logErrno(LOG_ERROR, "Send error on socket " + toString(fd));
 		removeClient(fd, i);
 		return;
 	}
 	if (bytes_sent == 0) {
-		// // TO DO - add to logger: Connection closed by peer
-		cout << "_pfds[i].events &= ~POLLOUT connection closed by peer on ";
-		cout << "socket " << fd << endl;
+		Logger::log(LOG_INFO, "Connection closed by peer on socket " + toString(fd));
 		removeClient(fd, i);
 		return;
 	}
@@ -257,39 +255,13 @@ void	ServerManager::handleClientWrite(size_t i) {
 	ctx.addBytesSent(static_cast<size_t>(bytes_sent));
 	if (ctx.isResponseComplete()) {
 		 if (ctx.request().getHeaderValue("connection") == "close") {
-			cout << "Connection: close. Closing socket " << fd << endl;
+			Logger::log(LOG_INFO, "Connection: close. Closing socket " + toString(fd));
 			removeClient(fd, i);
 		} else {
 			_pfds[i].events = POLLIN;
 			ctx.resetState();
 		}
 	}
-}
-
-void	ServerManager::handleErrorRevent(int fd, size_t i) {
-	
-	std::cerr << "Poll error on socket " << fd << endl;
-	removeClient(fd,i);
-}
-
-/** Client socket error. Error message and cleanup */
-void	ServerManager::handleClientError(int fd, size_t i) {
-	cout << "server: socket " << fd << " error after recv()" << endl;
-	removeClient(fd,i);
-	
-}
-
-/** Client socket is closed. Error message and cleanup */
-void	ServerManager::handleClientHungup(int fd, size_t i) {
-	cout << "server: socket " << fd << " hung up" << endl;
-	removeClient(fd,i);
-}
-
-/** close/erase logic */
-void	ServerManager::removeClient(int fd, size_t i) {
-	close(fd);
-	_contexts.erase(fd);
-	delFromPfds(i);
 }
 
 bool	ServerManager::isListener(int fd) {
@@ -309,11 +281,37 @@ void	ServerManager::addToPfds(std::vector<pollfd>& pfds, int newfd) {
 	pfds.push_back(pfd);
 }
 
+void	ServerManager::handleErrorRevent(int fd, size_t i) {
+	
+	Logger::logErrno(LOG_ERROR, "Poll error on socket " + toString(fd));
+	removeClient(fd,i);
+}
+
+/** Client socket error. Error message and cleanup */
+void	ServerManager::handleClientError(int fd, size_t i) {
+	Logger::logErrno(LOG_ERROR, "Socket error on fd " + toString(fd));
+	removeClient(fd,i);
+	
+}
+
+/** Client socket is closed. Error message and cleanup */
+void	ServerManager::handleClientHungup(int fd, size_t i) {
+	Logger::log(LOG_WARNING, "Socket " + toString(fd) + " hung up");
+	removeClient(fd,i);
+}
+
 /** Remove a file descriptor at a given index from the vector. */
 void	ServerManager::delFromPfds(size_t index) {
 	if (index < _pfds.size()) {
 		_pfds.erase(_pfds.begin() + index);
 	}
+}
+
+/** close/erase logic */
+void	ServerManager::removeClient(int fd, size_t i) {
+	close(fd);
+	_contexts.erase(fd);
+	delFromPfds(i);
 }
 
 void	ServerManager::cleanup() {

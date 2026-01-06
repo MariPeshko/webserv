@@ -201,8 +201,9 @@ void	Response::generateResponsePost()
 		return;
 	}
 	
-	// --- Simple File Upload Logic --- plain text
-	if (contentType.find("text/plain") != string::npos)	{
+	// --- Simple File Upload Logic --- plain text, image - png, jpeg.
+	if (contentType.find("text/plain") != string::npos || contentType.find("image/png") != string::npos
+			|| contentType.find("image/jpeg") != string::npos)	{
 		// Write the raw request body to the file
 		std::ofstream	file(_path.c_str(), std::ios::binary);
 		if (!file.is_open()) {

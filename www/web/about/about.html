@@ -1,150 +1,348 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<title>About - MySite</title>
-	<style>
-		:root {
-			--bg: #f7fafc;
-			--card: #ffffff;
-			--accent: #2563eb;
-			--text: #0f172a;
-		}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - WebServ Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-		html,
-		body {
-			height: 100%;
-			margin: 0;
-			font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-			background: var(--bg);
-			color: var(--text);
-		}
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --text-light: #64748b;
+            --border-color: #e2e8f0;
+        }
 
-		.container {
-			max-width: 900px;
-			margin: 3rem auto;
-			padding: 1.5rem;
-		}
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
 
-		header {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			gap: 1rem;
-		}
+        /* Navigation */
+        nav {
+            background: var(--card-bg);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
 
-		nav a {
-			margin-left: 0.75rem;
-			text-decoration: none;
-			color: var(--accent);
-			font-weight: 600;
-		}
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-		.hero {
-			background: linear-gradient(180deg, rgba(37, 99, 235, 0.06), transparent);
-			border-radius: 12px;
-			padding: 2rem;
-			box-shadow: 0 6px 18px rgba(2, 6, 23, 0.06);
-		}
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
 
-		.hero h1 {
-			margin: 0 0 .5rem 0;
-			font-size: 1.6rem;
-		}
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
 
-		.hero p {
-			margin: 0 0 1rem 0;
-			color: #334155;
-		}
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-color);
+            font-weight: 500;
+            transition: color 0.3s;
+        }
 
-		.btn {
-			display: inline-block;
-			background: var(--accent);
-			color: white;
-			padding: .6rem 1rem;
-			border-radius: 8px;
-			text-decoration: none;
-			font-weight: 600;
-		}
+        .nav-links a:hover,
+        .nav-links a.active {
+            color: var(--primary-color);
+        }
 
-		section {
-			margin-top: 1.25rem;
-			background: var(--card);
-			padding: 1rem;
-			border-radius: 8px;
-		}
+        /* Page Header */
+        .page-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
 
-		footer {
-			margin-top: 2rem;
-			text-align: center;
-			color: #64748b;
-			font-size: 0.9rem;
-		}
+        .page-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
 
-		@media (max-width:560px) {
-			.container {
-				margin: 1.5rem;
-				padding: .75rem;
-			}
+        .page-header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
 
-			header {
-				flex-direction: column;
-				align-items: flex-start;
-				gap: .5rem;
-			}
-		}
-	</style>
+        /* Content */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .about-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            margin-bottom: 4rem;
+        }
+
+        .about-section {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .about-section h2 {
+            color: var(--primary-color);
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .about-section p {
+            color: var(--text-light);
+            margin-bottom: 1rem;
+        }
+
+        .about-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .about-section li {
+            padding: 0.5rem 0;
+            color: var(--text-light);
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .about-section li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        /* Full Width Section */
+        .full-width-section {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 3rem;
+        }
+
+        .full-width-section h2 {
+            color: var(--primary-color);
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .full-width-section p {
+            color: var(--text-light);
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+
+        /* Tech Stack */
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .tech-item {
+            text-align: center;
+            padding: 1.5rem;
+            background: var(--bg-color);
+            border-radius: 8px;
+            transition: transform 0.3s;
+        }
+
+        .tech-item:hover {
+            transform: translateY(-5px);
+        }
+
+        .tech-icon {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-item h3 {
+            font-size: 1.1rem;
+            color: var(--text-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .tech-item p {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--card-bg);
+            padding: 2rem;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-light);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .about-content {
+                grid-template-columns: 1fr;
+            }
+
+            .page-header h1 {
+                font-size: 2rem;
+            }
+
+            .nav-container {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .nav-links {
+                gap: 1rem;
+            }
+        }
+    </style>
 </head>
-
 <body>
-	<div class="container">
-		<header>
-			<div>
-				<strong>MySite</strong>
-				<div style="color:#475569;font-size:.9rem">A minimal starter page</div>
-			</div>
-			<nav aria-label="Main navigation">
-				<a href="/">Home</a>
-				<a href="/about">About</a>
-				<a href="/additional">Additional</a>
-			</nav>
-		</header>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="/" class="logo">WebServ</a>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/about" class="active">About</a></li>
+                <li><a href="/contacts">Contacts</a></li>
+                <li><a href="/gallery">Gallery</a></li>
+            </ul>
+        </div>
+    </nav>
 
-		<main>
-			<section class="hero" aria-labelledby="hero-title">
-				<h1 id="hero-title">About Us</h1>
-				<p>Learn more about our mission, vision, and the team behind MySite.</p>
-			</section>
+    <!-- Page Header -->
+    <section class="page-header">
+        <h1>About WebServ</h1>
+        <p>Learn more about our HTTP server implementation</p>
+    </section>
 
-			<section aria-labelledby="mission-title">
-				<h3 id="mission-title">Our Mission</h3>
-				<p>We strive to provide simple, elegant, and efficient web solutions. Our goal is to make the web
-					accessible and enjoyable for everyone.</p>
-			</section>
+    <!-- Content -->
+    <div class="container">
+        <div class="about-content">
+            <div class="about-section">
+                <h2>Our Mission</h2>
+                <p>WebServ is a custom HTTP server implementation built from the ground up in C++. Our mission is to provide a fast, reliable, and educational example of how web servers work at a fundamental level.</p>
+                <p>This project demonstrates core concepts of network programming, HTTP protocol handling, and server architecture design.</p>
+            </div>
 
-			<section aria-labelledby="team-title">
-				<h3 id="team-title">The Team</h3>
-				<p>We are a passionate group of developers, designers, and creators dedicated to building high-quality
-					software.</p>
-				<ul>
-					<li><strong>Alice:</strong> Lead Developer</li>
-					<li><strong>Bob:</strong> UI/UX Designer</li>
-					<li><strong>Charlie:</strong> Project Manager</li>
-				</ul>
-			</section>
-		</main>
+            <div class="about-section">
+                <h2>Key Features</h2>
+                <ul>
+                    <li>HTTP/1.1 protocol support</li>
+                    <li>Multiple concurrent connections</li>
+                    <li>Static file serving</li>
+                    <li>CGI script execution</li>
+                    <li>Custom configuration system</li>
+                    <li>Error page customization</li>
+                    <li>Directory listing (autoindex)</li>
+                    <li>File upload support</li>
+                    <li>Virtual hosting</li>
+                </ul>
+            </div>
+        </div>
 
-		<footer>
-			© <span id="year"></span> MySite — Built with plain HTML
-		</footer>
-	</div>
+        <div class="full-width-section">
+            <h2>Technology Stack</h2>
+            <p>WebServ is built using modern C++ practices and leverages powerful system-level programming techniques.</p>
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <div class="tech-icon">⚙️</div>
+                    <h3>C++</h3>
+                    <p>Core language for performance</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">🔌</div>
+                    <h3>Socket API</h3>
+                    <p>Network communication</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">🔄</div>
+                    <h3>Epoll/Kqueue</h3>
+                    <p>Efficient I/O multiplexing</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">📋</div>
+                    <h3>HTTP/1.1</h3>
+                    <p>Standard web protocol</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">🐍</div>
+                    <h3>CGI Support</h3>
+                    <p>Python & PHP scripts</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">📄</div>
+                    <h3>Config Parser</h3>
+                    <p>Nginx-like configuration</p>
+                </div>
+            </div>
+        </div>
 
-	<script>
-		// small script to update the year
-		document.getElementById('year').textContent = new Date().getFullYear();
-	</script>
+        <div class="about-content">
+            <div class="about-section">
+                <h2>How It Works</h2>
+                <p>WebServ uses a non-blocking I/O model with event-driven architecture. When a client connects, the server:</p>
+                <ul>
+                    <li>Accepts the connection</li>
+                    <li>Parses the HTTP request</li>
+                    <li>Routes to appropriate handler</li>
+                    <li>Processes the request</li>
+                    <li>Generates HTTP response</li>
+                    <li>Sends data back to client</li>
+                </ul>
+            </div>
+
+            <div class="about-section">
+                <h2>Project Goals</h2>
+                <p>This project serves multiple purposes:</p>
+                <ul>
+                    <li>Deep understanding of HTTP protocol</li>
+                    <li>Practice system-level programming</li>
+                    <li>Learn about network architecture</li>
+                    <li>Implement efficient I/O handling</li>
+                    <li>Build robust error handling</li>
+                    <li>Create maintainable C++ code</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 WebServ Project</p>
+    </footer>
 </body>
-
 </html>

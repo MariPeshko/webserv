@@ -25,7 +25,7 @@
 		.container {
 			max-width: 900px;
 			margin: 3rem auto;
-			padding: 1rem;
+			padding: 1.5rem;
 		}
 
 		header {
@@ -74,6 +74,10 @@
 			background: var(--card);
 			padding: 1rem;
 			border-radius: 8px;
+		}
+
+		.file-input {
+			display: none;
 		}
 
 		footer {
@@ -138,13 +142,15 @@
 	<div class="container">
 		<header>
 			<div>
-				<strong>42 WebServer</strong>
+				<strong>MySite</strong>
 				<div style="color:#475569;font-size:.9rem">A minimal starter page</div>
 			</div>
 			<nav aria-label="Main navigation">
 				<a href="/">Home</a>
-				<a href="/about">About</a>
-				<a href="/additional">Additional</a>
+				<a href="/test_cases.html">Test Cases</a>
+				<a href="/uploads/uploads.html">Uploads</a>
+				<a href="/additional/additional.html">Additional</a>
+				<a href="/form.html">Form</a>
 			</nav>
 		</header>
 
@@ -163,6 +169,7 @@
 						Choose Picture
 					</button>
 				</div>
+				<div id="selected-file" style="margin-top: 0.5rem; color: #475569; font-size: 0.9rem;"></div>
 				<br><br>
 				<button type="submit" class="btn">Upload Picture</button>
 			</form>
@@ -175,15 +182,10 @@
 			</div>
 		</section>
 
-		<section aria-labelledby="about-title">
-			<h3 id="about-title">About this template</h3>
-			<p>This file is intentionally small and dependency-free. Replace the content, add styles or scripts as
-					needed.</p>
-		</section>
 	</main>
 
 		<footer>
-			© <span id="year"></span> MySite — Built with plain HTML
+			© <span id="year"></span> WebServ Project
 		</footer>
 	</div>
 
@@ -193,8 +195,15 @@
 
         // Show selected file name
         document.getElementById('picture').addEventListener('change', function(e) {
-            const fileName = e.target.files[0] ? e.target.files[0].name : 'No file selected';
-            console.log('Selected file:', fileName);
+            const fileDisplay = document.getElementById('selected-file');
+            if (e.target.files[0]) {
+                const fileName = e.target.files[0].name;
+                fileDisplay.textContent = '📎 Selected: ' + fileName;
+                fileDisplay.style.color = '#2563eb';
+                fileDisplay.style.fontWeight = '500';
+            } else {
+                fileDisplay.textContent = '';
+            }
         });
 
 		async function loadImages() {
@@ -241,7 +250,7 @@
                 });
             } catch (err) {
                 console.error(err);
-                grid.innerHTML = '<p>Error loading images. Make sure autoindex is on for /uploaded_images/.</p>';
+                grid.innerHTML = '<p>There no images found.</p>';
             }
         }
 

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <signal.h>
 #include "server/ServerManager.hpp"
+#include "logger/Logger.hpp"
 
 static ServerManager*	g_server_manager = NULL;
 
@@ -31,10 +32,12 @@ int		main(int ac, char **argv) {
 
 	// Ignore the SIGPIPE signal globally for this process
 	signal(SIGPIPE, SIG_IGN);
-
 	signal(SIGINT, signalHandler);
 	signal(SIGTERM, signalHandler);
 	signal(SIGQUIT, signalHandler);
+
+    Logger::init("webserv.log");
+    Logger::log(LOG_INFO, "Webserv started");
 	
 	Config			config;
 	ServerManager	server_manager;
@@ -50,16 +53,16 @@ int		main(int ac, char **argv) {
 			config.parse(config_file);
 			server_manager.setupServers(config.getServerConfigs());
 			server_manager.runServers();
-		} else {
-			std::cout << "Error: wrong arguments. Usage: ./webserv [config_file]" << std::endl;
+        } else {
+			Logger::log(LOG_ERROR, "Wrong arguments. Usage: ./webserv [config_file]");
 			g_server_manager = NULL;
-			return 1;
-		}
-	} catch (const std::exception& e) {
-		std::cerr << "Error: " << e.what() << std::endl;
+            return 1;
+        }
+    } catch (const std::exception& e) {
+		Logger::log(LOG_ERROR, "Exception: " + std::string(e.what()));
 		g_server_manager = NULL;
-		return 1;
-	}
+        return 1;
+    }
     g_server_manager = NULL;
-	return 0;
+    return 0;
 }

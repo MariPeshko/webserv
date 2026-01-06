@@ -10,6 +10,7 @@
 # include <netinet/in.h>	// do we need it here?
 # include <fcntl.h>
 # include "Location.hpp"
+# include "../response/utils.hpp"
 
 #define CONF_DEBUG 0
 

@@ -18,10 +18,32 @@
 			padding: 20px;
 			background-color: white;
 			display: inline-block;
+			max-width: 800px;
+			width: 100%;
 		}
 
 		h1 {
 			color: #333;
+		}
+
+		#images-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+			gap: 10px;
+			margin-top: 20px;
+		}
+
+		#images-grid img {
+			width: 100%;
+			height: 150px;
+			object-fit: cover;
+			border-radius: 4px;
+			border: 1px solid #ddd;
+			transition: transform 0.2s;
+		}
+
+		#images-grid img:hover {
+			transform: scale(1.05);
 		}
 	</style>
 </head>
@@ -30,9 +52,51 @@
 
 	<div class="gallery-container">
 		<h1>Image Gallery</h1>
-		<p>This is a dummy page for the gallery section.</p>
-		<p>Content coming soon...</p>
+		<p>Images uploaded to /uploaded_images:</p>
+		<div id="images-grid">Loading images...</div>
 	</div>
+
+	<script>
+		async function loadImages() {
+			const grid = document.getElementById('images-grid');
+			try {
+				const response = await fetch('/uploaded_images');
+				if (!response.ok) throw new Error('Failed to load directory listing');
+				
+				const text = await response.text();
+				const parser = new DOMParser();
+				const doc = parser.parseFromString(text, 'text/html');
+				const links = doc.querySelectorAll('a');
+				
+				grid.innerHTML = ''; // Clear loading text
+				
+				let count = 0;
+				links.forEach(link => {
+					const href = link.getAttribute('href');
+					// Filter for images and avoid parent directory links
+					if (href && href.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+						const img = document.createElement('img');
+						// Handle relative paths from autoindex
+						img.src = '/uploaded_images/' + href.replace(/^\/uploaded_images\//, ''); 
+						img.alt = href;
+						img.title = href;
+						grid.appendChild(img);
+						count++;
+					}
+				});
+
+				if (count === 0) {
+					grid.innerHTML = '<p>No images found.</p>';
+				}
+
+			} catch (error) {
+				console.error(error);
+				grid.innerHTML = '<p style="color:red">Error loading images.</p>';
+			}
+		}
+
+		loadImages();
+	</script>
 
 </body>
 

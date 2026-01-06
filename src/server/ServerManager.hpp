@@ -4,6 +4,7 @@
 #include "Server.hpp"
 #include "../httpContext/Connection.hpp"
 #include "../httpContext/HttpContext.hpp"
+# include "../logger/Logger.hpp"
 #include "../response/utils.hpp"
 #include <unistd.h>	// close()
 #include <poll.h>
@@ -23,7 +24,7 @@ class	ServerManager {
 		ServerManager();
 		~ServerManager();
 
-		void	setupServers(std::vector<Server> & server_configs);
+		void	setupServers(std::vector<Server>& server_configs);
 		void	runServers();
 		void	removeClient(int fd, size_t i);
 		bool	isShutdownRequested() const;

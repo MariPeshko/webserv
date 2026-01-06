@@ -34,6 +34,11 @@ std::string &	Connection::getBuffer() {
 	return _request_buffer;
 }
 
+const sockaddr_in &Connection::getClientAddress() const
+{
+	return _client_address;
+}
+
 /**
  * Receives data from the client's socket and appends it to the internal request buffer.
  * Updates the last activity timestamp on each successful read.

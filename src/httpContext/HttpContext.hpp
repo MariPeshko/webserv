@@ -15,7 +15,7 @@
 #include <sstream>
 
 #define CTX_DEBUG 0
-#define REQ_DEBUG 0
+#define REQ_DEBUG 1
 #define REQ_DEBUG_BODY 0
 #define RESP_DEBUG 0
 #define YELLOW "\033[33m"

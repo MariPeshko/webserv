@@ -13,6 +13,7 @@ SRCS =	src/main.cpp \
 		src/response/utils.cpp \
 		src/request/Request.cpp \
 		src/cgi/CgiHandler.cpp  \
+		src/logger/Logger.cpp \
 
 # - Header files
 HEADERS	= inc/Webserv.hpp
@@ -25,6 +26,8 @@ OBJS = $(addprefix $(OBJ_DIR), $(SRCS:.cpp=.o))
 # - Compiler
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -g3
+
+LOG_FILE = webserv.log
 
 RM = rm -rf
 
@@ -45,6 +48,7 @@ $(OBJ_DIR)%.o: %.cpp $(HEADERS)
 
 clean:
 	$(RM) $(OBJ_DIR)
+	$(RM) $(LOG_FILE)
 
 fclean: clean
 	$(RM) $(NAME)

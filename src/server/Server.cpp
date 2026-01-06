@@ -1,8 +1,10 @@
 #include "Server.hpp"
+#include "../logger/Logger.hpp"
 #include <arpa/inet.h> // For inet_addr
 #include <unistd.h>	   // For close
 #include <string.h>	   // For memset
 #include <cerrno>	   // errno
+#include <sstream>	   // For stringstream
 
 // --- Server Implementation ---
 
@@ -40,7 +42,7 @@ Server::~Server() {
 int	Server::setupServer() {
 	_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (_listen_fd == -1) {
-		std::cerr << "Failed to create socket" << std::endl;
+		Logger::logErrno(LOG_ERROR, "Failed to create socket");
 		return -1;
 	}
 
@@ -48,9 +50,10 @@ int	Server::setupServer() {
 	if (lflags != -1)
 		fcntl(_listen_fd, F_SETFL, lflags | O_NONBLOCK);
 
-	int	yes = 1;
-	if (setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
-		std::cerr << "Failed to set SO_REUSEADDR: " << strerror(errno) << std::endl;
+	int yes = 1;
+	if (setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
+	{
+		Logger::logErrno(LOG_ERROR, "Failed to set SO_REUSEADDR");
 	}
 
 	struct sockaddr_in	server_address = {};
@@ -59,20 +62,20 @@ int	Server::setupServer() {
 	server_address.sin_port = htons(_port);
 	_server_address = server_address;
 
-	if (bind(_listen_fd, (struct sockaddr *)&_server_address, sizeof(_server_address)) == -1) {
-		std::cerr << "Failed to bind socket to " << _host << ":" << _port
-			<< " Error: " << strerror(errno)  << std::endl;
+	if (bind(_listen_fd, (struct sockaddr *)&_server_address, sizeof(_server_address)) == -1)
+	{
+		std::stringstream ss;
+		ss << _port;
+		Logger::logErrno(LOG_ERROR, "Failed to bind socket to " + _host + ":" + ss.str());
 		close(_listen_fd);
 		_listen_fd = -1;
 		return -1;
 	}
 	if (listen(_listen_fd, 10) == -1) {
-		std::cerr << "Failed to listen on socket: " << strerror(errno) << std::endl;
+		Logger::logErrno(LOG_ERROR, "Failed to listen on socket");
 		return -1;
 	}
-	std::cout << "Server is listening on port " << _port << std::endl;
-	std::cout << "IP(host): " << this->_host << std::endl;
-
+	Logger::log(LOG_INFO, "Server listening on " + _host + ":" + toString(_port));
 	return 0;
 }
 

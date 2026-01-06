@@ -30,8 +30,9 @@ class	Connection {
 		void	setClientAddress(const sockaddr_in& client_address);
 
 		// getters
-		int				getFd() const;
-		std::string &	getBuffer();
+		int					getFd() const;
+		std::string &		getBuffer();
+		const sockaddr_in&	getClientAddress() const;
 
 		ssize_t			receiveData();
 		
