@@ -269,7 +269,6 @@ void	Response::generateResponsePost()
 				_headers["Location"] = getRequest()->getUri() + filename;
 				_headers["Content-Type"] = "text/html";
 			}
-			// Instead of 201, send a 303 redirect back to the uploads page
 			fillResponse(303, ""); // 303 See Other, empty body
 			_headers["Location"] = redirectTo;
 			// TO DELETE _headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
@@ -426,8 +425,17 @@ Response::PathType Response::getPathType(string const path)
 }
 
 void	Response::badRequest() {
-	if (DEBUG) cout << RED << "Response. Bad request" << RESET << endl; 
-	if (getRequest()->getRequestLineFormatValid() == false) {
+	if (DEBUG) cout << RED << "Response. Bad request" << RESET << endl;
+	
+	// Check if a specific status code was set during request parsing
+	short requestStatusCode = getRequest()->getStatusCode();
+	if (requestStatusCode == 414) {
+		if (DEBUG) cout << RED << "Response. URI Too Long" << RESET << endl;
+		fillResponse(414, getErrorPageContent(414));
+	} else if (requestStatusCode == 431) {
+		if (DEBUG) cout << RED << "Response. Request Header Fields Too Large" << RESET << endl;
+		fillResponse(431, getErrorPageContent(431));
+	} else if (getRequest()->getRequestLineFormatValid() == false) {
 		fillResponse(400, getErrorPageContent(400));
 	} else if (getRequest()->getHeadersFormatValid() == false) {
 		if (DEBUG) cout << RED << "Response. Bad request. Invalid headers" << RESET << endl; 

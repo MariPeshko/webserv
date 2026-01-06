@@ -25,6 +25,9 @@
 #define RED "\033[31m"
 #define ORANGE "\033[38;5;208m"
 
+#define MAX_REQUEST_LINE_SIZE 100      // 100 bytes for request line
+#define MAX_HEADER_BLOCK_SIZE 16384     // 16KB for all headers combined
+
 /**
  * Briefly: HTTP (request) state + Request/Response
  *
@@ -90,6 +93,8 @@ class HttpContext
 		e_parse_state	_state;
 
 		bool	validateHost();
+		bool	checkRequestLineSize(const std::string &buf);
+   		bool	checkHeaderBlockSize(const std::string &buf);
 
 		// body members
 		size_t			_expectedBodyLen;

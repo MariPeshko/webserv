@@ -55,18 +55,28 @@ void	HttpContext::requestParsingStateMachine()
 	while (can_parse) {
 		switch (_state) {
 			case REQUEST_LINE: {
+				// Check buffer size limit before parsing
+                if (!checkRequestLineSize(buf)) {
+                    _state = REQUEST_ERROR;
+                    request().setStatusCode(414); // URI Too Long
+					request().ifConnNotPresent();
+					request().setVersion("HTTP/1.0");
+                    can_parse = false;
+                    break;
+                }
+
 				if (!findAndParseReqLine(buf)) {
 					if (_state == REQUEST_ERROR) {
-                        if (CTX_DEBUG) cout << RED << "ParseReqLine error" << RESET << endl;
+						if (CTX_DEBUG) cout << RED << "ParseReqLine error" << RESET << endl;
 						if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
 						if (REQ_DEBUG) cout << RESET << endl;
 						request().ifConnNotPresent();
 						can_parse = false;
-                        break;
-                    }
+						break;
+					}
 					// Otherwise, we just need more data, so we wait.
 					can_parse = false;
-                    break;
+					break;
 				} else {
 					// If successful, the state is READING_HEADERS, continue parsing.
 					if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
@@ -75,6 +85,16 @@ void	HttpContext::requestParsingStateMachine()
 				}
 			}
 			case READING_HEADERS : {
+				// Check buffer size limit before parsing headers
+                if (!checkHeaderBlockSize(buf)) {
+					cout << RED << "limit of headers" << RESET << endl;
+                    _state = REQUEST_ERROR;
+                    request().setStatusCode(431); // Request Header Fields Too Large
+					request().ifConnNotPresent();
+                    can_parse = false;
+                    break;
+                }
+
 				if (!findAndParseHeaders(buf)) {
 					request().ifConnNotPresent();
 					can_parse = false; break;
@@ -385,7 +405,10 @@ void	HttpContext::buildResponseString()
 	std::ostringstream	oss;
 
 	// 1. Status Line
-	oss << _request.getVersion() << " " << status_code << " " << reason_phrase << "\r\n";
+	string	version = _request.getVersion();
+	if (version.empty())
+		version = "HTTP/1.0";
+	oss << version << " " << status_code << " " << reason_phrase << "\r\n";
 	oss << "Connection: " << _request.getHeaderValue("connection") << "\r\n";
 
 	// 2. Headers
@@ -436,4 +459,44 @@ void			HttpContext::addBytesSent(size_t bytes) {
 
 bool			HttpContext::isResponseComplete() const {
 	return _bytesSent >= _responseBuffer.size();
+}
+
+/**
+ * Check if the buffer exceeds the request line size limit.
+ * If \r\n is found, check only the request line portion.
+ * If \r\n is not found yet, check the entire buffer (waiting for complete line).
+ */
+bool	HttpContext::checkRequestLineSize(const std::string &buf)
+{
+	size_t	pos = buf.find("\r\n");
+	size_t	sizeToCheck;
+	
+	if (pos != string::npos) {
+		// We have a complete request line, check only its size
+		sizeToCheck = pos;
+	} else {
+		// Still waiting for \r\n, check the entire buffer
+		sizeToCheck = buf.size();
+	}
+	
+	if (sizeToCheck > MAX_REQUEST_LINE_SIZE) {
+		if (CTX_DEBUG) cerr << RED << "Request line exceeds maximum size: " 
+			<< sizeToCheck << " > " << MAX_REQUEST_LINE_SIZE << RESET << endl;
+		return false;
+	}
+	return true;
+}
+
+/**
+ * Check if the buffer exceeds the header block size limit.
+ * This checks from the start of headers up to current buffer size.
+ */
+bool	HttpContext::checkHeaderBlockSize(const std::string &buf)
+{
+    if (buf.size() > MAX_HEADER_BLOCK_SIZE) {
+        if (CTX_DEBUG) cerr << RED << "Header block exceeds maximum size: " 
+            << buf.size() << " > " << MAX_HEADER_BLOCK_SIZE << RESET << endl;
+        return false;
+    }
+    return true;
 }

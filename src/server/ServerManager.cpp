@@ -195,7 +195,7 @@ void	ServerManager::handleClientData(size_t i) {
 		ctx.buildResponseString();
 		_pfds[i].events |= POLLOUT;
 		Logger::logRequest(
-			toString(ntohl(ctx.connection().getClientAddress().sin_addr.s_addr)),
+			ipv4_to_string(ntohl(ctx.connection().getClientAddress().sin_addr.s_addr)),
 			ctx.request().getMethod(),
 			ctx.request().getUri(),
 			ctx.response().getStatusCode(),

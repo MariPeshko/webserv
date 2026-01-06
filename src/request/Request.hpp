@@ -36,6 +36,7 @@ class	Request {
 		void	ifConnNotPresent();
 		void	setBody(const std::string &body);
 		void	setChunked(bool value);
+		void	setStatusCode(short code);
 
 		// getters
 		bool				getRequestLineFormatValid() const;
@@ -52,6 +53,7 @@ class	Request {
 		std::map<std::string, std::string>	getHeaders() const;
 		const std::string &	getHeaderValue(const std::string header_name) const;
 		const std::string &	getHost() const;
+		short				getStatusCode() const;
 
 	private:
 		bool						_validFormatReqLine;
@@ -63,6 +65,7 @@ class	Request {
 		std::string					_body;
 		bool						_bodyChunked;
 		std::string					_host;
+		short						_statusCode;
 };
 
 #endif

@@ -4,7 +4,8 @@ Request::Request() :
 	_validFormatReqLine(false),
 	_validFormatHeaders(false),
 	_method(INVALID),
-	_bodyChunked(false)
+	_bodyChunked(false),
+	_statusCode(0)
 { }
 
 Request::~Request() { }
@@ -90,6 +91,10 @@ void	Request::setChunked(bool value) {
 	_bodyChunked = value;
 }
 
+void	Request::setStatusCode(short code) {
+	_statusCode = code;
+}
+
 std::string&		Request::getUri() {
 	return _uri;
 }
@@ -149,4 +154,8 @@ const std::string&	Request::getBody() const {
 
 const std::string& Request::getHost() const {
 	return _host;
+}
+
+short Request::getStatusCode() const {
+	return _statusCode;
 }
