@@ -4,6 +4,7 @@
 #include "Server.hpp"
 #include "../httpContext/Connection.hpp"
 #include "../httpContext/HttpContext.hpp"
+#include "../response/utils.hpp"
 #include <unistd.h>	// close()
 #include <poll.h>
 #include <vector>

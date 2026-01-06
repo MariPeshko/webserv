@@ -18,10 +18,12 @@ bool		isDirectory(const std::string& path);
 template <typename T>
 std::string	toString(const T val)
 {
-    std::stringstream	stream;
+	std::stringstream	stream;
 	
-    stream << val;
-    return stream.str();
+	stream << val;
+	return stream.str();
 }
+
+std::string	ipv4_to_string(uint32_t ip);
 
 #endif

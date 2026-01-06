@@ -11,7 +11,7 @@
 # include <cstring>
 # include <iostream>
 
-# define CGI_DEBUG 1
+# define CGI_DEBUG 0
 
 class CgiHandler {
 	public:

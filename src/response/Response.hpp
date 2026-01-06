@@ -34,12 +34,14 @@ class	Response
 		void			bindRequest(const Request &req);
 		void			badRequest();
 		void			generateResponse();
-		void			postAndGenerateResponse();
-		void			deleteAndGenerateResponse();
+		void			generateResponseGet();
+		void			generateResponsePost();
+		void			generateResponseDelete();
 		
 		void			fillResponse(short statusCode, const std::string &bodyContent);
 		std::string		getErrorPageContent(int code);
 
+		const Request*		getRequest();
 		short				getStatusCode() const;
 		size_t				getContentLength() const;
 		const std::string&	getResponseBody() const;
@@ -71,14 +73,21 @@ class	Response
 		std::string			_responseBody;
 		std::string			_resourcePath;
 		std::map<std::string, std::string>	_headers;
+		std::string			_path;
+		const Location*		_loc;
 
+		// main responces methods
 		const Location*		validateRequestAndGetLocation();
+		std::string			constructPath(const Location* loc);
+		bool				tryServeCgi();
+		bool				applyCgiOutput(const std::string &output);
+
+		// helpers
 		const Location*		matchPathToLocation();
 		std::string			getIndexFromLocation();
 		PathType			getPathType(std::string const path);
 		static std::string	getMimeType(const std::string &filePath);
-		bool				tryServeCgi(const Location* loc, const std::string& path);
-		bool				applyCgiOutput(const std::string &output);
+		std::string			buildCreatedResponse(const std::string& uri, const std::string&filename);
 
 };
 

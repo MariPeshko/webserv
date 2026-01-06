@@ -13,17 +13,19 @@ Response::Response(Server &server)
 	  _request(0),
 	  _statusCode(200),
 	  _reasonPhrase(generateStatusMessage(200)),
-	  _contentLength(0)
+	  _contentLength(0),
+	  _loc(0)
 { }
 
-Response &Response::operator=(const Response &other)
-{
+Response &Response::operator=(const Response &other) {
 	if (this != &other)	{
 		_server_config = other._server_config;
 		_request = other._request;
 		_statusCode = other.getStatusCode();
 		_reasonPhrase = other._reasonPhrase;
 		_contentLength = other.getContentLength();
+		_path = other._path;
+		_loc = other._loc;
 	}
 	return *this;
 }
@@ -31,9 +33,7 @@ Response &Response::operator=(const Response &other)
 Response::~Response() {}
 
 // call after parsing
-void	Response::bindRequest(const Request &req) {
-	_request = &req;
-}
+void	Response::bindRequest(const Request &req) {	_request = &req; }
 
 void	Response::fillResponse(short statusCode, const string &bodyContent)
 {
@@ -43,134 +43,181 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 	_contentLength = _responseBody.size();
 }
 
-// Method DELETE and generation of the response
-// set status code success 204 (No Content).
-void	Response::deleteAndGenerateResponse()
-{
-	const Location*	loc = validateRequestAndGetLocation();
-	if (!loc) {
+/**
+ * @brief Main entry point for generating HTTP responses.
+ * 
+ * Validates the request, constructs the file system path, and dispatches
+ * to the appropriate method handler (GET, POST, DELETE) based on the HTTP method.
+ * Returns early if validation or path construction fails (response already set).
+ */
+void	Response::generateResponse() {
+	if (!getRequest()) return;
+
+	_loc = validateRequestAndGetLocation();
+	if (!_loc) {
 		return; // Response is already filled by the validation function
 	}
-	
-	// Construct Path
-	if (D_POST) cout << ORANGE << "Constructing Path..." << RESET << endl;
-	string	root;
-	if (loc->getRoot().empty())
-		root = _server_config.getRoot();
-	else
-		root = loc->getRoot();
-	if (D_POST) cout << YELLOW << "Using root: " << root << RESET << endl;
-	string	uri = _request->getUri();
-	// **FIX for CGI: Strip query string from URI before constructing path**
-	size_t	queryPos = uri.find('?');
-	if (queryPos != string::npos) {
-		uri = uri.substr(0, queryPos);  // Remove everything after '?'
-	}
-	if (D_POST) cout << YELLOW << "Using URI: " << uri << RESET << endl;
 
-	string	path;
-	path = root + uri;
-	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
+	_path = constructPath(_loc);
+	if (_path.empty())
+		return;
 	
-	// Check if the file/resource exists
-	PathType pathType = getPathType(path);
+	if (getRequest()->getEnumMethod() == Request::GET) {
+		generateResponseGet();
+	} else if (getRequest()->getEnumMethod() == Request::POST) {
+		generateResponsePost();
+	} else if (getRequest()->getEnumMethod() == Request::DELETE) {
+		generateResponseDelete();
+	} else if (getRequest()->getEnumMethod() == Request::INVALID) {
+		fillResponse(400, getErrorPageContent(400));
+	} else {
+		fillResponse(400, getErrorPageContent(400));
+	}
+}
+
+/**
+ * @brief Generates HTTP response for GET requests.
+ * 
+ * Handles three types of resources:
+ * - **Files**: Reads and serves with correct MIME type
+ * - **Directories**: Serves index file if present, generates autoindex if enabled,
+ *   otherwise returns 403 Forbidden
+ * - **CGI scripts**: Executes script and returns dynamic output
+ * 
+ * Returns 404 if the path doesn't exist on disk.
+ */
+void	Response::generateResponseGet()
+{
+	PathType	pathType = getPathType(_path);
 	if (pathType == NOT_EXIST) {
-		if (D_POST) cout << RED << "Resource not found: " << path << RESET << endl;
+		if (DEBUG) cout << RED << "Path not found: " << _path << RESET << endl;
 		fillResponse(404, getErrorPageContent(404));
 		return;
 	}
-	// Don't allow deleting directories (optional, depends on your requirements)
 	if (pathType == DIRECTORY_PATH) {
-		if (D_POST) cout << RED << "Cannot delete directory: " << path << RESET << endl;
-		fillResponse(403, getErrorPageContent(403)); // Forbidden
+		if (DEBUG) cout << BLUE << "Path is a directory.1" << RESET << endl;
+		if (_path[_path.length() - 1] != '/')
+			_path += "/";
+		// if autoindex true
+		bool	isIndexPresent = _loc->getIndex().empty() ? false : true;
+		bool	isAutoindexPresent = _loc->getAutoindex() ? true : false;
+		// Check for index file
+		string	indexFile = isIndexPresent ? _loc->getIndex() : "";
+		// string targetPath = path + indexFile;
+		string	targetPath = indexFile.empty() ? isAutoindexPresent ? _path : "" : _path + indexFile;
+
+		if (DEBUG) cout << BLUE << "Checking targetPath file1: " << targetPath << RESET << endl;
+		if (DEBUG) cout << YELLOW << "Index to use: " << indexFile << RESET << endl;
+
+		if (getPathType(targetPath) == FILE_PATH) {
+			_path = targetPath; // Index exists, serve this file
+			if (DEBUG) cout << GREEN << "Index file exists: " << _path << RESET << endl;
+		} else {
+			if (DEBUG) cout << BLUE << "Index file not found." << RESET << endl;
+			if (_loc->getAutoindex()) {
+				if (DEBUG) cout << BLUE << "Autoindex is ON. Generating listing for: " << _path << RESET << endl;
+				string	body;
+				size_t	bodyLen = 0;
+				if (buildHtmlIndexTable(_path, body, bodyLen) == 0) {
+					if (DEBUG) cout << "buildHtmlIndexTable(). " << "path: " << _path << endl;
+					_headers["Content-Type"] = "text/html";
+					fillResponse(200, body);
+					return;
+				}
+				if (DEBUG) cout << RED << "Autoindex generation failed." << RESET << endl;
+				fillResponse(500, getErrorPageContent(500));
+				return;
+			} else {
+				if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off2)" << RESET << endl;
+				fillResponse(403, getErrorPageContent(403));
+				return;
+			}
+		}
+	}
+	if (tryServeCgi())
+		return;
+
+	if (DEBUG) cout << BLUE << "Serving file: " << _path << RESET << endl;
+	std::ifstream	file(_path.c_str());
+	if (!file.is_open()) {
+		if (DEBUG) cout << RED << "File not found: " << _path << RESET << endl;
+		fillResponse(404, getErrorPageContent(404));
 		return;
 	}
-	// Attempt to delete the file
-	if (std::remove(path.c_str()) != 0) { // Deletion failed (permission denied, etc.)
-		if (D_POST) cout << RED << "Failed to delete file: " << path << RESET << endl;
-		fillResponse(403, getErrorPageContent(403)); // Forbidden
-		return;
-	}
-	if (D_POST) cout << GREEN << "File deleted successfully: " << path << RESET << endl;
-	// Success: 204 No Content
-	fillResponse(204, "");
+
+	string	contentType = getMimeType(_path);
+	_headers["Content-Type"] = contentType;
+
+	std::ostringstream	ss;
+	ss << file.rdbuf();
+	_responseBody = ss.str();
+	_contentLength = _responseBody.size();
+	file.close();
 }
 
-// Method POST and generation of the response
-// To Do refactor code that ised in generateResponse():
-// 1. matchPrefixPathToLocation()(); 2. allowed = loc->getAllowedMethods();
-// 3. if (!allowed.empty()) 4. Check for redirection if (loc->getReturnCode() != 0)
-void	Response::postAndGenerateResponse()
-{
-	const Location*	loc = validateRequestAndGetLocation();
-	if (!loc) {
-		return; // Response is already filled by the validation function
-	}
+string	Response::buildCreatedResponse(const string& uri, const string &filename) {
+	string	body;
 
-	// Construct Path
-	if (D_POST) cout << ORANGE << "Constructing Path..." << RESET << endl;
-	string	root;
-	if (loc->getRoot().empty())
-		root = _server_config.getRoot();
-	else
-		root = loc->getRoot();
-	if (D_POST) cout << YELLOW << "Using root: " << root << RESET << endl;
-	string	uri = _request->getUri();
+	body = "<html><body>"
+		   "<h1>201 Created</h1>"
+		   "<p>Resource created at <a href=\"" + uri + "\">"
+		   + uri + "</a></p>";
+	if (!filename.empty())
+		body = body + "<p>File uploaded successfully: " + filename;
+	body = body + "</body></html>";
+	return body;
+}
 
-	// **FIX for CGI: Strip query string from URI before constructing path**
-	size_t	queryPos = uri.find('?');
-	if (queryPos != string::npos) {
-		uri = uri.substr(0, queryPos);  // Remove everything after '?'
-	}
-
-	if (D_POST) cout << YELLOW << "Using URI: " << uri << RESET << endl;
-
-	string	path;
-	path = root + uri;
-	if (D_POST) cout << GREEN << "Resolved path: " << path << RESET << endl;
-	
-	// Check for CGI
-	if (tryServeCgi(loc, path))
+/**
+ * @brief Generates HTTP response for POST requests - handles file uploads and form submissions.
+ * 
+ * Logic flow:
+ * 1. Tries CGI execution first (for form processing scripts)
+ * 2. Validates parent directory exists → 409 if missing
+ * 3. Handles three content types:
+ *    - text/plain or image/: Direct file write → 201 Created
+ *    - multipart/form-data: Parse, extract file, write → 303 redirect to referer
+ *    - application/x-www-form-urlencoded: → 501 Not Implemented
+ * 4. Returns 415 for unsupported content types
+ */
+void	Response::generateResponsePost()
+{	
+	if (tryServeCgi())
 		return;
 
-	// For POST, we don't check if the file exists, but if the upload path (directory) is valid.
-	// Handle Directory
-	size_t	path_separator = path.find_last_of('/');
+	size_t	path_separator = _path.find_last_of('/');
 	if (path_separator != string::npos) {
-		string	dirPath = path.substr(0, path_separator);
+		string	dirPath = _path.substr(0, path_separator);
 		if (!isDirectory(dirPath)) {
-			// The directory doesn't exist. Return a 409 Conflict error.
 			if (D_POST) cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
 			fillResponse(409, getErrorPageContent(409));
 			return;
 		}
 	}
-	// 1. Check the type of content
-	const string&	contentType = _request->getHeaderValue("content-type");
-	// --- Simple File Upload Logic ---
-	// This handles plain text, images, pdfs, etc. - anything to be saved as a file.
-	if (contentType.find("text/plain") != string::npos || contentType.find("image/") != string::npos)
-	{
-		// 3. Write the raw request body to the file
-		std::ofstream	file(path.c_str(), std::ios::binary);
+
+	const string&	contentType = getRequest()->getHeaderValue("content-type");
+	if (contentType.empty()) {
+		fillResponse(400, getErrorPageContent(400));
+		return;
+	}
+	
+	// --- Simple File Upload Logic --- plain text
+	if (contentType.find("text/plain") != string::npos)	{
+		// Write the raw request body to the file
+		std::ofstream	file(_path.c_str(), std::ios::binary);
 		if (!file.is_open()) {
-			if (D_POST) cout << RED << "POST. Could not open file for writing: " << path << RESET << endl;
-			// Handle error (permission denied, etc.)
+			if (D_POST) cout << RED << "Could not open file for writing: " << _path << RESET << endl;
 			fillResponse(500, getErrorPageContent(500));
 			return;
 		}
-		file << _request->getBody();
+		file << getRequest()->getBody();
 		file.close();
 
-		if (D_POST) cout << GREEN << "POST. File created at: " << path << RESET << endl;
+		if (D_POST) cout << GREEN << "File created at: " << _path << RESET << endl;
 
-		// 4. Send a "Created" response
-		fillResponse(201,
-			"<html><body><h1>201 Created</h1><p>Resource created at <a href=\"" + _request->getUri() + "\">" + _request->getUri() + "</a></p></body></html>");
-		// Set the 'Location' header to the URI of the new file
-		// it's good practice to include a Location header that points
-		// to the newly created resource.
-		_headers["Location"] = _request->getUri();
+		// Send a "Created" response
+		fillResponse(201, buildCreatedResponse(getRequest()->getUri(), ""));
+		_headers["Location"] = getRequest()->getUri();
 		_headers["Content-Type"] = "text/html";
 		return;
 	}
@@ -179,18 +226,17 @@ void	Response::postAndGenerateResponse()
 		// Parse multipart data to extract the file
 		string	filename, fileData;
 
-		string	boundary = HttpParser::extractBoundary(_request->getHeaderValue("content-type"));
-		if (HttpParser::parseMultipartData(_request->getBody(), boundary, filename, fileData))
+		string	boundary = HttpParser::extractBoundary(getRequest()->getHeaderValue("content-type"));
+		if (HttpParser::parseMultipartData(getRequest()->getBody(), boundary, filename, fileData))
 		{
 			if (!HttpParser::isExtensionAllowed(filename)) {
 				fillResponse(415, getErrorPageContent(415));
 				return;
 			}
-			// Construct file path with the original filename
-			string	uploadPath = path;
+			string	uploadPath = _path;
 			uploadPath += filename;
-
 			if (D_POST) cout << ORANGE << "uploadPath: " << uploadPath << RESET << endl;
+
 			// Write the file data
 			std::ofstream	file(uploadPath.c_str(), std::ios::binary);
 			if (!file.is_open()) {
@@ -200,28 +246,26 @@ void	Response::postAndGenerateResponse()
 			}
 			file << fileData;
 			file.close();
+			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern: ";
+			if (D_POST) cout << uploadPath << RESET << endl;
 
-			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern: " << uploadPath << RESET << endl;
-
-			// go back to the form page (the Referer)
+			// Go back to the form page (the Referer)
 			string	redirectTo;
-			string	referer = _request->getHeaderValue("referer");
+			string	referer = getRequest()->getHeaderValue("referer");
 			if (!referer.empty()) { 		// extract of path from "http://host/path?..."
 				size_t	pos = referer.find("://");
-				if (pos != string::npos) {
+				if (pos != string::npos)
 					pos = referer.find('/', pos + 3);
-				} else {
+				else
 					pos = referer.find('/');
-				}
 				if (pos != string::npos) {
 					redirectTo = referer.substr(pos);
 					if (D_POST) cout << GREEN << "Redirect to the Referer: " << redirectTo << RESET << endl;
 				}
 			}
 			if (redirectTo.empty()) {
-				fillResponse(201, "<html><body><h1>201 Created</h1><p>File uploaded successfully: " +
-					filename + "</p></body></html>");
-			_headers["Location"] = _request->getUri() + filename;
+				fillResponse(201, buildCreatedResponse(getRequest()->getUri(), filename));
+				_headers["Location"] = getRequest()->getUri() + filename;
 				_headers["Content-Type"] = "text/html";
 			}
 			// Instead of 201, send a 303 redirect back to the uploads page
@@ -235,14 +279,42 @@ void	Response::postAndGenerateResponse()
 		}
 	} else if (contentType.find("application/x-www-form-urlencoded") != string::npos) {
 		// --- Form Data Logic ---
-		// TODO: Parse the request body to get key-value pairs.
 		// For example, parse "name=Maryna&city=Kyiv"
 		fillResponse(501, getErrorPageContent(501)); // Not Implemented yet
 	} else {
 		// --- Unsupported Type Logic ---
-		// The server doesn't know how to handle this content type.
 		fillResponse(415, getErrorPageContent(415));
 	}
+}
+
+// Method DELETE and generation of the response
+// set status code success 204 (No Content).
+void	Response::generateResponseDelete()
+{
+	// DELETE logic
+	// Check if the file/resource exists
+	PathType pathType = getPathType(_path);
+	if (pathType == NOT_EXIST) {
+		if (D_POST) cout << RED << "Resource not found: " << _path << RESET << endl;
+		fillResponse(404, getErrorPageContent(404));
+		return;
+	}
+	// Don't allow deleting directories (optional, depends on your requirements)
+	if (pathType == DIRECTORY_PATH) {
+		if (D_POST) cout << RED << "Cannot delete directory: " << _path << RESET << endl;
+		fillResponse(403, getErrorPageContent(403)); // Forbidden
+		return;
+	}
+
+	// Attempt to delete the file
+	if (std::remove(_path.c_str()) != 0) { // Deletion failed (permission denied, etc.)
+		if (D_POST) cout << RED << "Failed to delete file: " << _path << RESET << endl;
+		fillResponse(403, getErrorPageContent(403)); // Forbidden
+		return;
+	}
+	if (D_POST) cout << GREEN << "File deleted successfully: " << _path << RESET << endl;
+	// Success: 204 No Content
+	fillResponse(204, "");
 }
 
 // Debugging purpose for matchPathToLocation()
@@ -267,18 +339,18 @@ static void	printCurrentLocation(const Location *loc) {
  */
 const Location*	Response::matchPathToLocation()
 {
-	if (!_request) return NULL;
+	if (!getRequest()) return NULL;
 
 	const std::vector<Location>&	locations = _server_config.getLocations();
 	const Location*					bestMatch = NULL;
 	size_t							bestMatchLen = 0;
 
-	if (DEBUG_PATH) cout << GREEN << "Matching URI: [" << _request->getUri() << "] against ";
+	if (DEBUG_PATH) cout << GREEN << "Matching URI: [" << getRequest()->getUri() << "] against ";
 	if (DEBUG_PATH) cout << locations.size() << " locations." << RESET << endl;
 
 	for (size_t i = 0; i < locations.size(); ++i) {
 		const string&	locPath = locations[i].getPath();
-		const string&	uri = _request->getUri();
+		const string&	uri = getRequest()->getUri();
 		const string	html_ext = ".html";
 		
 		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
@@ -322,11 +394,11 @@ string	Response::getIndexFromLocation()
 	{
 		if (DEBUG) {
 			cout << "Checking location for index: " << it->getPath() << endl;
-			cout << ORANGE << "Request URI: " << _request->getUri() << RESET << endl;
+			cout << ORANGE << "Request URI: " << getRequest()->getUri() << RESET << endl;
 			cout << ORANGE << "Location Path: " << it->getPath() << RESET << endl;
 			cout << ORANGE << "Location Index: " << it->getIndex() << RESET << endl;
 		}
-		if (_request->getUri() == it->getPath()) {
+		if (getRequest()->getUri() == it->getPath()) {
 			return "/" + it->getIndex();
 		}
 	}
@@ -354,123 +426,14 @@ Response::PathType Response::getPathType(string const path)
 
 void	Response::badRequest() {
 	if (DEBUG) cout << RED << "Response. Bad request" << RESET << endl; 
-	if (_request->getRequestLineFormatValid() == false) {
+	if (getRequest()->getRequestLineFormatValid() == false) {
 		fillResponse(400, getErrorPageContent(400));
-	} else if (_request->getHeadersFormatValid() == false) {
+	} else if (getRequest()->getHeadersFormatValid() == false) {
 		if (DEBUG) cout << RED << "Response. Bad request. Invalid headers" << RESET << endl; 
 		fillResponse(400, getErrorPageContent(400));
 	} else {
 		fillResponse(400, getErrorPageContent(400));
 	}
-}
-
-void	Response::generateResponse()
-{
-	if (!_request) return;
-	fillResponse(200, "");
-
-	const Location*	loc = validateRequestAndGetLocation();
-	if (!loc) {
-		return; // Response is already filled by the validation function
-	}
-
-	// Construct Path
-	string			root;
-	const string&	locationRoot = loc->getRoot();
-	if (!locationRoot.empty())
-		root = loc->getRoot();				// Use location-specific root
-	else 
-		root = _server_config.getRoot();	// Fall back to server root
-	// Safety. Fallback if root is empty: use current directory.
-	if (root.empty()) root = "."; // the current working directory
-	
-	string			uri = _request->getUri();
-
-	// **FIX for CGI: Strip query string from URI before constructing path**
-	size_t	queryPos = uri.find('?');
-	if (queryPos != string::npos) {
-		uri = uri.substr(0, queryPos);  // Remove everything after '?'
-	}
-
-	string			path = root + uri;
-	
-	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
-	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
-	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
-
-	// Check if path exists
-	PathType	pathType = getPathType(path);
-	// CRITICAL: If location exists in config but path doesn't exist on disk → 404
-	if (pathType == NOT_EXIST) {
-		if (DEBUG) cout << RED << "Path not found: " << path << RESET << endl;
-		fillResponse(404, getErrorPageContent(404));
-		return;
-	}
-	// Handle Directory
-	if (pathType == DIRECTORY_PATH) {
-		if (DEBUG) cout << BLUE << "Path is a directory.1" << RESET << endl;
-		if (path[path.length() - 1] != '/')
-			path += "/";
-		// if autoindex true
-		//
-		bool	isIndexPresent = loc->getIndex().empty() ? false : true;
-		bool	isAutoindexPresent = loc->getAutoindex() ? true : false;
-		// Check for index file
-		string	indexFile = isIndexPresent ? loc->getIndex() : "";
-		// string targetPath = path + indexFile;
-		string	targetPath = indexFile.empty() ? isAutoindexPresent ? path : "" : path + indexFile;
-
-		if (DEBUG) cout << BLUE << "Checking targetPath file1: " << targetPath << RESET << endl;
-		if (DEBUG) cout << YELLOW << "Index to use: " << indexFile << RESET << endl;
-
-		if (getPathType(targetPath) == FILE_PATH) {
-			path = targetPath; // Index exists, serve this file
-			if (DEBUG) cout << GREEN << "Index file exists1: " << path << RESET << endl;
-		} else {
-			if (DEBUG) cout << BLUE << "Index file not found." << RESET << endl;
-			// No index file found. Check Autoindex.
-			if (loc->getAutoindex()) {
-				if (DEBUG) cout << BLUE << "Autoindex is ON. Generating listing for: " << path << RESET << endl;
-				string	body;
-				size_t	bodyLen = 0;
-				if (buildHtmlIndexTable(path, body, bodyLen) == 0) {
-					if (DEBUG) cout << "buildHtmlIndexTable(). " << "path: " << path << endl;
-					_headers["Content-Type"] = "text/html";
-					fillResponse(200, body);
-					return;
-				}
-				if (DEBUG) cout << RED << "Autoindex generation failed." << RESET << endl;
-				fillResponse(500, getErrorPageContent(500));
-				return;
-			} else {
-				// Directory, no index, no autoindex -> Forbidden
-				if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off2)" << RESET << endl;
-				fillResponse(403, getErrorPageContent(403));
-				return;
-			}
-		}
-	}
-	// Check for CGI
-	if (tryServeCgi(loc, path))
-		return;
-
-	// 3. Serve File
-	if (DEBUG) cout << BLUE << "Serving file: " << path << RESET << endl;
-	std::ifstream	file(path.c_str());
-	if (!file.is_open()) {
-		if (DEBUG) cout << RED << "File not found: " << path << RESET << endl;
-		fillResponse(404, getErrorPageContent(404));
-		return;
-	}
-
-	string	contentType = getMimeType(path);
-	_headers["Content-Type"] = contentType;
-
-	std::ostringstream	ss;
-	ss << file.rdbuf();
-	_responseBody = ss.str();
-	_contentLength = _responseBody.size();
-	file.close();
 }
 
 /**
@@ -491,7 +454,7 @@ void	Response::generateResponse()
 const Location*	Response::validateRequestAndGetLocation() {
 	const Location*	loc = matchPathToLocation();
 	if (!loc) {
-		if (DEBUG) cout << RED << "Resource not found: " << _request->getUri() << RESET << endl;
+		if (DEBUG) cout << RED << "Resource not found: " << getRequest()->getUri() << RESET << endl;
 		fillResponse(404, getErrorPageContent(404));
 		return NULL;
 	}
@@ -500,13 +463,13 @@ const Location*	Response::validateRequestAndGetLocation() {
 	if (!allowed.empty()) {
 		bool	methodAllowed = false;
 		for (size_t i = 0; i < allowed.size(); ++i) {
-			if (allowed[i] == _request->getMethod()) {
+			if (allowed[i] == getRequest()->getMethod()) {
 				methodAllowed = true;
 				break;
 			}
 		}
 		if (!methodAllowed) {
-			if (DEBUG) cout << RED << "Method " << _request->getMethod() << " not allowed for this location." << RESET << endl;
+			if (DEBUG) cout << RED << "Method " << getRequest()->getMethod() << " not allowed for this location." << RESET << endl;
 			fillResponse(405, getErrorPageContent(405));
 			return NULL;
 		}
@@ -522,6 +485,50 @@ const Location*	Response::validateRequestAndGetLocation() {
 	}
 	return loc;
 }
+
+/**
+ * @brief Constructs the file system path from location config and request URI.
+ * 
+ * Determines the root directory (location-specific or server-wide),
+ * strips query strings from the URI, and combines them into a full path.
+ * Returns a 500 error if no root is configured.
+ * 
+ * @param loc Pointer to the matched Location
+ * @param uri Reference to store the cleaned URI (query string removed)
+ * @return The constructed file system path, or empty string on error
+ */
+string		Response::constructPath(const Location* loc) {
+	if (DEBUG) cout << ORANGE << "Constructing Path..." << RESET << endl;
+	// Determine root
+	string			root;
+	const string&	locationRoot = loc->getRoot();
+	if (!locationRoot.empty())
+		root = loc->getRoot();
+	else 
+		root = _server_config.getRoot();
+	// Safety check: root must be configured
+	if (root.empty()) {
+		if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
+		fillResponse(500, getErrorPageContent(500));
+		return "";
+	}
+	// Strip query string from URI
+	string		uri = getRequest()->getUri();
+	size_t		queryPos = uri.find('?');
+	if (queryPos != string::npos) {
+		uri = uri.substr(0, queryPos);
+	}
+	string	path = root + uri;
+	
+	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
+	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
+	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
+	
+	return path;
+}
+
+
+const Request*	Response::getRequest() { return _request; }
 
 short			Response::getStatusCode() const { return _statusCode; }
 
@@ -549,6 +556,8 @@ void			Response::reset()
 	_request = 0;
 	fillResponse(200, "");
 	_headers.clear();
+	_path.clear();
+	_loc = 0;
 }
 
 string			Response::getErrorPageContent(int code)
@@ -614,24 +623,24 @@ string			Response::getMimeType(const string &filePath)
  * - Look up the interpreter for this extension
  * - Calls CgiHandler constructor
  */
-bool		Response::tryServeCgi(const Location* loc, const std::string& path)
+bool		Response::tryServeCgi()
 {
-	const std::map<string, string>&	cgiMap = loc->getCgi();
+	const std::map<string, string>&	cgiMap = _loc->getCgi();
 	if (cgiMap.empty())
 		return false;
-	size_t	dotPos = path.find_last_of('.');
+	size_t	dotPos = _path.find_last_of('.');
 	if (dotPos == string::npos)
 		return false;
-	string	ext = path.substr(dotPos + 1);
+	string	ext = _path.substr(dotPos + 1);
 
 	std::map<string, string>::const_iterator	it = cgiMap.find(ext);
 	if (it == cgiMap.end())
 		return false;
-	if (getPathType(path) != FILE_PATH)
+	if (getPathType(_path) != FILE_PATH)
 		return false;
-	if (DEBUG) cout << GREEN << "Executing CGI: " << path << RESET << endl;
+	if (DEBUG) cout << GREEN << "Executing CGI: " << _path << RESET << endl;
 	try {
-		CgiHandler	cgi(*_request, path, it->second);
+		CgiHandler	cgi(*_request, _path, it->second);
 		string		output = cgi.executeCgi();
 		if (!applyCgiOutput(output)) {
 			fillResponse(502, getErrorPageContent(502)); // 502 Bad Gateway

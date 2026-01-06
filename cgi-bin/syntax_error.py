@@ -1,4 +1,4 @@
 #!/usr/bin/env python3
-print("Content-Type: text/html\r\n\r\n")
-print("This script has a syntax error")
+prnt("Content-Type: text/html\r\n\r\n")
+pnt("This script has a syntax error")
 
