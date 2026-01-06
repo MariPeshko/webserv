@@ -585,7 +585,9 @@ string			Response::getErrorPageContent(int code)
 			return ss.str();
 		}
 	}
-	return "";
+
+	int defaultError = 500;
+	return getErrorPageContent(defaultError);
 }
 
 string			Response::getMimeType(const string &filePath)
@@ -705,6 +707,10 @@ bool		Response::applyCgiOutput(const std::string &output) {
 				_headers[key] = value;
 			}
 		}
+	}
+	if (statusCode >= 400) {
+		fillResponse(statusCode, getErrorPageContent(statusCode));
+		return true;
 	}
 	fillResponse(statusCode, body);
 	return true;

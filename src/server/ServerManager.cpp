@@ -318,14 +318,11 @@ void	ServerManager::cleanup() {
 	cout << "Closing all connections..." << endl;
 	for (size_t i = 0; i < _pfds.size(); ++i) {
 		if (close(_pfds[i].fd) == -1) {
-			// TO DO to logger
-			std::cerr << RED << "Error closing fd " << _pfds[i].fd << ": ";
-			std::cerr << strerror(errno) << endl;
+			Logger::logErrno(LOG_ERROR, "Error closing fd " + toString(_pfds[i].fd));
 		}
 	}
-	// TO DO to logger
-	cout << "Cleared " << _pfds.size() << " pfds and " << _contexts.size();
-	cout << " contexts" << endl;
+	string message = "Cleared " + toString(_pfds.size()) + " pfds and " + toString(_contexts.size()) + " contexts";
+	Logger::log(LOG_INFO, message);
 	_pfds.clear();
 	_contexts.clear();
 }
@@ -355,10 +352,9 @@ void	ServerManager::checkTimeouts() {
 			map<int, HttpContext>::iterator it = _contexts.find(fd);
 			if (it != _contexts.end()) {
 				 if (it->second.connection().hasTimedOut(timeout)) {
-					//TO DO - add it to logger
-					 cout << "Connection timed out on socket " << fd << endl;
-					 removeClient(fd, i);
-					 continue; 
+					Logger::log(LOG_INFO, "Connection timed out on socket " + toString(fd));
+					removeClient(fd, i);
+					continue; 
 				 }
 			}
 		}

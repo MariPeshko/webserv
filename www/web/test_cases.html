@@ -154,7 +154,6 @@
 			<h1>Server Behavior Test Cases</h1>
 
 			<div class="grid">
-				<!-- Basic Navigation -->
 				<div class="card">
 					<span class="tag success">200 OK</span>
 					<h3>Standard Page</h3>
@@ -162,15 +161,13 @@
 					<a href="/about.html" class="btn">Visit /about.html</a>
 				</div>
 
-				<!-- Directory Handling -->
 				<div class="card">
 					<span class="tag success">200 OK</span>
 					<h3>Directory with Index</h3>
-					<p>Requesting a directory that contains an index file (should serve about.html).</p>
-					<a href="/about" class="btn">Visit /about</a>
+					<p>Requesting a directory that contains an index file (should serve new-page.html).</p>
+					<a href="/new-page" class="btn">Visit /new-page</a>
 				</div>
 
-				<!-- Autoindex -->
 				<div class="card">
 					<span class="tag info">Autoindex</span>
 					<h3>Directory Listing</h3>
@@ -185,22 +182,20 @@
 					<a href="/correct-auto-index/nested" class="btn">Visit .../nested</a>
 				</div>
 
-				<!-- Custom Root -->
 				<div class="card">
-					<span class="tag info">Alias/Root</span>
+					<span class="tag info">Root</span>
 					<h3>Custom Root Mapping</h3>
 					<p>Maps /gallery/gallery.html to www/gallery/gallery.html</p>
 					<a href="/gallery/gallery.html" class="btn">Visit Gallery File</a>
 				</div>
 
 				<div class="card">
-					<span class="tag info">Alias/Root</span>
+					<span class="tag info">Root</span>
 					<h3>Deep Root Mapping</h3>
 					<p>Maps /correct-auto-index/contact.html to www/web/auto-index/contact.html</p>
 					<a href="/correct-auto-index/contact.html" class="btn">Visit Contact File</a>
 				</div>
 
-				<!-- Errors -->
 				<div class="card">
 					<span class="tag danger">404 Not Found</span>
 					<h3>Non-existent Page</h3>
@@ -215,7 +210,6 @@
 					<a href="/wrong-auto-index" class="btn">Trigger 403</a>
 				</div>
 
-				<!-- Redirection -->
 				<div class="card">
 					<span class="tag warning">301 Redirect</span>
 					<h3>Redirection</h3>
@@ -223,14 +217,21 @@
 					<a href="/old-page" class="btn">Visit /old-page</a>
 				</div>
 
-				<!-- CGI (Placeholder if configured) -->
 				<div class="card">
-					<span class="tag warning">CGI</span>
-					<h3>CGI Script</h3>
-					<p>Execute a PHP script (if configured).</p>
-					<a href="/cgi-bin/index.php" class="btn">Visit /cgi-bin/index.php</a>
+					<span class="tag info">CGI</span>
+					<h3>CGI Script in form component</h3>
+					<p>Execute a Python script sending form data.</p>
+					<a href="/form.html" class="btn">Visit /form.html</a>
 				</div>
 
+				<div class="card">
+					<span class="tag danger">500 CGI</span>
+					<h3>CGI syntax error test</h3>
+					<p>Execute a Python script with syntax errors.</p>
+					<form action="/cgi-bin/syntax_error.py" method="POST">
+						<button type="submit" class="btn">Trigger CGI Error</button>
+					</form>
+				</div>
 			</div>
 		</main>
 
