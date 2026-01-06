@@ -26,6 +26,8 @@ OBJS = $(addprefix $(OBJ_DIR), $(SRCS:.cpp=.o))
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -g3
 
+LOG_FILE = webserv.log
+
 RM = rm -rf
 
 # - Colors
@@ -45,6 +47,7 @@ $(OBJ_DIR)%.o: %.cpp $(HEADERS)
 
 clean:
 	$(RM) $(OBJ_DIR)
+	$(RM) $(LOG_FILE)
 
 fclean: clean
 	$(RM) $(NAME)

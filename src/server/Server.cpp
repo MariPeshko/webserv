@@ -146,7 +146,6 @@ int	Server::setupServer() {
 		fcntl(_listen_fd, F_SETFL, lflags | O_NONBLOCK);
 
 	int yes = 1;
-	//TODO: REPLACE SO_REUSEADDR WITH SO_KEEPALIVE
 	if (setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
 	{
 		Logger::logErrno(LOG_ERROR, "Failed to set SO_REUSEADDR");
