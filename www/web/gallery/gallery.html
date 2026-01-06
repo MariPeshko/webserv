@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Gallery - WebServ Project</title>
     <style>
         * {
@@ -58,6 +58,8 @@
             display: flex;
             gap: 2rem;
             list-style: none;
+            margin: 0;
+            padding: 0;
         }
 
         .nav-links a {
@@ -98,7 +100,8 @@
         }
 
         /* Upload Section */
-        .upload-section {
+        section {
+            margin-top: 1rem;
             background: var(--card-bg);
             padding: 2rem;
             border-radius: 12px;
@@ -106,47 +109,25 @@
             margin-bottom: 3rem;
         }
 
-        .upload-section h2 {
+        section h2, section h3 {
             color: var(--primary-color);
             font-size: 1.75rem;
             margin-bottom: 1.5rem;
         }
 
-        .upload-area {
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            padding: 3rem 2rem;
-            text-align: center;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .upload-area:hover,
-        .upload-area.dragover {
-            border-color: var(--primary-color);
-            background: rgba(37, 99, 235, 0.05);
-        }
-
-        .upload-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-        }
-
-        .upload-area p {
-            color: var(--text-light);
-            margin-bottom: 1rem;
-        }
-
-        .upload-area .highlight {
-            color: var(--primary-color);
-            font-weight: 600;
-        }
-
-        #fileInput {
+        .file-input {
             display: none;
         }
 
-        .upload-btn {
+        .file-input-wrapper {
+            text-align: center;
+            padding: 2rem;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
             display: inline-block;
             padding: 0.75rem 1.5rem;
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
@@ -159,38 +140,11 @@
             transition: transform 0.3s;
         }
 
-        .upload-btn:hover {
+        .btn:hover {
             transform: translateY(-2px);
         }
 
-        /* Status Message */
-        .status-message {
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            display: none;
-        }
-
-        .status-message.success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #10b981;
-        }
-
-        .status-message.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #ef4444;
-        }
-
         /* Gallery Section */
-        .gallery-section {
-            background: var(--card-bg);
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
         .gallery-header {
             display: flex;
             justify-content: space-between;
@@ -198,52 +152,42 @@
             margin-bottom: 2rem;
         }
 
-        .gallery-header h2 {
+        .gallery-header h2, .gallery-header h3 {
             color: var(--primary-color);
             font-size: 1.75rem;
+            margin: 0;
         }
 
-        .refresh-btn {
-            padding: 0.5rem 1rem;
-            background: var(--bg-color);
-            color: var(--text-color);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .refresh-btn:hover {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-
-        .gallery-grid {
+        .image-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 1.5rem;
         }
 
-        .gallery-item {
+        .image-card {
             position: relative;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transition: transform 0.3s, box-shadow 0.3s;
             background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
         }
 
-        .gallery-item:hover {
+        .image-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 16px rgba(0,0,0,0.15);
         }
 
-        .gallery-item img {
+        .image-card img {
             width: 100%;
             height: 200px;
             object-fit: cover;
             display: block;
+            border-radius: 4px;
         }
 
         .gallery-item-info {
@@ -274,6 +218,8 @@
             font-weight: 600;
             cursor: pointer;
             transition: background 0.3s;
+            width: 100%;
+            text-align: center;
         }
 
         .delete-btn:hover {
@@ -299,13 +245,7 @@
             background: var(--secondary-color);
         }
 
-        .no-images {
-            text-align: center;
-            padding: 3rem;
-            color: var(--text-light);
-        }
-
-        .loading {
+        .no-images, .loading {
             text-align: center;
             padding: 3rem;
             color: var(--text-light);
@@ -323,7 +263,7 @@
 
         /* Responsive */
         @media (max-width: 768px) {
-            .gallery-grid {
+            .image-grid {
                 grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             }
 
@@ -346,6 +286,19 @@
                 align-items: flex-start;
             }
         }
+
+        @media (max-width:560px) {
+			.container {
+				margin: 1.5rem;
+				padding: .75rem;
+			}
+
+			header {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: .5rem;
+			}
+		}
     </style>
 </head>
 <body>
@@ -353,225 +306,124 @@
     <nav>
         <div class="nav-container">
             <a href="/" class="logo">WebServ</a>
-            <ul class="nav-links">
-                <li><a href="/">Home</a></li>
-                <li><a href="/about">About</a></li>
-                <li><a href="/contacts">Contacts</a></li>
-                <li><a href="/gallery" class="active">Gallery</a></li>
-            </ul>
+            <nav aria-label="Main navigation">
+                <ul class="nav-links">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/about">About</a></li>
+                    <li><a href="/contacts">Contacts</a></li>
+                    <li><a href="/gallery" class="active">Gallery</a></li>
+                </ul>
+            </nav>
         </div>
     </nav>
 
     <!-- Page Header -->
-    <section class="page-header">
-        <h1>Image Gallery</h1>
+    <header class="page-header" aria-labelledby="page-title">
+        <h1 id="page-title">Image Gallery</h1>
         <p>Upload and manage your images</p>
-    </section>
+    </header>
 
     <!-- Content -->
-    <div class="container">
-        <!-- Upload Section -->
-        <div class="upload-section">
-            <h2>Upload Images</h2>
-            <div id="statusMessage" class="status-message"></div>
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">📤</div>
-                <p><span class="highlight">Click to upload</span> or drag and drop</p>
-                <p style="font-size: 0.9rem;">PNG, JPG, GIF, WEBP up to 10MB</p>
-                <input type="file" id="fileInput" accept="image/*" multiple>
-            </div>
-        </div>
+    <main class="container">
+		<section aria-labelledby="upload-title">
+			<h3 id="upload-title">Upload a Picture</h3>
+			<p>Select an image file to upload to the server.</p>
+			<form class="upload-form" action="/uploaded_images/" method="post" enctype="multipart/form-data">
+				<div class="file-input-wrapper">
+					<input type="file" id="picture" name="picture" accept="image/*" 
+						   onchange="document.getElementById('selected-file').textContent = this.files[0] ? '📎 Selected: ' + this.files[0].name : ''" 
+						   class="file-input" required>
+					<button type="button" class="btn" onclick="document.getElementById('picture').click()">
+						Choose Picture
+					</button>
+				</div>
+				<output id="selected-file" style="margin-top: 0.5rem; color: #2563eb; font-size: 0.9rem; font-weight: 500; display: block;"></output>
+				<br><br>
+				<button type="submit" class="btn">Upload Picture</button>
+			</form>
+		</section>
 
         <!-- Gallery Section -->
-        <div class="gallery-section">
-            <div class="gallery-header">
-                <h2>Your Images</h2>
+        <section aria-labelledby="gallery-title">
+            <h3 id="gallery-title">Uploaded Images</h3>
+            <div id="image-grid" class="image-grid">
+                <!-- Images will be loaded here -->
             </div>
-            <div class="gallery-grid" id="galleryGrid">
-                <div class="loading">Loading images...</div>
-            </div>
-        </div>
-    </div>
+        </section>
+    </main>
 
     <!-- Footer -->
     <footer>
-        <p>&copy; 2026 WebServ Project</p>
+        <p>&copy; <span id="year">2026</span> WebServ Project</p>
     </footer>
 
     <script>
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const statusMessage = document.getElementById('statusMessage');
-        const galleryGrid = document.getElementById('galleryGrid');
 
-        // Click to upload
-        uploadArea.addEventListener('click', () => fileInput.click());
-
-        // Prevent default drag behaviors
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
-        });
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        // Highlight drop area when item is dragged over it
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, () => {
-                uploadArea.classList.add('dragover');
-            }, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, () => {
-                uploadArea.classList.remove('dragover');
-            }, false);
-        });
-
-        // Handle dropped files
-        uploadArea.addEventListener('drop', handleDrop, false);
-
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            handleFiles(files);
-        }
-
-        // Handle selected files
-        fileInput.addEventListener('change', function() {
-            handleFiles(this.files);
-        });
-
-        // Upload files
-        async function handleFiles(files) {
-            if (files.length === 0) return;
-
-            for (let file of files) {
-                if (!file.type.startsWith('image/')) {
-                    showStatus('Please upload only image files', 'error');
-                    continue;
-                }
-
-                if (file.size > 10 * 1024 * 1024) {
-                    showStatus(`${file.name} is too large. Maximum size is 10MB`, 'error');
-                    continue;
-                }
-
-                await uploadFile(file);
-            }
-        }
-
-        async function uploadFile(file) {
-            const formData = new FormData();
-            formData.append('file', file);
+        async function loadImages() {
+            const grid = document.getElementById('image-grid');
+            grid.innerHTML = '<p>Loading...</p>';
 
             try {
-                const response = await fetch('/uploaded_images/' + file.name, {
-                    method: 'POST',
-                    body: file
-                });
+                const response = await fetch('/uploaded_images/');
+                if (!response.ok) throw new Error('Failed to load images');
 
-                if (response.ok) {
-                    showStatus(`${file.name} uploaded successfully!`, 'success');
-                    setTimeout(() => loadGallery(), 500);
-                } else {
-                    showStatus(`Failed to upload ${file.name}`, 'error');
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                showStatus(`Error uploading ${file.name}`, 'error');
-            }
-        }
-
-        // Load gallery images
-        async function loadGallery() {
-            try {
-                const response = await fetch('/uploaded_images');
-                if (!response.ok) throw new Error('Failed to load gallery');
-                
                 const text = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(text, 'text/html');
-                const links = doc.querySelectorAll('a');
-                
-                galleryGrid.innerHTML = '';
-                
-                let imageCount = 0;
-                links.forEach(link => {
-                    const href = link.getAttribute('href');
-                    if (href && href.match(/\.(jpg|jpeg|png|gif|webp)$/i) && !href.includes('..')) {
-                        createGalleryItem(href);
-                        imageCount++;
-                    }
-                });
+                const links = Array.from(doc.querySelectorAll('a'));
 
-                if (imageCount === 0) {
-                    galleryGrid.innerHTML = '<div class="no-images">No images uploaded yet. Upload some images to get started!</div>';
+                grid.innerHTML = '';
+
+                const imageFiles = links
+                    .map(link => link.getAttribute('href'))
+                    .filter(href => href && !href.startsWith('.') && !href.startsWith('/'))
+                    .filter(href => /\.(jpeg|png)$/i.test(href));
+
+                if (imageFiles.length === 0) {
+                    grid.innerHTML = '<p>No images found.</p>';
+                    return;
                 }
 
-            } catch (error) {
-                console.error('Gallery load error:', error);
-                galleryGrid.innerHTML = '<div class="no-images" style="color: #ef4444;">Error loading images</div>';
+                imageFiles.forEach(fileName => {
+                    const div = document.createElement('div');
+                    div.className = 'image-card';
+
+                    const img = document.createElement('img');
+                    img.src = '/uploaded_images/' + fileName;
+
+                    const btn = document.createElement('button');
+                    btn.textContent = 'Delete';
+                    btn.className = 'btn delete-btn';
+                    btn.onclick = () => deleteImage(fileName, div);
+
+                    div.appendChild(img);
+                    div.appendChild(btn);
+                    grid.appendChild(div);
+                });
+            } catch (err) {
+                console.error(err);
+                grid.innerHTML = '<p>There no images found.</p>';
             }
         }
 
-        function createGalleryItem(filename) {
-            const item = document.createElement('div');
-            item.className = 'gallery-item';
-            
-            const imagePath = `/uploaded_images/${filename.replace(/^\/uploaded_images\//, '')}`;
-            
-            item.innerHTML = `
-                <img src="${imagePath}" alt="${filename}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22250%22 height=%22200%22><rect width=%22250%22 height=%22200%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>Image not found</text></svg>'">
-                <div class="gallery-item-info">
-                    <div class="gallery-item-name">${filename}</div>
-                    <div class="gallery-item-actions">
-                        <a href="${imagePath}" target="_blank" class="view-btn">View</a>
-                        <button class="delete-btn" onclick="deleteImage('${filename}')">Delete</button>
-                    </div>
-                </div>
-            `;
-            
-            galleryGrid.appendChild(item);
-        }
-
-        async function deleteImage(filename) {
-            if (!confirm(`Are you sure you want to delete ${filename}?`)) {
-                return;
-            }
-
+        async function deleteImage(fileName, element) {
             try {
-                const response = await fetch(`/uploaded_images/${filename}`, {
+                const response = await fetch('/uploaded_images/' + fileName, {
                     method: 'DELETE'
                 });
-
                 if (response.ok) {
-                    showStatus(`${filename} deleted successfully`, 'success');
-                    loadGallery();
+                    element.remove();
                 } else {
-                    showStatus(`Failed to delete ${filename}`, 'error');
+                    alert('Failed to delete image');
                 }
-            } catch (error) {
-                console.error('Delete error:', error);
-                showStatus(`Error deleting ${filename}`, 'error');
+            } catch (err) {
+                console.error(err);
+                alert('Error deleting image');
             }
         }
 
-        function showStatus(message, type) {
-            statusMessage.textContent = message;
-            statusMessage.className = `status-message ${type}`;
-            statusMessage.style.display = 'block';
-            
-            setTimeout(() => {
-                statusMessage.style.display = 'none';
-            }, 5000);
-        }
-
-        // Load gallery on page load
-        loadGallery();
+        // Load images on startup
+        loadImages();
     </script>
 </body>
 </html>
