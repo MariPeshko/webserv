@@ -12,7 +12,7 @@ print("")
 print("<html>")
 print("<head><title>Form Result</title></head>")
 print("<body>")
-print("<h1>Form Submission Received</h1>")
+print("<h1>Form Submission Received From Python CGI</h1>")
 
 # Manually parse the form data to avoid FieldStorage issues
 try:
