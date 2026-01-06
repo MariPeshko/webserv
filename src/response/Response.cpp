@@ -641,7 +641,7 @@ bool		Response::tryServeCgi()
 		return false;
 	if (DEBUG) cout << GREEN << "Executing CGI: " << _path << RESET << endl;
 	try {
-		CgiHandler	cgi(*_request, _path, it->second);
+		CgiHandler	cgi(*this, _path, it->second);
 		string		output = cgi.executeCgi();
 		if (!applyCgiOutput(output)) {
 			fillResponse(502, getErrorPageContent(502)); // 502 Bad Gateway

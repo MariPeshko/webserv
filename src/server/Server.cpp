@@ -124,6 +124,11 @@ const std::vector<Location>&		Server::getLocations() const {
 const std::vector<std::string>&		Server::getServerNames() const {
 	return _server_names;
 }
+
+const std::string&					Server::getFirstServerName() const {
+	return _server_names[0];
+}
+
 const std::map<int, std::string>&	Server::getErrorPages() const {
 	return _error_pages;
 }

@@ -37,6 +37,7 @@ class	Server {
 		size_t								getLocationCount() const;
 		const std::vector<Location>&		getLocations() const;
 		const std::vector<std::string>&		getServerNames() const;
+		const std::string&					getFirstServerName() const;
 		const std::map<int, std::string>&	getErrorPages() const;
 		const std::string&					getClientMaxBodySize() const;
 		const std::vector<std::string>&		getAllowedMethods() const;
