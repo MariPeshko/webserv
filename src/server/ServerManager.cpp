@@ -348,7 +348,7 @@ void	ServerManager::cleanup() {
  *    and the next element moves into the current index.
  */
 void	ServerManager::checkTimeouts() {
-	time_t	timeout = 10; // 10 seconds timeout
+	time_t	timeout = 30; // 30 seconds timeout
 	for (size_t i = 0; i < _pfds.size(); ) {
 		int	fd = _pfds[i].fd;
 		if (!isListener(fd)) {

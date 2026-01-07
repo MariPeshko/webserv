@@ -16,6 +16,7 @@ HttpContext::HttpContext(Connection &conn, Server &server) :
 	_expectedBodyLen(0),
 	_chunkState(READING_CHUNK_SIZE),
 	_chunkSize(0),
+	_accumulatedBodySize(0),
 	_responseBuffer(""),
 	_bytesSent(0)
 { }
@@ -30,6 +31,7 @@ HttpContext::HttpContext(const HttpContext &other) :
 	_expectedBodyLen(other._expectedBodyLen),
 	_chunkState(other._chunkState),
 	_chunkSize(other._chunkSize),
+	_accumulatedBodySize(other._accumulatedBodySize),
 	_responseBuffer(other._responseBuffer),
 	_bytesSent(other._bytesSent)
 { }
@@ -56,14 +58,14 @@ void	HttpContext::requestParsingStateMachine()
 		switch (_state) {
 			case REQUEST_LINE: {
 				// Check buffer size limit before parsing
-                if (!checkRequestLineSize(buf)) {
-                    _state = REQUEST_ERROR;
-                    request().setStatusCode(414); // URI Too Long
+				if (!checkRequestLineSize(buf)) {
+					_state = REQUEST_ERROR;
+					request().setStatusCode(414); // URI Too Long
 					request().ifConnNotPresent();
 					request().setVersion("HTTP/1.0");
-                    can_parse = false;
-                    break;
-                }
+					can_parse = false;
+					break;
+				}
 
 				if (!findAndParseReqLine(buf)) {
 					if (_state == REQUEST_ERROR) {
@@ -86,20 +88,18 @@ void	HttpContext::requestParsingStateMachine()
 			}
 			case READING_HEADERS : {
 				// Check buffer size limit before parsing headers
-                if (!checkHeaderBlockSize(buf)) {
+				if (!checkHeaderBlockSize(buf)) {
 					cout << RED << "limit of headers" << RESET << endl;
-                    _state = REQUEST_ERROR;
-                    request().setStatusCode(431); // Request Header Fields Too Large
+					_state = REQUEST_ERROR;
+					request().setStatusCode(431); // Request Header Fields Too Large
 					request().ifConnNotPresent();
-                    can_parse = false;
-                    break;
-                }
-
+					can_parse = false;
+					break;
+				}
 				if (!findAndParseHeaders(buf)) {
 					request().ifConnNotPresent();
 					can_parse = false; break;
 				}
-
 				if (REQ_DEBUG) PrintUtils::printRequestHeaders(request());
 				if (isBodyToRead()) {
 					if (CTX_DEBUG) cout << YELLOW << "requestParsingStateMachine: we have a body to read" << RESET << endl;
@@ -256,7 +256,6 @@ bool	HttpContext::isBodyToRead()
 			_state = REQUEST_ERROR;
 			return false;
 		}
-		if (CTX_DEBUG) cout << YELLOW << "isBodyToRead(): Transfer-Encoding header is here" << endl;
 		_state = READING_CHUNKED_BODY;
 		return true;
 	} else if (request().isContentLengthHeader()) {
@@ -266,7 +265,7 @@ bool	HttpContext::isBodyToRead()
 			return false;
 		}
 		// Reject non-digit characters early and manual accumulation
-		size_t	need = 0;
+		size_t	contentLength = 0;
 		bool	ok = true;
 		for (size_t i = 0; i < cl.size(); ++i) {
 			char c = cl[i];
@@ -274,19 +273,25 @@ bool	HttpContext::isBodyToRead()
 				ok = false;
 				break;
 			}
-			need = need * 10 + static_cast<size_t>(c - '0');
+			contentLength = contentLength * 10 + static_cast<size_t>(c - '0');
 			// TODO (пізніше): перевірити верхню межу й ліміти
 		}
 		if (!ok) {
 			_state = REQUEST_ERROR;
 			return false;
 		}
-		if (need == 0) {
+		// Now check against client_max_body_size
+		if (!checkBodySizeLimit(contentLength)) {
+			_state = REQUEST_ERROR;
+			request().setStatusCode(413);
+			return false;
+		}
+		if (contentLength == 0) {
 			_state = REQUEST_COMPLETE;
 			return false;
 		} else {
 			_state = READING_FIXED_BODY;
-			_expectedBodyLen = need;
+			_expectedBodyLen = contentLength;
 			return true;
 		}
 	}
@@ -312,6 +317,9 @@ bool	HttpContext::findAndParseFixBody(std::string &buf)
 	}
 }
 
+/**
+ * track the accumulated body size during chunk processing
+ */
 bool	HttpContext::chunkedBodyStateMachine(std::string &buf)
 {
 	if (_chunkState == READING_CHUNK_SIZE) {
@@ -339,7 +347,15 @@ bool	HttpContext::chunkedBodyStateMachine(std::string &buf)
 		if (buf.size() < _chunkSize) { // Need more data for chunk body
 			return false;
 		}
+		// Check if adding this chunk would exceed the limit
+		if (!checkBodySizeLimit(_accumulatedBodySize + _chunkSize)) {
+			_state = REQUEST_ERROR;
+			request().setStatusCode(413);
+			return false;
+		}
+
 		HttpParser::appendToBody(buf, _chunkSize, request());
+		_accumulatedBodySize += _chunkSize;
 		buf.erase(0, _chunkSize);
 		_chunkState = READING_CHUNK_TRAILER;
 		return true;
@@ -493,10 +509,36 @@ bool	HttpContext::checkRequestLineSize(const std::string &buf)
  */
 bool	HttpContext::checkHeaderBlockSize(const std::string &buf)
 {
-    if (buf.size() > MAX_HEADER_BLOCK_SIZE) {
-        if (CTX_DEBUG) cerr << RED << "Header block exceeds maximum size: " 
-            << buf.size() << " > " << MAX_HEADER_BLOCK_SIZE << RESET << endl;
-        return false;
-    }
-    return true;
+	if (buf.size() > MAX_HEADER_BLOCK_SIZE) {
+		if (CTX_DEBUG) cerr << RED << "Header block exceeds maximum size: " 
+			<< buf.size() << " > " << MAX_HEADER_BLOCK_SIZE << RESET << endl;
+		return false;
+	}
+	return true;
+}
+
+/**
+ * - Check location-specific limit first
+ * - Fall back to server-level limit
+ * - If maxBodySizeStr is empty then no limit set
+ * - Parse the size string (e.g., "1m", "500k", "1024")
+ * 
+ * Return true if size is valid.
+ */
+bool	HttpContext::checkBodySizeLimit(size_t contentLength)
+{
+	const Location*	matchedLocation = _response.matchPathToLocation();
+	string			maxBodySizeStr;
+	
+	if (matchedLocation && !matchedLocation->getClientMaxBodySize().empty()) {
+		maxBodySizeStr = matchedLocation->getClientMaxBodySize();
+	} else {
+		maxBodySizeStr = _server_config.getClientMaxBodySize();
+	}
+	if (maxBodySizeStr.empty()) {
+		return true; 
+	}
+	size_t maxBodySize = HttpParser::parseSizeString(maxBodySizeStr);
+	
+	return contentLength <= maxBodySize;
 }

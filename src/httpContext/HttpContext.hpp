@@ -5,6 +5,7 @@
 #include "HttpParser.hpp"
 #include "../request/Request.hpp"
 #include "../server/Server.hpp"
+#include "../server/Location.hpp"
 #include "../httpContext/Connection.hpp"
 #include <iostream>
 #include <string>
@@ -95,6 +96,7 @@ class HttpContext
 		bool	validateHost();
 		bool	checkRequestLineSize(const std::string &buf);
    		bool	checkHeaderBlockSize(const std::string &buf);
+		bool	checkBodySizeLimit(size_t contentLength);
 
 		// body members
 		size_t			_expectedBodyLen;
@@ -106,6 +108,7 @@ class HttpContext
 		};
 		e_chunk_state	_chunkState;
 		size_t			_chunkSize;
+		size_t			_accumulatedBodySize; // for chunk body
 
 		// For non-blocking response sending
 		std::string		_responseBuffer;

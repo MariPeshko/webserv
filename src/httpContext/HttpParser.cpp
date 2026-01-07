@@ -19,12 +19,12 @@ HttpParser::~HttpParser() { }
 
 static bool	is_only_digits(const std::string& str) {
 	if (str.empty())
-        return false;
-    for (std::string::const_iterator it = str.begin(); it != str.end(); ++it) {
-        if (!std::isdigit(static_cast<unsigned char>(*it)))
-            return false;
-    }
-    return true;
+		return false;
+	for (std::string::const_iterator it = str.begin(); it != str.end(); ++it) {
+		if (!std::isdigit(static_cast<unsigned char>(*it)))
+			return false;
+	}
+	return true;
 }
 
 void	HttpParser::appendToBody(const std::string & buffer, const size_t n, Request& req) {
@@ -68,24 +68,24 @@ bool HttpParser::parseRequestLine(const std::string& line,
 		return false;
 	}
 	// Handle absolute URI (e.g., GET http://localhost:8080/ HTTP/1.0)
-    if (uri.rfind("http://", 0) == 0) {
+	if (uri.rfind("http://", 0) == 0) {
 		if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine. http:// is found" << RESET << endl;
-        size_t	host_start = 7; // "http://" is 7 chars
-        size_t	path_start = uri.find("/", host_start);
-        
-        if (path_start != std::string::npos) {
-            std::string host = uri.substr(host_start, path_start - host_start);
-            req.setHost(host);
+		size_t	host_start = 7; // "http://" is 7 chars
+		size_t	path_start = uri.find("/", host_start);
+		
+		if (path_start != std::string::npos) {
+			std::string host = uri.substr(host_start, path_start - host_start);
+			req.setHost(host);
 			if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine. host: " << host << RESET << endl;
-            uri = uri.substr(path_start);
-        } else {
-            // Case: GET http://localhost:8080 HTTP/1.0 (no trailing slash)
-            std::string host = uri.substr(host_start);
-            req.setHost(host);
+			uri = uri.substr(path_start);
+		} else {
+			// Case: GET http://localhost:8080 HTTP/1.0 (no trailing slash)
+			std::string host = uri.substr(host_start);
+			req.setHost(host);
 			if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine. host: " << host << RESET << endl;
-            uri = "/";
-        }
-    }
+			uri = "/";
+		}
+	}
 	if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine:\nmethod: " << method << "\nuri: ";
 	if (DEBUG_HTTP_PARSER) cout << BLUE << uri << "\nversion: " << version << RESET << endl;
 	req.setMethod(method);
@@ -255,20 +255,20 @@ bool	HttpParser::parseMultiHeadersName(string& multipart_headers, string& filena
 	}
 	original_filename = headers.substr(0, char_after_name);
 	// Sanitize filename
-    for (size_t i = 0; i < original_filename.length(); ++i) {
-        unsigned char c = original_filename[i];
-        if (c < 128) {
-            if (c == ' ' || c == '\t') {
-                sanitized_filename += '_';
-            } else {
-                sanitized_filename += c;
-            }
+	for (size_t i = 0; i < original_filename.length(); ++i) {
+		unsigned char c = original_filename[i];
+		if (c < 128) {
+			if (c == ' ' || c == '\t') {
+				sanitized_filename += '_';
+			} else {
+				sanitized_filename += c;
+			}
 		} else {
 			sanitized_filename += "non_ascii_name";
 			sanitized_filename += HttpParser::getExtensionStr(original_filename);
 			break;
 		}
-    }
+	}
 	string	timestamp_ss = generateTimestamp();
 	// Prepend timestamp to the filename
 	filename = timestamp_ss + "_" + sanitized_filename;
@@ -325,6 +325,7 @@ bool	HttpParser::parseMultipartData(const string& reqBody,
 	
 	string	picture = fileData.substr(0, 10);
 
+	// TO DO
 	// TO DELETE Expected JPEG structure:
 	// Start: FF D8 FF (JPEG header)
 	// End: FF D9 (JPEG end marker) + possible metadata
@@ -369,36 +370,66 @@ std::string	HttpParser::extractBoundary(const std::string& contentType) {
 
 string HttpParser::getExtensionStr(const std::string& filename) {
 	size_t dot_pos = filename.find_last_of(".");
-    if (dot_pos == std::string::npos) {
-        return ".no_extention";
-    }
+	if (dot_pos == std::string::npos) {
+		return ".no_extention";
+	}
 	std::string	ext = filename.substr(dot_pos);
 	for (size_t i = 0; i < ext.length(); ++i) {
-        ext[i] = std::tolower(ext[i]);
-    }
+		ext[i] = std::tolower(ext[i]);
+	}
 	return ext;
 }
 
 // Conceptual function to sanitize and validate a filename's extension
 bool	HttpParser::isExtensionAllowed(const std::string& filename) {
-    // 1. Isolate the extension
-    size_t dot_pos = filename.find_last_of(".");
-    if (dot_pos == std::string::npos) {
-        return false;
-    }
-    std::string	ext = filename.substr(dot_pos);
-    // 2. Normalize to lowercase
-    for (size_t i = 0; i < ext.length(); ++i) {
-        ext[i] = std::tolower(ext[i]);
-    }
-    // 3. Whitelist of allowed extensions
-    const char*		allowed_extensions[] = {".jpg", ".jpeg", ".png", ".gif"};
-    const size_t	num_allowed = sizeof(allowed_extensions) / sizeof(allowed_extensions[0]);
-    // 4. Validate against the whitelist
-    for (size_t i = 0; i < num_allowed; ++i) {
-        if (ext == allowed_extensions[i]) {
-            return true;
-        }
-    }
-    return false;
+	// 1. Isolate the extension
+	size_t dot_pos = filename.find_last_of(".");
+	if (dot_pos == std::string::npos) {
+		return false;
+	}
+	std::string	ext = filename.substr(dot_pos);
+	// 2. Normalize to lowercase
+	for (size_t i = 0; i < ext.length(); ++i) {
+		ext[i] = std::tolower(ext[i]);
+	}
+	// 3. Whitelist of allowed extensions
+	const char*		allowed_extensions[] = {".jpg", ".jpeg", ".png", ".gif"};
+	const size_t	num_allowed = sizeof(allowed_extensions) / sizeof(allowed_extensions[0]);
+	// 4. Validate against the whitelist
+	for (size_t i = 0; i < num_allowed; ++i) {
+		if (ext == allowed_extensions[i]) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/** Function to parse client_max_body_size diretive of 
+ * configuration file */
+size_t	HttpParser::parseSizeString(const string& sizeStr) {
+	if (sizeStr.empty()) return 0;
+	
+	size_t	multiplier = 1;
+	string	numStr = sizeStr;
+
+	// Check for suffix
+	char	lastChar = sizeStr[sizeStr.length() - 1];
+	if (lastChar == 'k' || lastChar == 'K') {
+		multiplier = 1024;
+		numStr = sizeStr.substr(0, sizeStr.length() - 1);
+	} else if (lastChar == 'm' || lastChar == 'M') {
+		multiplier = 1024 * 1024;
+		numStr = sizeStr.substr(0, sizeStr.length() - 1);
+	}
+
+	size_t	num = 0;
+	for (size_t i = 0; i < numStr.size(); ++i) {
+		if (numStr[i] >= '0' && numStr[i] <= '9') {
+			num = num * 10 + (numStr[i] - '0');
+		} else {
+			return 0;
+		}
+	}
+	
+	return num * multiplier;
 }
