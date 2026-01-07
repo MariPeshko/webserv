@@ -118,6 +118,8 @@ void	ServerManager::processConnections() {
  * - Make the accepted socket non-blocking
  * - Create Connection
  * - Create HttpContext bound to this connection+server
+ * 
+ * Note: to convert a port: uint16_t	port = ntohs(remoteaddr.sin_port);
 */
 void	ServerManager::handleNewConnection(int listener) {
 	struct sockaddr_in		remoteaddr;
@@ -147,9 +149,9 @@ void	ServerManager::handleNewConnection(int listener) {
 
 	uint32_t	ip = ntohl(remoteaddr.sin_addr.s_addr);
 	std::string	ip_str = ipv4_to_string(ip);
-	uint16_t	port = ntohs(remoteaddr.sin_port);
 		
-	Logger::log(LOG_INFO, "New connection accepted from " + ip_str + ":" + toString(port) + " by listener " + toString(newfd));
+	Logger::log(LOG_INFO, "New connection on socket " + toString(newfd) + " by listener " + toString(server->getListenFd()));
+	// " accepted from " + ip_str + 
 }
 
 /**
