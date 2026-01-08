@@ -56,14 +56,11 @@ void	Config::parse(const std::string &config_file)
 	std::vector<std::string>	tokens = tokenize(buffer.str());
 	std::reverse(tokens.begin(), tokens.end());
 
-	std::cout << "Tokens found: " << tokens.size() << std::endl;
 	while (!tokens.empty())	{
 		if (tokens.back() == "server") {
 			tokens.pop_back(); // Consume "server"
 			Server server;
-			std::cout << "Parsing server block..." << std::endl;
 			parseServer(server, tokens);
-			std::cout << "Server block parsed." << std::endl;
 			_servers.push_back(server);
 		} else {
 			throw std::runtime_error("Unexpected token outside server block: " + tokens.back());
@@ -156,13 +153,11 @@ void	Config::parseServer(Server &server, std::vector<std::string> &tokens)
 				server.setHost(val.substr(0, colonPos));
 				server.setPort(atoi(val.substr(colonPos + 1).c_str()));
 			} else {
-				std::cout << "Parsing listen port: " << val << std::endl;
 				int port = atoi(val.c_str());
 				if (!is_only_digits(val.substr(0, colonPos)) || port <= 0 || port > 65535) {
 					throw std::runtime_error("Invalid port in listen directive: " + val);
 				}
 				server.setPort(port);
-				std::cout << "Set server port to: " << port << std::endl;
 			}
 		} else if (directive == "host") {
 			server.setHost(tokens.back());
@@ -214,16 +209,13 @@ void	Config::parseServer(Server &server, std::vector<std::string> &tokens)
 		} else {
 			throw std::runtime_error("Unknown server directive: " + directive);
 		}
-		std::cout << "Consuming semicolon for directive: " << directive << std::endl;
 		consumeSemiColon(tokens);
-		std::cout << "Semicolon consumed." << std::endl;
 	}
 
 	if (tokens.empty() || tokens.back() != "}")	{
 		throw std::runtime_error("Expected '}' to close server block");
 	}
 	tokens.pop_back(); // Consume "}"
-	std::cout << "Server block closed." << std::endl;
 }
 
 // Parses a location block from the token stream.

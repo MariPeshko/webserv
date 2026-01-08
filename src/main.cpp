@@ -49,9 +49,7 @@ int		main(int ac, char **argv) {
 			std::string config_file = (ac == 1 ? "configs/default.conf" : argv[1]);
 			// parse config file and save parsed data
 			config.parse(config_file);
-			std::cout << "Configuration file '" << config_file << "' parsed successfully." << std::endl;
 			server_manager.setupServers(config.getServerConfigs());
-			std::cout << "Running webserver with config file: " << config_file << std::endl;
 			server_manager.runServers();
 
         } else {
