@@ -9,6 +9,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdint.h> // for uint32_t in C++98
 
 const char*	generateStatusMessage(short status_code);
 int			buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_len);
