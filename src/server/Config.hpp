@@ -2,14 +2,8 @@
 #define CONFIG_HPP
 
 #include "../server/Server.hpp"
-#include <string>
-#include <vector>
-#include <fstream>
-#include <sstream>
+#include "../../inc/Webserv.hpp"
 #include <stdexcept>
-#include <cctype>
-#include <cstdlib>
-#include <algorithm>
 
 class Config
 {

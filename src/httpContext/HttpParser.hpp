@@ -1,13 +1,11 @@
 #ifndef HTTPPARSER_HPP
 # define HTTPPARSER_HPP
 
+# include "../../inc/Webserv.hpp"
 # include "../request/Request.hpp"
-# include <string>
-# include <map>
-# include <vector>
-# include <iostream>
-# include <sstream>
+# include "PrintUtils.hpp"
 # include <limits>
+# include <cstdio>
 
 #define DEBUG_HTTP_PARSER 0
 

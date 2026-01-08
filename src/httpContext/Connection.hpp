@@ -1,14 +1,9 @@
 #ifndef CONNECTION_HPP
 # define CONNECTION_HPP
 
-# include <string>
-# include <map>
-# include <vector>
-# include <iostream>
-# include <sstream>
+# include "../../inc/Webserv.hpp"
 # include <sys/socket.h>
 # include <netinet/in.h>
-# include <ctime>
 
 #define CON_DEBUG 0
 #define YELLOW "\033[33m"

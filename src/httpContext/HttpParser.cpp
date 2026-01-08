@@ -1,12 +1,4 @@
 #include "HttpParser.hpp"
-#include "PrintUtils.hpp"
-#include <iostream>
-#include <cctype>	// For std::isdigit
-#include <algorithm>	// For std::all_of
-#include <limits>
-#include <cstdio>
-#include <ctime>    // For time functions
-#include <sstream>  // For stringstream
 
 using std::cout;
 using std::cerr;
@@ -16,16 +8,6 @@ using std::string;
 HttpParser::HttpParser() { }
 
 HttpParser::~HttpParser() { }
-
-static bool	is_only_digits(const std::string& str) {
-	if (str.empty())
-        return false;
-    for (std::string::const_iterator it = str.begin(); it != str.end(); ++it) {
-        if (!std::isdigit(static_cast<unsigned char>(*it)))
-            return false;
-    }
-    return true;
-}
 
 void	HttpParser::appendToBody(const std::string & buffer, const size_t n, Request& req) {
 	if (n == 0 || buffer.empty()) {

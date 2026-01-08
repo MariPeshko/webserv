@@ -3,16 +3,12 @@
 
 # include "../request/Request.hpp"
 # include "../response/Response.hpp"
-# include <string>
-# include <map>
-# include <vector>
-# include <cstdlib>
-# include <unistd.h>
-# include <sys/wait.h>
-# include <cstring>
-# include <iostream>
+# include "../../inc/Webserv.hpp"
+
 
 # define CGI_DEBUG 0
+
+class Response;
 
 class CgiHandler {
 	public:

@@ -10,7 +10,7 @@ SRCS =	src/main.cpp \
 		src/httpContext/HttpContext.cpp \
 		src/httpContext/HttpParser.cpp \
 		src/response/Response.cpp \
-		src/response/utils.cpp \
+		src/utils/utils.cpp \
 		src/request/Request.cpp \
 		src/cgi/CgiHandler.cpp  \
 		src/logger/Logger.cpp \

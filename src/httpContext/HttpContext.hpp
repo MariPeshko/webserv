@@ -1,18 +1,16 @@
 #ifndef HTTPCONTEXT_HPP
 #define HTTPCONTEXT_HPP
 
+#include "../../inc/Webserv.hpp"
 #include "../response/Response.hpp"
-#include "HttpParser.hpp"
 #include "../request/Request.hpp"
 #include "../server/Server.hpp"
 #include "../httpContext/Connection.hpp"
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
+#include "HttpParser.hpp"
+#include "PrintUtils.hpp"
+
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <sstream>
 
 #define CTX_DEBUG 0
 #define REQ_DEBUG 0

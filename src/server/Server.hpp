@@ -1,16 +1,13 @@
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
-# include <iostream>
-# include <string>
-# include <vector>
-# include <map>
+# include "../../inc/Webserv.hpp"
+# include "Location.hpp"
+
 # include <sys/types.h>		// socket(), bind(), listen()
 # include <sys/socket.h>	// socket(), bind(), listen()
 # include <netinet/in.h>	// do we need it here?
-# include <fcntl.h>
-# include "Location.hpp"
-# include "../response/utils.hpp"
+# include <arpa/inet.h> // For inet_addr
 
 #define CONF_DEBUG 0
 
