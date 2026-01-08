@@ -5,6 +5,7 @@
 #include "../response/Response.hpp"
 #include "../request/Request.hpp"
 #include "../server/Server.hpp"
+#include "../server/Location.hpp"
 #include "../httpContext/Connection.hpp"
 #include "HttpParser.hpp"
 #include "PrintUtils.hpp"
@@ -66,19 +67,22 @@ class HttpContext
 
 		bool	isRequestComplete() const;
 		bool	isRequestError() const;
-
-		void	buildResponseString();
 		void	resetState();
+		void	buildResponseString();
+		e_parse_state	getParserState() const;
 
-		// getters
-		e_parse_state getParserState() const;
-
-		// Response buffer for POLLOUT
+		// response sending helpers
 		std::string getResponseBuffer() const;
 		size_t		getBytesSent() const;
 		void		setResponseBuffer(const std::string &buffer);
 		void		addBytesSent(size_t bytes);
 		bool		isResponseComplete() const;
+
+		// Draining helpers (to safely close after error responses)
+		void		startDraining();
+		void		stopDraining();
+		bool		isDraining() const;
+		bool		hasDrainTimedOut(time_t now, time_t timeoutSec) const;
 
 	private:
 		HttpContext();									  // no default construction
@@ -90,9 +94,11 @@ class HttpContext
 		Response		_response;
 		e_parse_state	_state;
 
-		bool	validateHost();
-		bool	checkRequestLineSize(const std::string &buf);
-   		bool	checkHeaderBlockSize(const std::string &buf);
+		bool			validateHost();
+		bool			checkRequestLineSize(const std::string &buf);
+   		bool			checkHeaderBlockSize(const std::string &buf);
+		bool			checkBodySizeLimit(size_t contentLength);
+		const Location*	findMatchingLocation();
 
 		// body members
 		size_t			_expectedBodyLen;
@@ -104,10 +110,15 @@ class HttpContext
 		};
 		e_chunk_state	_chunkState;
 		size_t			_chunkSize;
+		size_t			_accumulatedBodySize; // for chunk body
 
 		// For non-blocking response sending
 		std::string		_responseBuffer;
 		size_t			_bytesSent;
+
+		// Draining state
+		bool			_draining;
+		time_t			_drainStart;
 };
 
 #endif

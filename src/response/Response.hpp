@@ -34,6 +34,7 @@ class	Response
 		void			generateResponsePost();
 		void			generateResponseDelete();
 		
+		const Location*	matchPathToLocation();
 		void			fillResponse(short statusCode, const std::string &bodyContent);
 		std::string		getErrorPageContent(int code);
 
@@ -79,7 +80,6 @@ class	Response
 		bool				applyCgiOutput(const std::string &output);
 
 		// helpers
-		const Location*		matchPathToLocation();
 		std::string			getIndexFromLocation();
 		PathType			getPathType(std::string const path);
 		static std::string	getMimeType(const std::string &filePath);

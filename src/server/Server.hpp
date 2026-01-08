@@ -47,8 +47,8 @@ class	Server {
 		void print() const;
 
 	private:
-		int							_port; // ?uint16_t
-		std::string					_host; // ?in_addr_t
+		int							_port;
+		std::string					_host;
 		std::vector<std::string>	_server_names;
 		std::string					_root;
 		std::string					_index; // bool _autoindex;

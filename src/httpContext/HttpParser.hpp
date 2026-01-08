@@ -28,12 +28,9 @@ class	HttpParser {
 	static bool			parseMultiHeadersName(std::string& multipart_headers, std::string& filename);
 	static std::string	extractBoundary(const std::string& contentType);
 	static bool			isExtensionAllowed(const std::string& filename);
+	static size_t		parseSizeString(const std::string& sizeStr);
 
 	private:
 };
-
-
-
-	
 
 #endif

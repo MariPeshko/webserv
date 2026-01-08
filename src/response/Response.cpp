@@ -343,12 +343,14 @@ const Location*	Response::matchPathToLocation()
 	const Location*					bestMatch = NULL;
 	size_t							bestMatchLen = 0;
 
+	const string&					uri = getRequest()->getUri();
+
 	if (DEBUG_PATH) cout << GREEN << "Matching URI: [" << getRequest()->getUri() << "] against ";
 	if (DEBUG_PATH) cout << locations.size() << " locations." << RESET << endl;
-
+	
 	for (size_t i = 0; i < locations.size(); ++i) {
 		const string&	locPath = locations[i].getPath();
-		const string&	uri = getRequest()->getUri();
+		// TO DO: do we need this variable html_ext? 
 		const string	html_ext = ".html";
 		
 		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
@@ -427,7 +429,10 @@ void	Response::badRequest() {
 	
 	// Check if a specific status code was set during request parsing
 	short requestStatusCode = getRequest()->getStatusCode();
-	if (requestStatusCode == 414) {
+	if (requestStatusCode == 413) {
+		if (DEBUG) cout << RED << "Response. Payload Too Large" << RESET << endl;
+		fillResponse(413, getErrorPageContent(413));
+	} else if (requestStatusCode == 414) {
 		if (DEBUG) cout << RED << "Response. URI Too Long" << RESET << endl;
 		fillResponse(414, getErrorPageContent(414));
 	} else if (requestStatusCode == 431) {
