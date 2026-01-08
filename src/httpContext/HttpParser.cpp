@@ -5,7 +5,7 @@
 #include <algorithm>	// For std::all_of
 #include <limits>
 #include <cstdio>
-#include <ctime>    // For time functions
+#include <ctime> 
 #include <sstream>  // For stringstream
 
 using std::cout;

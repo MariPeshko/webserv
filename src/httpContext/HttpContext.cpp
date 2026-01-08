@@ -18,7 +18,9 @@ HttpContext::HttpContext(Connection &conn, Server &server) :
 	_chunkSize(0),
 	_accumulatedBodySize(0),
 	_responseBuffer(""),
-	_bytesSent(0)
+	_bytesSent(0),
+	_draining(false),
+	_drainStart(0)
 { }
 
 // Copy constructor
@@ -33,7 +35,9 @@ HttpContext::HttpContext(const HttpContext &other) :
 	_chunkSize(other._chunkSize),
 	_accumulatedBodySize(other._accumulatedBodySize),
 	_responseBuffer(other._responseBuffer),
-	_bytesSent(other._bytesSent)
+	_bytesSent(other._bytesSent),
+	_draining(other._draining),
+	_drainStart(other._drainStart)
 { }
 
 HttpContext::~HttpContext() {}
@@ -57,7 +61,6 @@ void	HttpContext::requestParsingStateMachine()
 	while (can_parse) {
 		switch (_state) {
 			case REQUEST_LINE: {
-				// Check buffer size limit before parsing
 				if (!checkRequestLineSize(buf)) {
 					_state = REQUEST_ERROR;
 					request().setStatusCode(414); // URI Too Long
@@ -76,23 +79,23 @@ void	HttpContext::requestParsingStateMachine()
 						can_parse = false;
 						break;
 					}
-					// Otherwise, we just need more data, so we wait.
+					// Otherwise, we just need more data, so we wait
 					can_parse = false;
 					break;
 				} else {
-					// If successful, the state is READING_HEADERS, continue parsing.
+					// If successful, the state is READING_HEADERS, continue parsing
 					if (REQ_DEBUG) PrintUtils::printRequestLineInfo(request());
 					_state = READING_HEADERS;
 					continue; // Continue to READING_HEADERS case
 				}
 			}
 			case READING_HEADERS : {
-				// Check buffer size limit before parsing headers
 				if (!checkHeaderBlockSize(buf)) {
-					cout << RED << "limit of headers" << RESET << endl;
+					if (REQ_DEBUG) cout << RED << "limit of headers" << RESET << endl;
 					_state = REQUEST_ERROR;
 					request().setStatusCode(431); // Request Header Fields Too Large
 					request().ifConnNotPresent();
+					request().setVersion("HTTP/1.0");
 					can_parse = false;
 					break;
 				}
@@ -117,7 +120,7 @@ void	HttpContext::requestParsingStateMachine()
 				}
 			}
 			case READING_CHUNKED_BODY : {
-				while (chunkedBodyStateMachine(buf)) { // The body of the loop can be empty.
+				while (chunkedBodyStateMachine(buf)) { // The body of the loop can be empty
 					}
 				if (_state != REQUEST_COMPLETE && _state != REQUEST_ERROR) {
 					can_parse = false; // Pause parsing if we're waiting for more data
@@ -274,7 +277,7 @@ bool	HttpContext::isBodyToRead()
 				break;
 			}
 			contentLength = contentLength * 10 + static_cast<size_t>(c - '0');
-			// TODO (пізніше): перевірити верхню межу й ліміти
+			// TO DO mpeshko: перевірити верхню межу й ліміти
 		}
 		if (!ok) {
 			_state = REQUEST_ERROR;
@@ -425,7 +428,13 @@ void	HttpContext::buildResponseString()
 	if (version.empty())
 		version = "HTTP/1.0";
 	oss << version << " " << status_code << " " << reason_phrase << "\r\n";
-	oss << "Connection: " << _request.getHeaderValue("connection") << "\r\n";
+	
+	// FIX: For error responses, always use Connection: close
+	string connectionValue = _request.getHeaderValue("connection");
+	if (status_code >= 400 || connectionValue.empty()) {
+		connectionValue = "close";
+	}
+	oss << "Connection: " << connectionValue << "\r\n";
 
 	// 2. Headers
 	oss << "Content-Length: " << content_length << "\r\n";
@@ -504,14 +513,27 @@ bool	HttpContext::checkRequestLineSize(const std::string &buf)
 }
 
 /**
- * Check if the buffer exceeds the header block size limit.
- * This checks from the start of headers up to current buffer size.
+ * Check if the header portion exceeds the header block size limit.
+ * Only checks the actual headers, not body data mixed in the buffer.
  */
 bool	HttpContext::checkHeaderBlockSize(const std::string &buf)
 {
-	if (buf.size() > MAX_HEADER_BLOCK_SIZE) {
+	size_t headerEnd = buf.find("\r\n\r\n");
+	size_t sizeToCheck;
+	
+	if (headerEnd != string::npos) {
+		sizeToCheck = headerEnd;
+	} else {
+		sizeToCheck = buf.size();
+		// TO DO: why multiplying by two?
+		if (sizeToCheck > MAX_HEADER_BLOCK_SIZE * 2) {
+			if (CTX_DEBUG) cerr << RED << "Potential attack: huge buffer without header termination" << RESET << endl;
+			return false;
+		}
+	}
+	if (sizeToCheck > MAX_HEADER_BLOCK_SIZE) {
 		if (CTX_DEBUG) cerr << RED << "Header block exceeds maximum size: " 
-			<< buf.size() << " > " << MAX_HEADER_BLOCK_SIZE << RESET << endl;
+			<< sizeToCheck << " > " << MAX_HEADER_BLOCK_SIZE << RESET << endl;
 		return false;
 	}
 	return true;
@@ -527,7 +549,7 @@ bool	HttpContext::checkHeaderBlockSize(const std::string &buf)
  */
 bool	HttpContext::checkBodySizeLimit(size_t contentLength)
 {
-	const Location*	matchedLocation = _response.matchPathToLocation();
+	const Location*	matchedLocation = findMatchingLocation();
 	string			maxBodySizeStr;
 	
 	if (matchedLocation && !matchedLocation->getClientMaxBodySize().empty()) {
@@ -541,4 +563,46 @@ bool	HttpContext::checkBodySizeLimit(size_t contentLength)
 	size_t maxBodySize = HttpParser::parseSizeString(maxBodySizeStr);
 	
 	return contentLength <= maxBodySize;
+}
+
+// TO DO: mpeshko: to compare it to matchPathToLocation(). Can we use
+// one method in two places?
+const Location* HttpContext::findMatchingLocation()
+{
+	const std::vector<Location>&	locations = _server_config.getLocations();
+	const Location*					bestMatch = NULL;
+	size_t							bestMatchLen = 0;
+	
+	const string&					uri = request().getUri();
+	
+	for (size_t i = 0; i < locations.size(); ++i) {
+		const string&	locPath = locations[i].getPath();
+		
+		if (uri.find(locPath) == 0) { // URI starts with location path
+			if (locPath.length() > bestMatchLen) {
+				bestMatch = &locations[i];
+				bestMatchLen = locPath.length();
+			}
+		}
+	}
+	
+	return bestMatch;
+}
+
+void	HttpContext::startDraining() {
+	_draining = true;
+	_drainStart = time(NULL);
+}
+
+void	HttpContext::stopDraining() {
+	_draining = false;
+	_drainStart = 0;
+}
+
+bool	HttpContext::isDraining() const { return _draining; }
+
+bool	HttpContext::hasDrainTimedOut(time_t now, time_t timeoutSec) const {
+	if (!_draining)
+		return false;
+	return (now - _drainStart) >= timeoutSec;
 }
