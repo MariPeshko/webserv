@@ -27,7 +27,8 @@ OBJS = $(addprefix $(OBJ_DIR), $(SRCS:.cpp=.o))
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -g3
 
-LOG_FILE = webserv.log
+LOG_FILE = webserv.log \
+			valgrind.log
 
 RM = rm -rf
 

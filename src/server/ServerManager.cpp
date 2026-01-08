@@ -1,4 +1,6 @@
 #include "ServerManager.hpp"
+#include <unistd.h>
+#include <ctime>
 
 using std::string;
 using std::map;
@@ -155,45 +157,66 @@ void	ServerManager::handleNewConnection(int listener) {
 }
 
 /**
- * In case of POLLHUP client hung up (disconnected) and
- * recv() returns 0 (EOF).
+ * In case of POLLHUP client hung up (disconnected) and recv() returns 0 (EOF).
  * 
  * Reads the available chunk of data (which might be an incomplete 
  * request). Stores that chunk in the corresponding HttpContext object's 
  * internal buffer.
  * 
  * If request is not complete, we do nothing and wait for the next poll() event.
+ * 
+ * If the socket is in "drain" state:
+ * - recv() into a small buffer in a loop until socket would block or 
+ * closes; discard data (no parsing).
+ * TO DO: when is it EOF? When n == 0?
+ * - if recv() returns 0 (peer closed) - close(fd) and remove client
+ * - if draining timeout reached (1 s) - close(fd) and remove client
+ * - 
  */
 void	ServerManager::handleClientData(size_t i) {
-	const int	fd = _pfds[i].fd;
-
+	const int fd = _pfds[i].fd;
 	// Find HttpContext
-	map<int, HttpContext>::iterator	it = _contexts.find(fd);
+	map<int, HttpContext>::iterator it = _contexts.find(fd);
 	if (it == _contexts.end()) {
 		Logger::logErrno(LOG_ERROR, "No context found for fd " + toString(fd));
 		close(fd);
 		delFromPfds(i);
 		return ;
 	}
-	HttpContext&	ctx = it->second;
+	HttpContext& ctx = it->second;
+	// For correct 413 Payload Too Large page
+	if (ctx.isDraining()) {
+		char tmp[8192];
+		// TO DO describe what is for (;;)
+		for (;;) {
+			ssize_t n = recv(fd, tmp, sizeof(tmp), 0);
+			if (n > 0) {
+				ctx.connection().updateLastActivity();
+				continue;
+			}
+			if (n == 0) {
+				Logger::log(LOG_INFO, "Peer closed during drain on fd " + toString(fd));
+				removeClient(fd, i);
+				return;
+			}
+			break;
+		}
+		if (ctx.hasDrainTimedOut(time(NULL), 1)) {
+			Logger::log(LOG_INFO, "Drain timeout; closing fd " + toString(fd));
+			removeClient(fd, i);
+		}
+		return;
+	}
 
 	ssize_t nbytes = ctx.connection().receiveData();
-	if (nbytes == 0) {
-		handleClientHungup(fd, i);
-		return ;
-	}
-	if (nbytes < 0) {
-		handleClientError(fd, i);
-		return ;
-	}
+	if (nbytes == 0) { handleClientHungup(fd, i); return; }
+	if (nbytes < 0) { handleClientError(fd, i); return; }
+
 	ctx.requestParsingStateMachine();
 	if (ctx.isRequestComplete() || ctx.isRequestError()) {
 		ctx.response().bindRequest(ctx.request());
-		if (ctx.isRequestError()) {
-			ctx.response().badRequest();
-		} else {
-			ctx.response().generateResponse();
-		}
+		if (ctx.isRequestError()) ctx.response().badRequest();
+		else ctx.response().generateResponse();
 		ctx.buildResponseString();
 		_pfds[i].events |= POLLOUT;
 		Logger::logRequest(
@@ -206,7 +229,8 @@ void	ServerManager::handleClientData(size_t i) {
 	}
 }
 
-/** Handle POLLOUT event - send response data when socket is ready 
+/**
+ * Handle POLLOUT event - send response data when socket is ready
  * 
  * - Get remaining data to send
  * - A safeguard: If response fully sent, switch off POLLOUT
@@ -215,26 +239,39 @@ void	ServerManager::handleClientData(size_t i) {
  * - Updates the last activity timestamp on each successful send
  * - Updates bytes sent counter
  * - Check if response is complete
- *   - If yes and it's "close" connection - close it
+ *   - If yes and it's an error response - begin draining: stop writing, keep reading 
+ * 		to discard body
+ *   - If yes and it's a "close" connection - close it
  * 	 - If yes and it's "keep-alive" connection: reset state for the next 
  * 	   request and wait for POLLIN
  *   - Otherwise, response isn't complete - wait for next POLLOUT event
-*/
+ * 
+ * Note about raining: After fully send the error response (with Connection: close), 
+ * the webserver does not close(fd) immediately. Instead it switchs this
+ * connection to a "drain" state. 
+ * 1. TO DO: describe _pfds[i].events = POLLIN (remove POLLOUT)
+ * 2. set a ctx flag like ctx.setDraining(true) and record start time
+ * 
+ * We avoid closing while unread body is pending, so the kernel doesn’t 
+ * generate a TCP RST (Reset) and Chrome doesn't show ERR_CONNECTION_ABORTED
+ */
 void	ServerManager::handleClientWrite(size_t i) {
-	const int								fd = _pfds[i].fd;
-	map<int, HttpContext>::iterator	it = _contexts.find(fd);
+	const int fd = _pfds[i].fd;
+	map<int, HttpContext>::iterator it = _contexts.find(fd);
 	if (it == _contexts.end()) {
 		Logger::logErrno(LOG_ERROR, "No context found for fd " + toString(fd));
 		close(fd);
 		delFromPfds(i);
 		return;
 	}
-	HttpContext&		ctx = it->second;
+	HttpContext& ctx = it->second;
 
-	const string&	buffer = ctx.getResponseBuffer();
-	size_t			already_sent = ctx.getBytesSent();
-	
-	if (buffer.size() <= already_sent) { // A safeguard
+	const string& buffer = ctx.getResponseBuffer();
+	size_t already_sent = ctx.getBytesSent();
+	if (buffer.size() <= already_sent) {
+		//TO DO: describe: stop POLLOUT
+		_pfds[i].events &= ~POLLOUT;
+		//TO DO: describe: keep POLLIN
 		_pfds[i].events = POLLIN;
 		ctx.resetState();
 		return;
@@ -255,8 +292,19 @@ void	ServerManager::handleClientWrite(size_t i) {
 	}
 	ctx.connection().updateLastActivity();
 	ctx.addBytesSent(static_cast<size_t>(bytes_sent));
+
 	if (ctx.isResponseComplete()) {
-		 if (ctx.request().getHeaderValue("connection") == "close") {
+		short	statusCode = ctx.response().getStatusCode();
+		if (statusCode >= 400) {
+			// TO DO: describe: stop POLLOUT
+			_pfds[i].events &= ~POLLOUT;
+			// TO DO: describe: keep POLLIN
+			_pfds[i].events |= POLLIN;
+			ctx.startDraining();
+			Logger::log(LOG_INFO, "Begin draining after error response: " + toString(statusCode));
+			return;
+		}
+		if (ctx.request().getHeaderValue("connection") == "close") {
 			Logger::log(LOG_INFO, "Connection: close. Closing socket " + toString(fd));
 			removeClient(fd, i);
 		} else {
@@ -345,19 +393,30 @@ void	ServerManager::cleanup() {
  *  - If the connection has timed out, log it and call `removeClient(fd, i)`.
  *    Do not increment `i` when an element is removed, because `_pfds` shrinks
  *    and the next element moves into the current index.
+ * 
+ * For a "draining" connection: If no more events arrive while draining
+ * To close exactly at 1s even when idle we check if it's draining and
+ * if it's timed out.
  */
-void	ServerManager::checkTimeouts() {
-	time_t	timeout = 10; // 10 seconds timeout
-	for (size_t i = 0; i < _pfds.size(); ) {
+void	ServerManager::checkTimeouts()
+{
+	time_t	timeout = 30; // 30 seconds timeout
+	for (size_t i = 0; i < _pfds.size(); )
+	{
 		int	fd = _pfds[i].fd;
 		if (!isListener(fd)) {
-			map<int, HttpContext>::iterator it = _contexts.find(fd);
+			map<int, HttpContext>::iterator	it = _contexts.find(fd);
+
 			if (it != _contexts.end()) {
 				 if (it->second.connection().hasTimedOut(timeout)) {
-					Logger::log(LOG_INFO, "Connection timed out on socket " + toString(fd));
+					 Logger::log(LOG_INFO, "Connection timed out on socket " + toString(fd));
+					 removeClient(fd, i);
+					 continue; 
+				 } else if ((it->second.isDraining() && it->second.hasDrainTimedOut(time(NULL), 1))) {
+					Logger::log(LOG_INFO, "Drain timeout; closing fd " + toString(fd));
 					removeClient(fd, i);
-					continue; 
-				 }
+					continue;
+				}
 			}
 		}
 		i++;
