@@ -82,11 +82,11 @@ void	Config::parse(const std::string &config_file)
 // Helper to check if a token is a known directive (to handle missing semicolons)
 static bool	isDirective(const std::string &token)
 {
-	static const std::array<const char*, 15> directives = {
+	static const char *directives[] = {
 		"listen", "host", "server_name", "error_page", "client_max_body_size",
 		"location", "methods", "allow_methods", "index", "root",
 		"autoindex", "return", "cgi", "alias", "}"};
-	for (size_t i = 0; i < directives.size(); ++i)
+	for (size_t i = 0; i < sizeof(directives) / sizeof(directives[0]); ++i)
 	{
 		if (token == directives[i])
 			return true;
