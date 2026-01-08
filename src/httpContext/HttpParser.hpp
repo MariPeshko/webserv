@@ -7,7 +7,7 @@
 # include <vector>
 # include <iostream>
 # include <sstream>
-# include <limits>
+# include <limits> // C++98: for std::numeric_limits<size_t>::max()
 
 #define DEBUG_HTTP_PARSER 0
 
@@ -31,6 +31,7 @@ class	HttpParser {
 	static std::string	extractBoundary(const std::string& contentType);
 	static bool			isExtensionAllowed(const std::string& filename);
 	static size_t		parseSizeString(const std::string& sizeStr);
+	static bool			safeParseContentLength(const std::string &cl, size_t &contentLength);
 
 	private:
 };

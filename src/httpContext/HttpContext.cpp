@@ -267,22 +267,14 @@ bool	HttpContext::isBodyToRead()
 			_state = REQUEST_COMPLETE;
 			return false;
 		}
-		// Reject non-digit characters early and manual accumulation
+
 		size_t	contentLength = 0;
-		bool	ok = true;
-		for (size_t i = 0; i < cl.size(); ++i) {
-			char c = cl[i];
-			if (c < '0' || c > '9') {
-				ok = false;
-				break;
-			}
-			contentLength = contentLength * 10 + static_cast<size_t>(c - '0');
-			// TO DO mpeshko: перевірити верхню межу й ліміти
-		}
-		if (!ok) {
+		if (!HttpParser::safeParseContentLength(cl, contentLength)) {
 			_state = REQUEST_ERROR;
+			request().setStatusCode(400); // invalid Content-Length
 			return false;
 		}
+
 		// Now check against client_max_body_size
 		if (!checkBodySizeLimit(contentLength)) {
 			_state = REQUEST_ERROR;

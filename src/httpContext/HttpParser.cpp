@@ -433,3 +433,38 @@ size_t	HttpParser::parseSizeString(const string& sizeStr) {
 	
 	return num * multiplier;
 }
+
+// Safe parse for Content-Length in C++98:
+// - only digits allowed
+// - detect overflow while accumulating
+// - reject leading '+'/'-' and empty strings
+//
+// contentLength = contentLength * 10 + static_cast<size_t>(c - '0');
+bool	HttpParser::safeParseContentLength(const std::string &cl, size_t &contentLength)
+{
+	if (cl.empty())
+		return false;
+
+	for (size_t i = 0; i < cl.size(); ++i) {
+		char c = cl[i];
+		if (c < '0' || c > '9')
+			return false;
+	}
+
+	// 2) accumulate with overflow detection
+	const size_t	SIZE_MAX_CPP98 = std::numeric_limits<size_t>::max();
+	size_t			acc = 0;
+	for (size_t i = 0; i < cl.size(); ++i) {
+		const size_t	digit = static_cast<size_t>(cl[i] - '0');
+		// overflow check before multiply/add: acc * 10 + digit <= SIZE_MAX 
+		if (acc > (SIZE_MAX_CPP98 / 10))
+			return false;
+		const size_t	mul = acc * 10;
+		if (mul > (SIZE_MAX_CPP98 - digit))
+			return false;
+
+		acc = mul + digit;
+	}
+	contentLength = acc;
+	return true;
+}
