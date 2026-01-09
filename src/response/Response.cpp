@@ -432,6 +432,9 @@ void	Response::badRequest() {
 	if (requestStatusCode == 400) {
 		if (DEBUG) cout << RED << "Response. Bad Request" << RESET << endl;
 		fillResponse(400, getErrorPageContent(400));
+	} else if (requestStatusCode == 405) {
+		if (DEBUG) cout << RED << "Response. Not Allowed" << RESET << endl;
+		fillResponse(405, getErrorPageContent(405));
 	} else if (requestStatusCode == 413) {
 		if (DEBUG) cout << RED << "Response. Payload Too Large" << RESET << endl;
 		fillResponse(413, getErrorPageContent(413));

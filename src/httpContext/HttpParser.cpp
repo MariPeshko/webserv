@@ -73,6 +73,7 @@ bool HttpParser::parseRequestLine(const std::string& line,
 	if (method != "GET" && method != "POST" && method != "DELETE") {
 		req.setRequestLineFormatValid(false);
 		req.setMethod("");
+		req.setStatusCode(405);
 		return false;
 	}
 	if (version != "HTTP/1.1" && version != "HTTP/1.0") {
