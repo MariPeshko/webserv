@@ -1,15 +1,15 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include <string>
-#include <iostream>
-#include <dirent.h>
-#include <sstream>
-#include <sys/stat.h>
+#include <cerrno>
 #include <cstring>
+#include <dirent.h>
+#include <iostream>
+#include <sstream>
+#include <string>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <cerrno>
+#include <stdint.h> // for uint32_t in C++98
 
 const char*	generateStatusMessage(short status_code);
 int			buildHtmlIndexTable(std::string &dir_name, std::string &body, size_t &body_len);
@@ -25,5 +25,6 @@ std::string	toString(const T val)
 }
 
 std::string	ipv4_to_string(uint32_t ip);
+bool		is_only_digits(const std::string& str);
 
 #endif

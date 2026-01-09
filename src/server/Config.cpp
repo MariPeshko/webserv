@@ -1,7 +1,4 @@
 #include "Config.hpp"
-#include <iostream>
-#include <algorithm>
-#include <set>
 
 Config::Config() {}
 Config::~Config() {}
@@ -85,11 +82,11 @@ void	Config::parse(const std::string &config_file)
 // Helper to check if a token is a known directive (to handle missing semicolons)
 static bool	isDirective(const std::string &token)
 {
-	static const char*	directives[] = {
-		"listen", "host", "server_name", "root", "error_page", "client_max_body_size",
-		"client_body_buffer_size", "location", "methods", "allow_methods", "index",
-		"autoindex", "return", "cgi", "cgi_pass", "alias", "}"};
-	for (size_t i = 0; i < 17; ++i)
+	static const char *directives[] = {
+		"listen", "host", "server_name", "error_page", "client_max_body_size",
+		"location", "methods", "allow_methods", "index", "root",
+		"autoindex", "return", "cgi", "alias", "}"};
+	for (size_t i = 0; i < sizeof(directives) / sizeof(directives[0]); ++i)
 	{
 		if (token == directives[i])
 			return true;
@@ -156,7 +153,11 @@ void	Config::parseServer(Server &server, std::vector<std::string> &tokens)
 				server.setHost(val.substr(0, colonPos));
 				server.setPort(atoi(val.substr(colonPos + 1).c_str()));
 			} else {
-				server.setPort(atoi(val.c_str()));
+				int port = atoi(val.c_str());
+				if (!is_only_digits(val.substr(0, colonPos)) || port <= 0 || port > 65535) {
+					throw std::runtime_error("Invalid port in listen directive: " + val);
+				}
+				server.setPort(port);
 			}
 		} else if (directive == "host") {
 			server.setHost(tokens.back());
@@ -255,25 +256,6 @@ void	Config::parseLocation(Location &location, std::vector<std::string> &tokens,
 			std::string path = tokens.back(); // Correct: second arg is path
 			tokens.pop_back();
 			location.addCgi(ext, path);
-		} else if (directive == "cgi_pass") {
-			// Assume path extension derived from location path or generic
-			std::string path = tokens.back();
-			tokens.pop_back();
-			// If location path is an extension (e.g. *.php), use it
-			std::string locPath = location.getPath();
-			if (locPath.size() > 1 && locPath[0] == '*' && locPath[1] == '.') {
-				location.addCgi(locPath.substr(1), path); // Remove *
-			} else {
-				location.addCgi("*", path); // Generic CGI
-			}
-		} else if (directive == "alias") {
-			// Alias might be empty in mac.conf (just 'alias'?) or have a path
-			if (!tokens.empty() && !isDirective(tokens.back()) && tokens.back() != "}") 	{
-				location.setAlias(tokens.back());
-				tokens.pop_back();
-			} else {
-				location.setAlias("on"); // Treat as flag if no value?
-			}
 		} else if (directive == "client_max_body_size" || directive == "client_body_buffer_size") {
 			location.setClientMaxBodySize(tokens.back());
 			tokens.pop_back();

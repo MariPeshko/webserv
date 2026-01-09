@@ -1,20 +1,12 @@
 #ifndef SERVER_MANAGER_HPP
 # define SERVER_MANAGER_HPP
 
+#include "../../inc/Webserv.hpp"
 #include "Server.hpp"
 #include "../httpContext/Connection.hpp"
 #include "../httpContext/HttpContext.hpp"
-# include "../logger/Logger.hpp"
-#include "../response/utils.hpp"
-#include <unistd.h>	// close()
+
 #include <poll.h>
-#include <vector>
-#include <map>
-#include <cstring>	// strerror()
-#include <cerrno>
-#include <sstream>	// for std::ostringstream
-#include <iostream>
-#include <fcntl.h>
 
 #define GREEN "\033[32m"
 #define RESET "\033[0m"

@@ -2,22 +2,16 @@
 #define CONFIG_HPP
 
 #include "../server/Server.hpp"
-#include <string>
-#include <vector>
-#include <fstream>
-#include <sstream>
+#include "../../inc/Webserv.hpp"
 #include <stdexcept>
-#include <cctype>
-#include <cstdlib>
-#include <algorithm>
 
 class Config
 {
 	public:
 		Config();
 		~Config();
-		void parse(const std::string &config_file);
-		std::vector<Server> &getServerConfigs();
+		void					parse(const std::string &config_file);
+		std::vector<Server>&	getServerConfigs();
 
 	private:
 		std::string					_config_file;

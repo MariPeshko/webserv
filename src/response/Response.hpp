@@ -1,6 +1,15 @@
 #ifndef RESPONSE_HPP
 #define RESPONSE_HPP
 
+#include "../request/Request.hpp"
+#include "../server/Server.hpp"
+#include "../../inc/Webserv.hpp"
+#include "../httpContext/HttpParser.hpp"
+#include "../cgi/CgiHandler.hpp"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
 #define DEBUG 0
 #define DEBUG_PATH 0
 #define D_POST 0
@@ -10,20 +19,6 @@
 #define RED "\033[31m"
 #define YELLOW "\033[33m"
 #define ORANGE "\033[38;5;208m"
-
-#include "../request/Request.hpp"
-#include "../server/Server.hpp"
-#include "utils.hpp"
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <map>
-#include <ctime>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <dirent.h>
 
 class	Response
 {

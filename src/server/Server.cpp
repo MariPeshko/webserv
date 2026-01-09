@@ -1,12 +1,4 @@
 #include "Server.hpp"
-#include "../logger/Logger.hpp"
-#include <arpa/inet.h> // For inet_addr
-#include <unistd.h>	   // For close
-#include <string.h>	   // For memset
-#include <cerrno>	   // errno
-#include <sstream>	   // For stringstream
-
-// --- Server Implementation ---
 
 Server::Server() {
 	_port = 8080;

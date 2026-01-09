@@ -1,5 +1,5 @@
-#include "Response.hpp"
 #include "utils.hpp"
+#include "../response/Response.hpp"
 
 const char *generateStatusMessage(short status_code)
 {
@@ -121,4 +121,14 @@ std::string	ipv4_to_string(uint32_t ip) {
 		<< ((ip >> 8) & 0xFF) << "."
 		<< (ip & 0xFF);
 	return oss.str();
+}
+
+bool	is_only_digits(const std::string& str) {
+	if (str.empty())
+        return false;
+    for (std::string::const_iterator it = str.begin(); it != str.end(); ++it) {
+        if (!std::isdigit(static_cast<unsigned char>(*it)))
+            return false;
+    }
+    return true;
 }

@@ -146,7 +146,6 @@ void	ServerManager::handleNewConnection(int listener) {
 	conn.setClientAddress(remoteaddr);
 
 	Server*		server = _map_servers[listener];
-	
 	_contexts.insert(std::make_pair(newfd, HttpContext(conn, *server)));
 
 	uint32_t	ip = ntohl(remoteaddr.sin_addr.s_addr);

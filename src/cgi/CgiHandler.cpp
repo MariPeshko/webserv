@@ -1,7 +1,4 @@
 #include "CgiHandler.hpp"
-#include <sstream>
-#include <cstdio>
-#include <cctype> // Required for std::toupper
 
 using std::string;
 using std::map;

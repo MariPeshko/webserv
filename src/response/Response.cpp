@@ -1,6 +1,4 @@
 #include "Response.hpp"
-#include "../httpContext/HttpParser.hpp"
-#include "../cgi/CgiHandler.hpp"
 
 using std::cerr;
 using std::cout;

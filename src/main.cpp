@@ -1,11 +1,9 @@
 #include "server/Server.hpp"
 #include "server/Config.hpp"
-#include <string>
-#include <iostream>
-#include <string.h>
-#include <signal.h>
 #include "server/ServerManager.hpp"
-#include "logger/Logger.hpp"
+#include "../inc/Webserv.hpp"
+
+#include <signal.h>
 
 static ServerManager*	g_server_manager = NULL;
 
@@ -48,11 +46,12 @@ int		main(int ac, char **argv) {
 	try {
 		if (ac <= 2) {
 			// if no config file provided, use default config file
-			std::string config_file = (ac == 1 ? "configs/default.conf" : argv[1]);
+			std::string	config_file = (ac == 1 ? "configs/default.conf" : argv[1]);
 			// parse config file and save parsed data
 			config.parse(config_file);
 			server_manager.setupServers(config.getServerConfigs());
 			server_manager.runServers();
+
         } else {
 			Logger::log(LOG_ERROR, "Wrong arguments. Usage: ./webserv [config_file]");
 			g_server_manager = NULL;

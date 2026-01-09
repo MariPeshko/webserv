@@ -1,5 +1,4 @@
 #include "Logger.hpp"
-#include <sstream>
 
 std::ofstream Logger::_logFile;
 std::string Logger::_filename;
