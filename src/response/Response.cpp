@@ -470,22 +470,7 @@ const Location*	Response::validateRequestAndGetLocation() {
 		fillResponse(404, getErrorPageContent(404));
 		return NULL;
 	}
-	// Check for allowed methods
-	const std::vector<string>&	allowed = loc->getAllowedMethods();
-	if (!allowed.empty()) {
-		bool	methodAllowed = false;
-		for (size_t i = 0; i < allowed.size(); ++i) {
-			if (allowed[i] == getRequest()->getMethod()) {
-				methodAllowed = true;
-				break;
-			}
-		}
-		if (!methodAllowed) {
-			if (DEBUG) cout << RED << "Method " << getRequest()->getMethod() << " not allowed for this location." << RESET << endl;
-			fillResponse(405, getErrorPageContent(405));
-			return NULL;
-		}
-	}
+
 	// Check for redirection
 	int	code = loc->getReturnCode();
 	if (code != 0) {
@@ -495,6 +480,26 @@ const Location*	Response::validateRequestAndGetLocation() {
 		_headers["Content-Type"] = "text/html";
 		return NULL;
 	}
+	// Check for allowed methods
+	const std::vector<string>&	allowed = loc->getAllowedMethods();
+	if (allowed.empty()) {
+		if (DEBUG) cout << RED << "No methods allowed for this location." << RESET << endl;
+		fillResponse(405, getErrorPageContent(405));
+		return NULL;
+	}
+	bool	methodAllowed = false;
+	for (size_t i = 0; i < allowed.size(); ++i) {
+		if (allowed[i] == getRequest()->getMethod()) {
+			methodAllowed = true;
+			break;
+		}
+	}
+	if (!methodAllowed) {
+		if (DEBUG) cout << RED << "Method " << getRequest()->getMethod() << " not allowed for this location." << RESET << endl;
+		fillResponse(405, getErrorPageContent(405));
+		return NULL;
+	}
+	
 	return loc;
 }
 
@@ -589,7 +594,7 @@ string			Response::getErrorPageContent(int code)
 		}
 	}
 
-	int defaultError = 500;
+	int	defaultError = 500;
 	return getErrorPageContent(defaultError);
 }
 
@@ -656,6 +661,7 @@ bool		Response::tryServeCgi()
 	try {
 		CgiHandler	cgi(*this, _path, it->second);
 		string		output = cgi.executeCgi();
+		cout << "cgi output: " << output << endl;
 		if (!applyCgiOutput(output)) {
 			fillResponse(502, getErrorPageContent(502)); // 502 Bad Gateway
 		}

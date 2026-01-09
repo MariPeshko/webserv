@@ -1,5 +1,6 @@
 #include "CgiHandler.hpp"
 
+
 using std::string;
 using std::map;
 
@@ -42,11 +43,9 @@ void	CgiHandler::setupEnv() {
 	string	uri = req->getUri();
 	size_t	queryPos = uri.find('?');
 	if (queryPos != string::npos) {
-		if (CGI_DEBUG) std::cout << "CGI: QUERY_STRING: " << uri.substr(queryPos + 1) << std::endl;
 		_env["QUERY_STRING"] = uri.substr(queryPos + 1);
 		_env["PATH_INFO"] = uri.substr(0, queryPos);
 	} else {
-		if (CGI_DEBUG) std::cout << "CGI: QUERY_STRING is empty string" << std::endl;
 		_env["QUERY_STRING"] = "";
 		_env["PATH_INFO"] = uri;
 	}
@@ -80,10 +79,12 @@ void	CgiHandler::setupEnv() {
 /**
  * Executes a CGI script using fork/exec and captures its output.
  * 
- * 1. Creates two pipes: one for sending request body to script (stdin),
- *    another for reading script output (stdout)
- * 2. Forks a child process to run the CGI script
- * 3. Child process:
+ *  I/O topology:
+ *  - pipeIn:  parent writes request body -> child's stdin
+ *  - pipeOut: child's stdout -> parent reads CGI output
+ *  
+ * - Forks a child process to run the CGI script
+ * - Child process:
  *    - Redirects stdin/stdout to the pipes
  *    - Closes unused file descriptors to prevent leakage
  *    - Executes the script using execve() with environment variables
@@ -91,6 +92,12 @@ void	CgiHandler::setupEnv() {
  *    - Writes request body to script's stdin
  *    - Reads script's output from stdout
  *    - Waits for child process to complete
+ * 
+ *  Timeout handling: 
+ * - Set both pipe fds (pipeIn[1], pipeOut[0]) to O_NONBLOCK.
+ * - Record start = time(NULL); enforce a hard limit CGI_TIMEOUT_SEC.
+ * - In a read phase: After each iteration check child state with waitpid with
+ *   a flag WNOHANG.
  * 
  * @return The complete output from the CGI script (headers + body),
  *         or an error message string if execution fails
@@ -140,26 +147,89 @@ string	CgiHandler::executeCgi()
 	} else { // Parent Process
 		close(pipeIn[0]);
 		close(pipeOut[1]);
-		// Write request body to the script's stdin
+
+		// For a a CGI timeout: Non-blocking I/O on pipes
+		fcntl(pipeIn[1], F_SETFL, O_NONBLOCK);
+		fcntl(pipeOut[0], F_SETFL, O_NONBLOCK);
+		const time_t	CGI_TIMEOUT_SEC = 5; // adjust as needed
+		const time_t	start = time(NULL);
+
+		// For a a CGI timeout: Write request body (best-effort, 
+		// non-blocking, with timeout).
+		// write() system call is not guaranteed to send all your data in one go;
+		// written - a counter to keep track of how many bytes have been sent
+		const string&	body = req->getBody();
+		size_t			written = 0;
+		while (written < body.size()) {
+			ssize_t	n = write(pipeIn[1], body.c_str() + written, body.size() - written);
+			if (n > 0) {
+				written += static_cast<size_t>(n);
+				continue;
+			}
+			// if n <= 0 - check timeout and give up writing for now
+			if (time(NULL) - start >= CGI_TIMEOUT_SEC) {
+				kill(pid, SIGKILL);
+				close(pipeIn[1]);
+				close(pipeOut[0]);
+				int	status;
+				waitpid(pid, &status, 0);
+				if (CGI_DEBUG) std::cout << "CGI Script Timeout (write)" << std::endl;
+				return "Status: 504\r\n\r\nCGI Script Timeout (write)";
+			}
+			break;
+		}
+
+		/* TO DELETE // Write request body to the script's stdin
 		if (!req->getBody().empty()) {
 			write(pipeIn[1], req->getBody().c_str(), req->getBody().length());
-		}
-		close(pipeIn[1]); // Finished writing
+		} */
+		close(pipeIn[1]); // Done writing (or child closed early)
 
 		// Read script's stdout
+		// For a a CGI timeout: read until child exits or timeout
 		string		result;
 		char		buffer[4096];
-		ssize_t		bytesRead;
-		while ((bytesRead = read(pipeOut[0], buffer, sizeof(buffer))) > 0) {
-			result.append(buffer, bytesRead);
-		}
-		close(pipeOut[0]);
-		
-		int	status;
-		waitpid(pid, &status, 0); // Wait for child
-		if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-			if (CGI_DEBUG) std::cout << "executeCgi(): Child process failed" << std::endl;
-			return "Status: 500\r\n\r\nCGI Script Error";
+
+		while (true) {
+			// Timeout check
+			if (time(NULL) - start >= CGI_TIMEOUT_SEC) {
+				kill(pid, SIGKILL);
+				close(pipeOut[0]);
+				int	status;
+				waitpid(pid, &status, 0);
+				if (CGI_DEBUG) std::cout << "CGI Script Timeout (read)" << std::endl;
+				return "Status: 504\r\n\r\nCGI Script Timeout";
+			}
+
+			ssize_t n = read(pipeOut[0], buffer, sizeof(buffer));
+			if (n > 0)
+				result.append(buffer, static_cast<size_t>(n));
+
+			// Check if child has exited
+			int		status;
+			// WNOHANG - return immediately if no child has exited.
+			// If a child died, its pid will be returned by waitpid() and process 
+			// can act on that. If nothing died, then the returned pid is 0.
+			pid_t	r = waitpid(pid, &status, WNOHANG);
+			if (r == pid) {
+				// Drain any remaining data once more
+				while (true) {
+					ssize_t n = read(pipeOut[0], buffer, sizeof(buffer));
+					if (n > 0)
+						result.append(buffer, static_cast<size_t>(n));
+					else break;
+				}
+				close(pipeOut[0]);
+				if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+					if (CGI_DEBUG) std::cout << "executeCgi(): Child process failed" << std::endl;
+					return "Status: 500\r\n\r\nCGI Script Error";
+				}
+				if (WIFSIGNALED(status)) {
+					if (CGI_DEBUG) std::cout << "executeCgi(): Child process terminated by signal" << std::endl;
+					return "Status: 500\r\n\r\nCGI Script Terminated";
+				}
+				return result;
+			}
 		}
 		return result;
 	}

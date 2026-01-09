@@ -23,6 +23,7 @@ const char *generateStatusMessage(short status_code)
 	case 500: return "Internal Server Error";
 	case 501: return "Not Implemented";
 	case 502: return "Bad Gateway";
+	case 504: return "Gateway Timeout";
 	default: return "Unknown Status";
 	}
 }

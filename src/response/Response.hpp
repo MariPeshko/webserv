@@ -10,8 +10,8 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#define DEBUG 0
-#define DEBUG_PATH 0
+#define DEBUG 1
+#define DEBUG_PATH 1
 #define D_POST 0
 #define GREEN "\033[32m"
 #define RESET "\033[0m"

@@ -2,7 +2,7 @@
 <html>
 
 <head>
-	<title>403 Forbidden</title>
+	<title>504 Gateway Timeout</title>
 	<style>
 		body {
 			font-family: Arial, sans-serif;
@@ -20,21 +20,23 @@
 			margin-top: 5px;
 			margin-bottom: 8px;
 		}
-		p:first-of-type {
+		p {
 			font-size: 20px;
-			margin-top: 8px;
-   		}
-		p { font-size: 16px; }
+		}
 		.home-top-btn { position: fixed; top: 20px; left: 30px; background: #3b82f6; color: #fff; text-decoration: none; font-size: 14px; padding: 8px 12px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); } .home-top-btn:hover { filter: brightness(1.1); } 
 	</style>
 </head>
 
 <body>
-	<h1>403</h1>
-	<p>Forbidden</p>
-	<p>You don't have permission to access this resource.</p>
-	<img src="https://http.cat/403" alt="HTTP 403 cat" style="max-width: 40%; height: auto; margin-bottom: 16px;" />
+	<h1>504</h1>
+	<h2>Gateway Timeout</h2>
+	<p>The HTTP 504 Gateway Timeout server error response status code 
+			indicates that the server, while acting as a gateway or proxy, did not get a 
+			response in time from the upstream server in order to complete the request. 
+			This is similar to a 502 Bad Gateway, except that in a 504 status, the proxy 
+			or gateway did not receive any HTTP response from the origin within a certain time.</p>
 	<br>
+	<img src="https://http.cat/504" alt="HTTP 504 cat" style="max-width: 80%; height: auto; margin-bottom: 16px;" />
 	<a href="/" class="home-top-btn">Go back home</a>
 </body>
 

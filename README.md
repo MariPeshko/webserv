@@ -148,10 +148,10 @@ How to trigger SIGPIPE
 
 ```sleep(5);                           // Give time for client to potentially disconnect
 shutdown(client_fd, SHUT_WR);       // Shutdown writing side of socket
-send(client_fd, "Second message\n", 15, 0);  // Try to send to shutdown socket → SIGPIPE!```
+send(client_fd, "Second message\n", 15, 0);  // Try to send to shutdown socket → SIGPIPE!
+```
 
 With MSG_NOSIGNAL - No signal generated, just returns -1 with errno
-
 
 ## /.well-known/appspecific/com.chrome.devtools.json
 The request for /.well-known/appspecific/com.chrome.devtools.json is a standard behavior of Google Chrome's Developer Tools.
@@ -180,6 +180,8 @@ CGI is a protocol that acts as a translator between a Web Server (like NGINX or 
 
 ### What is a query string?
 
+The query string is the mechanism for a web server (NGINX) to send specific user input or parameters to a backend dynamic application.
+
 A query string is the part of a URL that comes after the ? character, containing key-value pairs of data passed to the CGI script.
 
 Examples:
@@ -194,7 +196,10 @@ key1=value1&key2=value2&key3=value3
 
 `http://localhost:8080/cgi-bin/test.py`
 
-`http://localhost:8080/cgi-bin/form_handler.py`
+`http://localhost:8080/form.html`
 
 Error cases:
 `http://localhost:8080/cgi-bin/empty.py`
+`http://localhost:8080/cgi-bin/runtime_error.py`
+`http://localhost:8080/cgi-bin/syntax_error.py`
+`http://localhost:8080/cgi-bin/timeout.py`

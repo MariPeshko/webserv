@@ -9,23 +9,33 @@
 			text-align: center;
 			padding: 50px;
 		}
-
 		h1 {
-			font-size: 50px;
+            font-size: 30px;
+            color: #e74c3c;
+            margin: 0;
+        }
+		h2 {
+			color: #6c757d;
+			font-size: 24px;
+			margin-top: 5px;
+			margin-bottom: 16px;
 		}
-
-		p {
+		p { font-size: 20px; }
+		p:first-of-type {
 			font-size: 20px;
-		}
+			margin-top: 15px;
+   		}
+		p { font-size: 16px; }
+		.home-top-btn { position: fixed; top: 20px; left: 30px; background: #3b82f6; color: #fff; text-decoration: none; font-size: 14px; padding: 8px 12px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); } .home-top-btn:hover { filter: brightness(1.1); } 
 	</style>
 </head>
 
 <body>
 	<h1>405</h1>
-	<p>Method Not Allowed</p>
+	<h2>Method Not Allowed</h2>
 	<p>The method specified in the Request-Line is not allowed for the resource identified by the Request-URI.</p>
 	<br>
-	<a href="/"><button style="font-size: 20px; padding: 10px 20px; cursor: pointer;">Go back home</button></a>
+	<a href="/" class="home-top-btn">Go back home</a>
 </body>
 
 </html>

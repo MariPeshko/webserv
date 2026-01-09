@@ -76,7 +76,7 @@ def main():
         ("GET", "/correct-auto-index", 200, "Autoindex Directory Listing"),
         ("GET", "/correct-auto-index/nested", 200, "Nested Autoindex Directory Listing"),
         ("GET", "/correct-auto-index/with-index", 200, "Autoindex Directory with Index File (Should serve index)"),
-        ("GET", "/auto-index-off", 403, "Directory Forbidden (Autoindex Off)"),
+        ("GET", "/auto-index-off", 403, "Directory Forbidden (403) (Autoindex Off)"),
         
         # Gallery
         ("GET", "/gallery", 200, "Gallery Page (Index)"),

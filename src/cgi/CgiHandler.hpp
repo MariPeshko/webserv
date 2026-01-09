@@ -5,8 +5,7 @@
 # include "../response/Response.hpp"
 # include "../../inc/Webserv.hpp"
 
-
-# define CGI_DEBUG 0
+# define CGI_DEBUG 1
 
 class Response;
 
