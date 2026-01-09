@@ -28,11 +28,7 @@ void	HttpParser::appendToBody(const std::string & buffer, const size_t n, Reques
  */
 bool HttpParser::parseRequestLine(const std::string& line, 
 									Request& req) {
-	if (line.empty()) {
-		req.setRequestLineFormatValid(false);
-		req.setMethod("");
-		return false;
-	}
+
 	std::istringstream	iss(line); 
 	std::string			method, uri, version;
 
@@ -47,6 +43,7 @@ bool HttpParser::parseRequestLine(const std::string& line,
 		if(uri.size() != 0) req.setUri(uri);
 		if(version.size() != 0) req.setVersion(version);
 		req.setRequestLineFormatValid(false);
+		req.setStatusCode(400);
 		return false;
 	}
 	// Handle absolute URI (e.g., GET http://localhost:8080/ HTTP/1.0)

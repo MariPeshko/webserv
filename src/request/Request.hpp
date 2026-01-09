@@ -17,7 +17,6 @@ class	Request {
 			GET,
 			POST,
 			DELETE,
-			HEAD,
 			INVALID
 		};
 

@@ -203,6 +203,9 @@ bool	HttpContext::findAndParseReqLine(std::string &buf)
 
 	string	line = buf.substr(0, pos);
 	buf.erase(0, pos + 2);
+	
+	// Ignore leading empty lines (user pressed Enter in telnet)
+	if (line.empty()) return false;
 
 	if (HttpParser::parseRequestLine(line, request()) == true) {
 		// Validate host from absolute URI if present

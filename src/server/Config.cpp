@@ -102,7 +102,7 @@ static void	consumeSemiColon(std::vector<std::string> &tokens)
 	}
 }
 
-// Helper to parse array-like values e.g. [GET, POST, HEAD] or simple list GET POST
+// Helper to parse array-like values e.g. [GET, POST] or simple list GET POST
 static std::vector<std::string>	parseValues(std::vector<std::string> &tokens)
 {
 	std::vector<std::string>	values;
