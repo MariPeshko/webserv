@@ -93,7 +93,7 @@ void	Response::generateResponseGet()
 		return;
 	}
 	if (pathType == DIRECTORY_PATH) {
-		if (DEBUG) cout << BLUE << "Path is a directory.1" << RESET << endl;
+		if (DEBUG) cout << BLUE << "Path is a directory" << RESET << endl;
 		if (_path[_path.length() - 1] != '/')
 			_path += "/";
 		// if autoindex true
@@ -104,7 +104,7 @@ void	Response::generateResponseGet()
 		// string targetPath = path + indexFile;
 		string	targetPath = indexFile.empty() ? isAutoindexPresent ? _path : "" : _path + indexFile;
 
-		if (DEBUG) cout << BLUE << "Checking targetPath file1: " << targetPath << RESET << endl;
+		if (DEBUG) cout << BLUE << "Checking target Path file: " << targetPath << RESET << endl;
 		if (DEBUG) cout << YELLOW << "Index to use: " << indexFile << RESET << endl;
 
 		if (getPathType(targetPath) == FILE_PATH) {
@@ -112,6 +112,11 @@ void	Response::generateResponseGet()
 			if (DEBUG) cout << GREEN << "Index file exists: " << _path << RESET << endl;
 		} else {
 			if (DEBUG) cout << BLUE << "Index file not found." << RESET << endl;
+			if (isIndexPresent) {
+				if (DEBUG) cout << BLUE << "Index is present, but file not found: 404" << RESET << endl;
+				fillResponse(404, getErrorPageContent(404));
+				return;
+			}
 			if (_loc->getAutoindex()) {
 				if (DEBUG) cout << BLUE << "Autoindex is ON. Generating listing for: " << _path << RESET << endl;
 				string	body;
@@ -125,11 +130,14 @@ void	Response::generateResponseGet()
 				if (DEBUG) cout << RED << "Autoindex generation failed." << RESET << endl;
 				fillResponse(500, getErrorPageContent(500));
 				return;
-			} else {
-				if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off2)" << RESET << endl;
-				fillResponse(403, getErrorPageContent(403));
-				return;
 			}
+			// TO DO
+/* 			if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off)" << RESET << endl;
+			fillResponse(403, getErrorPageContent(403));
+			return; */
+			// No index and autoindex off then 404 (not 403)
+        	fillResponse(404, getErrorPageContent(404));
+        	return;
 		}
 	}
 	if (tryServeCgi())
@@ -278,8 +286,15 @@ void	Response::generateResponsePost()
 	} else if (contentType.find("application/x-www-form-urlencoded") != string::npos) {
 		// --- Form Data Logic ---
 		// For example, parse "name=Maryna&city=Kyiv"
-		fillResponse(501, getErrorPageContent(501)); // Not Implemented yet
+		if (getRequest()->getBody().empty()) {
+        	fillResponse(200, "OK");
+    	} else {
+			fillResponse(501, getErrorPageContent(501)); // Not Implemented yet
+		}
 	} else {
+		if (getRequest()->getBody().empty()) {
+        	fillResponse(200, "OK");
+    	} 
 		// --- Unsupported Type Logic ---
 		fillResponse(415, getErrorPageContent(415));
 	}
@@ -520,7 +535,7 @@ const Location*	Response::validateRequestAndGetLocation() {
  * @param uri Reference to store the cleaned URI (query string removed)
  * @return The constructed file system path, or empty string on error
  */
-string		Response::constructPath(const Location* loc) {
+/* string		Response::constructPath(const Location* loc) {
 	if (DEBUG) cout << ORANGE << "Constructing Path..." << RESET << endl;
 	// Determine root
 	string			root;
@@ -542,14 +557,122 @@ string		Response::constructPath(const Location* loc) {
 		uri = uri.substr(0, queryPos);
 	}
 	string	path = root + uri;
-	
+
 	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
 	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
 	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
 	
 	return path;
-}
+} */
 
+/* string Response::constructPath(const Location* loc) {
+    if (DEBUG) cout << ORANGE << "Constructing Path..." << RESET << endl;
+
+    // 1) Determine root
+    string root;
+    if (!loc->getRoot().empty())
+        root = loc->getRoot();
+    else
+        root = _server_config.getRoot();
+
+    if (root.empty()) {
+        if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
+        fillResponse(500, getErrorPageContent(500));
+        return "";
+    }
+
+    // 2) Strip query string from URI
+    string uri = getRequest()->getUri();
+    size_t q = uri.find('?');
+    if (q != string::npos)
+        uri = uri.substr(0, q);
+
+    // 3) Replace the matched location prefix with its root
+    const string locPath = loc->getPath();
+    string rel;
+    if (locPath == "/") {
+        rel = uri; // root location uses full URI
+    } else if (uri.compare(0, locPath.length(), locPath) == 0) {
+        rel = uri.substr(locPath.length()); // strip location prefix
+    } else {
+        // Fallback (shouldn't happen if matchPathToLocation() is correct)
+        rel = uri;
+    }
+
+    // Normalize joining
+    if (!rel.empty() && rel[0] == '/')
+        rel.erase(0, 1);
+
+    string path = root;
+    if (!path.empty() && path[path.size() - 1] != '/')
+        path += '/';
+    path += rel;
+
+    // 4) If no file part requested (e.g., "/directory"), point to the directory itself
+    // generateResponseGet() will then serve index or autoindex
+    if (rel.empty() && (path.empty() || path[path.size() - 1] != '/'))
+        path += '/';
+
+    if (DEBUG) {
+        cout << YELLOW << "Using root: " << root << RESET << endl;
+        cout << YELLOW << "Using URI: " << uri << RESET << endl;
+        cout << GREEN  << "Resolved path: " << path << RESET << endl;
+    }
+    return path;
+} */
+
+// 3d version
+string Response::constructPath(const Location* loc) {
+    if (DEBUG) cout << ORANGE << "Constructing Path..." << RESET << endl;
+
+    // Determine roots
+    string locRoot = loc->getRoot();
+    string srvRoot = _server_config.getRoot();
+    string root = !locRoot.empty() ? locRoot : srvRoot;
+
+    if (root.empty()) {
+        if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
+        fillResponse(500, getErrorPageContent(500));
+        return "";
+    }
+
+    // Strip query string
+    string uri = getRequest()->getUri();
+    size_t q = uri.find('?');
+    if (q != string::npos) uri = uri.substr(0, q);
+
+    const string	locPath = loc->getPath();
+    string			rel;
+
+    // Only strip the location prefix if the location provides its own root.
+	// It's instead of alias directive
+    // If it uses the server root, keep the full URI to preserve subdirectories.
+    if (!locRoot.empty() && locPath != "/" && uri.compare(0, locPath.length(), locPath) == 0) {
+        rel = uri.substr(locPath.length());
+    } else {
+        rel = uri;
+    }
+	cout << "rel: " << rel << endl;
+
+    //if (!rel.empty() && rel[0] == '/') rel.erase(0, 1);
+
+	//cout << "rel: " << rel << endl;
+
+    // Join root + rel
+    string	path = root;
+    //if (!path.empty() && path[path.size() - 1] != '/') path += '/';
+    path += rel;
+
+    // If requesting the location itself (no file part), point to directory
+    if (rel.empty() && (path.empty() || path[path.size() - 1] != '/')) path += '/';
+
+    if (DEBUG) {
+        cout << YELLOW << "Using root: " << root << RESET << endl;
+        cout << YELLOW << "Using URI: " << uri << RESET << endl;
+        cout << GREEN  << "Resolved path: " << path << RESET << endl;
+    }
+    return path;
+}
 
 const Request*	Response::getRequest() { return _request; }
 
@@ -651,8 +774,10 @@ string			Response::getMimeType(const string &filePath)
 bool		Response::tryServeCgi()
 {
 	const std::map<string, string>&	cgiMap = _loc->getCgi();
-	if (cgiMap.empty())
+	if (cgiMap.empty()) {
+		if (DEBUG) cout << "No cgi for location path: " << _loc->getPath() << endl;
 		return false;
+	}
 	size_t	dotPos = _path.find_last_of('.');
 	if (dotPos == string::npos)
 		return false;
@@ -661,13 +786,15 @@ bool		Response::tryServeCgi()
 	std::map<string, string>::const_iterator	it = cgiMap.find(ext);
 	if (it == cgiMap.end())
 		return false;
-	if (getPathType(_path) != FILE_PATH)
-		return false;
+
+	// Allow CGI even if the target file doesn’t exist 
+	// if (getPathType(_path) != FILE_PATH) return false;
+
 	if (DEBUG) cout << GREEN << "Executing CGI: " << _path << RESET << endl;
 	try {
 		CgiHandler	cgi(*this, _path, it->second);
 		string		output = cgi.executeCgi();
-		cout << "cgi output: " << output << endl;
+		if (DEBUG) cout << "cgi output: 200 bytes:\n" << output.substr(0, 199) << endl;
 		if (!applyCgiOutput(output)) {
 			fillResponse(502, getErrorPageContent(502)); // 502 Bad Gateway
 		}
@@ -679,54 +806,126 @@ bool		Response::tryServeCgi()
 	}
 }
 
+/**
+ * Prevents sending mismatched Content-Length vs actual body
+ * Surfaces truncation (502) instead of silently forwarding a short body.
+ */
 bool		Response::applyCgiOutput(const std::string &output) {
-	if (output.empty())
-		return false; // invalid CGI response
+	if (output.empty()) return false; // invalid CGI response
+
 	// Separate Headers and Body from CGI output
 	size_t	headerEnd = output.find("\r\n\r\n");
-	if (headerEnd == string::npos)
+
+	size_t	sep_len = 4;
+	if (headerEnd == string::npos) {
 		headerEnd = output.find("\n\n");
-	if (headerEnd == string::npos) { // No headers found, treat entire output as body
-		fillResponse(200, output);
+		sep_len = 2;
+	}
+	if (headerEnd == string::npos) {
+		if (DEBUG) cout << RED << "CGI: header/body separator not found" << RESET << endl;
+		fillResponse(502, getErrorPageContent(502));
+		// To DO to delete fillResponse(200, output);
 		return true;
 	}
 
 	string	headers = output.substr(0, headerEnd);
-	string	body    = output.substr(headerEnd + ((output[headerEnd] == '\r') ? 4 : 2));
-	if (DEBUG) cout << "CGI. Output headers:\n" << headers << endl;
-	std::istringstream	iss(headers);
-	std::string			line;
-	int					statusCode = 200;
+	string	body = output.substr(headerEnd + sep_len);
 	
-	while (std::getline(iss, line)) {
-		if (!line.empty() && line[line.length() - 1] == '\r') {
-			line.erase(line.length() - 1);
-		}
+	// 2) Parse headers
+	if (DEBUG) cout << "CGI. Output raw headers:\n" << headers << endl;
+	int					statusCode = 200;
+	std::string			statusReason;
+	std::string			contentType;
+	size_t				contentLengthHeader = static_cast<size_t>(-1);
+	std::map<std::string, std::string>	cgiHdrs;
+	
+	std::istringstream	hs(headers);
+	std::string			line;
+	while (std::getline(hs, line)) {
+		if (!line.empty() && line[line.size() - 1] == '\r')
+			line.erase(line.size() - 1);
 		if (line.empty()) continue;
 
 		size_t colon = line.find(':');
-		if (colon != string::npos) {
-			string key = line.substr(0, colon);
-			string value = line.substr(colon + 1);
+		if (colon == std::string::npos) continue; // skip malformed
+		string	key = line.substr(0, colon);
+		string	value = line.substr(colon + 1);
 
-			// Trim whitespace
-			while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
-				value.erase(0, 1);
-			if (key == "Status" || key == "status" || key == "STATUS") {
-				std::istringstream	statusIss(value);
-				int					tempCode;
-				if (statusIss >> tempCode)
-					statusCode = tempCode;
+		// Trim leading whitespace
+		while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
+			value.erase(0, 1);
+		
+		// Lowercase a copy for comparisons
+        std::string	lkey = key;
+        for (size_t i = 0; i < lkey.size(); ++i)
+			lkey[i] = static_cast<char>(std::tolower(lkey[i]));
+
+		if (key == "status") {
+			std::istringstream	statusIss(value);
+			int					tempCode;
+			if (statusIss >> tempCode) {
+				statusCode = tempCode;
+				std::string	rest;
+                std::getline(statusIss, rest);
+                if (!rest.empty()) {
+                    if (rest[0] == ' ') rest.erase(0,1);
+                    statusReason = rest;
+                }
 			}
-			else if (!key.empty()) { // Store other headers
-				_headers[key] = value;
-			}
+			continue; // do not forward Status header
 		}
+		if (lkey == "content-type") {
+            contentType = value;
+        } else if (lkey == "content-length") {
+            // store but recompute/validate against body we read
+            unsigned long long	n = std::strtoull(value.c_str(), NULL, 10);
+            contentLengthHeader = static_cast<size_t>(n);
+        } else if (lkey == "connection" || lkey == "transfer-encoding" ||
+                   lkey == "keep-alive" || lkey == "proxy-connection" ||
+                   lkey == "trailer" || lkey == "upgrade") {
+            // TO DO. What is ? drop hop-by-hop headers
+            continue;
+        } else {
+            cgiHdrs[key] = value; // keep original casing for unknown headers
+        }
 	}
-	if (statusCode >= 400) {
-		fillResponse(statusCode, getErrorPageContent(statusCode));
-		return true;
-	}
-	fillResponse(statusCode, body);
-	return true;
+
+	// 3) Validate/normalize body length w.r.t. CGI Content-Length
+    if (contentLengthHeader != static_cast<size_t>(-1)) {
+        if (body.size() < contentLengthHeader) {
+            if (DEBUG) {
+                cout << RED << "CGI body truncated. Have " << body.size()
+                     << ", expected " << contentLengthHeader << RESET << endl;
+            }
+            fillResponse(502, getErrorPageContent(502)); // Bad Gateway
+            return true;
+        } else if (body.size() > contentLengthHeader) {
+            // TO DO what? Truncate surplus bytes if any
+            body.resize(contentLengthHeader);
+        }
+    }
+
+	// 4) Apply headers to response
+    if (!contentType.empty())
+		_headers["Content-Type"] = contentType;
+    // TO DO. What? Recompute Content-Length from the body we will send
+    _headers.erase("Content-Length");
+    fillResponse(statusCode, body);
+
+	// 5) Optional: keep CGI-provided headers (except the ones we filtered)
+    for (std::map<std::string, std::string>::const_iterator it = cgiHdrs.begin(); it != cgiHdrs.end(); ++it) {
+        _headers[it->first] = it->second;
+    }
+
+	// Prefer CGI reason phrase if provided in "Status:"
+    if (!statusReason.empty()) _reasonPhrase = statusReason;
+
+	if (DEBUG) {
+        cout << "CGI. Parsed Status: " << statusCode
+             << " Body bytes: " << body.size();
+        if (contentLengthHeader != static_cast<size_t>(-1))
+            cout << " (CGI Content-Length: " << contentLengthHeader << ")";
+        cout << endl;
+    }
+    return true;
 }

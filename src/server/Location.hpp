@@ -39,7 +39,6 @@ class Location {
 
 	private:
 		std::string					_root;
-		std::string					_alias;
 		std::vector<std::string>	_allowed_methods;
 		std::string					_index;
 		bool						_autoindex;

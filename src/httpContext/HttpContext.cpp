@@ -545,7 +545,7 @@ bool	HttpContext::checkBodySizeLimit(size_t contentLength)
 {
 	const Location*	matchedLocation = findMatchingLocation();
 	string			maxBodySizeStr;
-	
+
 	if (matchedLocation && !matchedLocation->getClientMaxBodySize().empty()) {
 		maxBodySizeStr = matchedLocation->getClientMaxBodySize();
 	} else {
@@ -554,7 +554,7 @@ bool	HttpContext::checkBodySizeLimit(size_t contentLength)
 	if (maxBodySizeStr.empty()) {
 		return true; 
 	}
-	size_t maxBodySize = HttpParser::parseSizeString(maxBodySizeStr);
+	size_t	maxBodySize = HttpParser::parseSizeString(maxBodySizeStr);
 	
 	return contentLength <= maxBodySize;
 }

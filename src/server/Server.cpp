@@ -8,7 +8,7 @@ Server::Server() {
 	_root = "www/web";
 	_index = "index.html";
 	_error_pages[404] = "/var/www/errors/404.html";
-	_client_max_body_size = "1m";
+	_client_max_body_size = "";
 	_listen_fd = -1;
 }
 

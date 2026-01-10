@@ -6,6 +6,7 @@
 # include "../../inc/Webserv.hpp"
 
 # define CGI_DEBUG 0
+# define CGI_TIMEOUT 10 // 10 seconds
 
 class Response;
 
