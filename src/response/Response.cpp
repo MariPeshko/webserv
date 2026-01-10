@@ -194,66 +194,56 @@ void	Response::generateResponsePost()
 
 	PathType	pathType = getPathType(_path);
 
-	if (pathType == NOT_EXIST) {
-		if (DEBUG) cout << RED << "Path not found: " << _path << RESET << endl;
-		fillResponse(404, getErrorPageContent(404));
-		return;
-	}
-
-	// nginx treats POST to a static location as:
-	// “I received a body, but I don’t know what to do with it.”
-
-	// here I should check if _path is directory before content parsing
-	if (pathType == DIRECTORY_PATH) {
-		// consider that it can be without / in the end - www/web/about
-		if (D_POST) cout << BLUE << _path << " is a directory" << RESET << endl;
-
-		// 1. Якщо є index файл, і ми хочемо його "обробити"
-        // (Але зазвичай POST на індекс без CGI повертає 405)
-
-		// Якщо тіло порожнє: Просто повернути about.html, 
-		// ніби це GET, але зі статусом 200 (або 204).
-		if (getRequest()->getBody().empty()) {
-        	fillResponse(200, "OK");
-			return;
-    	} else {
-			fillResponse(200, "OK");
-			return;
-		}
-
-		// 2. Якщо ми хочемо дозволити завантаження файлів у цю директорію, 
-        // нам потрібне ім'я файлу. В Multipart воно є в заголовках, 
-        // а в text/plain — його НЕМАЄ в URI.
-		const string&	contentType = getRequest()->getHeaderValue("content-type");
-		if (contentType.find("text/plain") != string::npos) {
-            // Без імені файлу в URI ми не знаємо, як його назвати.
-            // Можна генерувати ім'я (наприклад, "upload_123"), 
-            // але зазвичай це 400 Bad Request або 409 Conflict.
-            fillResponse(400, getErrorPageContent(400));
-            return;
-        }
-	} else if (pathType == FILE_PATH) {
-		if (D_POST) cout << BLUE << _path << " is a file" << RESET << endl;
-	}
-
-	// In this case - curl -X POST http://localhost:8080/about --data-binary @/dev/null -
-	// there is no name of the file
-	size_t	path_separator = _path.find_last_of('/');
-	if (path_separator != string::npos) {
-		string	dirPath = _path.substr(0, path_separator);
-		if (!isDirectory(dirPath)) {
-			if (D_POST) cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
-			fillResponse(409, getErrorPageContent(409));
-			return;
-		}
-	}
-
-	// Is it valid? This case has no contentType
-	// curl -X POST http://localhost:8080/about --data-binary @/dev/null
 	const string&	contentType = getRequest()->getHeaderValue("content-type");
 	if (contentType.empty()) {
 		fillResponse(400, getErrorPageContent(400));
 		return;
+	}
+
+	if (pathType == DIRECTORY_PATH) {
+		if (D_POST) cout << BLUE << _path << " is a directory" << RESET << endl;
+
+		// Ensure trailing slash for directory
+        if (_path[_path.length() - 1] != '/')
+            _path += "/";
+
+		// multipart/form-data: filename will be extracted
+        if (contentType.find("multipart/form-data") != string::npos) {
+            if (D_POST) cout << BLUE << "Multipart upload to directory: " << _path << RESET << endl;
+        }
+		/// text/plain or image to directory: no filename available
+		else if (contentType.find("text/plain") != string::npos ||
+					contentType.find("image/png") != string::npos ||
+					contentType.find("image/jpeg") != string::npos ||
+					contentType.find("image/jpg") != string::npos) {
+            fillResponse(400, getErrorPageContent(400));
+            return;
+		} else if (getRequest()->getBody().empty()) { // Empty body
+			fillResponse(200, "OK");
+			return;
+		} else { // Other content types to directory with body
+			fillResponse(200, "OK");
+			return;
+		}
+	} else if (pathType == FILE_PATH) {
+		if (D_POST) cout << BLUE << _path << " is a file (overwriting)" << RESET << endl;
+	} else if (pathType == NOT_EXIST) {  // Handle NOT_EXIST (creating new file)
+		if (DEBUG) cout << BLUE << "Path not found: " << _path << RESET << endl;
+		
+		// Validate parent directory exists
+		size_t	path_separator = _path.find_last_of('/');
+		if (path_separator != string::npos) {
+			string	dirPath = _path.substr(0, path_separator);
+			if (!isDirectory(dirPath)) {
+				if (D_POST) cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
+				fillResponse(409, getErrorPageContent(409));
+				return;
+			} else {
+				if (D_POST) cout << GREEN << "Upload directory exists: " << dirPath << RESET << endl;
+				if (_path.size() > dirPath.size() + 1)
+					if (D_POST) cout << GREEN << "Name of the file: " << _path.substr(dirPath.size() + 1) << RESET << endl;
+			}
+		}
 	}
 
 	// --- Simple File Upload Logic --- plain text, image - png, jpeg.
@@ -271,7 +261,6 @@ void	Response::generateResponsePost()
 
 		if (D_POST) cout << GREEN << "File created at: " << _path << RESET << endl;
 
-		// Send a "Created" response
 		fillResponse(201, buildCreatedResponse(getRequest()->getUri(), ""));
 		_headers["Location"] = getRequest()->getUri();
 		_headers["Content-Type"] = "text/html";
@@ -289,7 +278,11 @@ void	Response::generateResponsePost()
 				fillResponse(415, getErrorPageContent(415));
 				return;
 			}
+			
 			string	uploadPath = _path;
+			// Ensure trailing slash for directory
+			if (!uploadPath.empty() && uploadPath[uploadPath.length() - 1] != '/')
+                uploadPath += "/";
 			uploadPath += filename;
 			if (D_POST) cout << ORANGE << "uploadPath: " << uploadPath << RESET << endl;
 
@@ -305,10 +298,10 @@ void	Response::generateResponsePost()
 			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern: ";
 			if (D_POST) cout << uploadPath << RESET << endl;
 
-			// Go back to the form page (the Referer)
+			// Check for Referer header (PRG pattern) - Go back to the form page
 			string	redirectTo;
 			string	referer = getRequest()->getHeaderValue("referer");
-			if (!referer.empty()) { 		// extract of path from "http://host/path?..."
+			if (!referer.empty()) { 	// extract of path from "http://host/path?..."
 				size_t	pos = referer.find("://");
 				if (pos != string::npos)
 					pos = referer.find('/', pos + 3);
@@ -321,20 +314,23 @@ void	Response::generateResponsePost()
 			}
 			if (redirectTo.empty()) {
 				fillResponse(201, buildCreatedResponse(getRequest()->getUri(), filename));
-				_headers["Location"] = getRequest()->getUri() + filename;
+				string location = getRequest()->getUri();
+				if (!location.empty() && location[location.length() - 1] != '/')
+					location += "/";
+				location += filename;
+				_headers["Location"] = location;
 				_headers["Content-Type"] = "text/html";
+				return; 
 			}
 			fillResponse(303, ""); // 303 See Other, empty body
 			_headers["Location"] = redirectTo;
-			// TO DELETE _headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
 			return;
 		} else {
 			fillResponse(400, getErrorPageContent(400));
 			return;
 		}
 	} else if (contentType.find("application/x-www-form-urlencoded") != string::npos) {
-		// --- Form Data Logic ---
-		// For example, parse "name=Maryna&city=Kyiv"
+		// --- Form Data Logic --- For example, parse "name=Maryna&city=Kyiv"
 		// We pretend to have processed the form data
 		if (getRequest()->getBody().empty()) {
         	fillResponse(200, "OK");
