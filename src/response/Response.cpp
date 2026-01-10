@@ -813,7 +813,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
         for (size_t i = 0; i < lkey.size(); ++i)
 			lkey[i] = static_cast<char>(std::tolower(lkey[i]));
 
-		if (key == "status") {
+		if (lkey == "status") {
 			std::istringstream	statusIss(value);
 			int					tempCode;
 			if (statusIss >> tempCode) {
