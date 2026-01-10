@@ -16,9 +16,9 @@ class	Server {
 		Server();
 		Server(const Server& other);
 		~Server();
-		
+
 		int		setupServer();
-		
+
 		// Setters
 		void	setPort(int port);
 		void	setHost(const std::string& host);
@@ -29,7 +29,8 @@ class	Server {
 		void	addLocation(const Location& location);
 		void	setClientMaxBodySize(const std::string& size);
 		void	addAllowedMethod(const std::string& method);
-		
+		void	setAlias(const std::string& alias);
+
 		// Getters
 		size_t								getLocationCount() const;
 		const std::vector<Location>&		getLocations() const;
@@ -43,7 +44,8 @@ class	Server {
 		const std::string&					getHost() const;
 		std::string							getRoot() const;
 		const std::string&					getIndex() const;
-		
+		const std::string&					getAlias() const;
+
 		void print() const;
 
 	private:

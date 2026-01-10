@@ -7,7 +7,7 @@ class Location {
 	public:
 		Location();
 		~Location();
-		
+
 		// Setters
 		void	setPath(const std::string& path);
 		void	setRoot(const std::string& root);
@@ -32,7 +32,7 @@ class Location {
 		int					getReturnCode() const;
 		const std::string&	getReturnUrl() const;
 		const std::string&	getClientMaxBodySize() const;
-		
+
 		void print() const;
 
 		std::string					_path;
@@ -47,6 +47,7 @@ class Location {
 		std::map<std::string, std::string>	_cgi;
 		std::vector<Location>		_locations;
 		std::string					_client_max_body_size;
+		std::string					_alias;
 };
 
 #endif

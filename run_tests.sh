@@ -6,7 +6,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}Building webserv...${NC}"
-make
+make re
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Build failed!${NC}"
