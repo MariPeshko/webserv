@@ -5,7 +5,7 @@
 #include <cerrno>
 #include <cstring>
 
-#define IS_LOGGER_ENABLED 0
+#define IS_LOGGER_ENABLED 1
 // colors
 #define RESET "\033[0m"
 #define RED "\033[31m"

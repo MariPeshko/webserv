@@ -86,6 +86,9 @@ void	Server::setRoot(const std::string& root) {
 void	Server::setIndex(const std::string& index) {
 	_index = index;
 }
+void	Server::setAlias(const std::string& alias) {
+	_root = alias;
+}
 void	Server::addErrorPage(int code, const std::string& page) {
 	_error_pages[code] = page;
 }
@@ -109,6 +112,10 @@ const std::string& Server::getHost() const {
 
 size_t	Server::getLocationCount() const {
 	return _locations.size();
+}
+
+const std::string& Server::getAlias() const {
+	return _root;
 }
 const std::vector<Location>&		Server::getLocations() const {
 	return _locations;

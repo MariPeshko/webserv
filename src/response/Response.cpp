@@ -43,7 +43,7 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 
 /**
  * @brief Main entry point for generating HTTP responses.
- * 
+ *
  * Validates the request, constructs the file system path, and dispatches
  * to the appropriate method handler (GET, POST, DELETE) based on the HTTP method.
  * Returns early if validation or path construction fails (response already set).
@@ -59,7 +59,7 @@ void	Response::generateResponse() {
 	_path = constructPath(_loc);
 	if (_path.empty())
 		return;
-	
+
 	if (getRequest()->getEnumMethod() == Request::GET) {
 		generateResponseGet();
 	} else if (getRequest()->getEnumMethod() == Request::POST) {
@@ -75,13 +75,13 @@ void	Response::generateResponse() {
 
 /**
  * @brief Generates HTTP response for GET requests.
- * 
+ *
  * Handles three types of resources:
  * - **Files**: Reads and serves with correct MIME type
  * - **Directories**: Serves index file if present, generates autoindex if enabled,
  *   otherwise returns 403 Forbidden
  * - **CGI scripts**: Executes script and returns dynamic output
- * 
+ *
  * Returns 404 if the path doesn't exist on disk.
  */
 void	Response::generateResponseGet()
@@ -136,7 +136,7 @@ void	Response::generateResponseGet()
 			fillResponse(403, getErrorPageContent(403));
 			return; */
 			// No index and autoindex off then 404 (not 403)
-        	fillResponse(404, getErrorPageContent(404));
+        	fillResponse(403, getErrorPageContent(403));
         	return;
 		}
 	}
@@ -176,7 +176,7 @@ string	Response::buildCreatedResponse(const string& uri, const string &filename)
 
 /**
  * @brief Generates HTTP response for POST requests - handles file uploads and form submissions.
- * 
+ *
  * Logic flow:
  * 1. Tries CGI execution first (for form processing scripts)
  * 2. Validates parent directory exists → 409 if missing
@@ -187,7 +187,7 @@ string	Response::buildCreatedResponse(const string& uri, const string &filename)
  * 4. Returns 415 for unsupported content types
  */
 void	Response::generateResponsePost()
-{	
+{
 	if (tryServeCgi())
 		return;
 	if (D_POST) cout << BLUE << "generateResponsePost()" << RESET << endl;
@@ -255,7 +255,7 @@ void	Response::generateResponsePost()
 		fillResponse(400, getErrorPageContent(400));
 		return;
 	}
-	
+
 	// --- Simple File Upload Logic --- plain text, image - png, jpeg.
 	if (contentType.find("text/plain") != string::npos || contentType.find("image/png") != string::npos
 			|| contentType.find("image/jpeg") != string::npos)	{
@@ -335,6 +335,7 @@ void	Response::generateResponsePost()
 	} else if (contentType.find("application/x-www-form-urlencoded") != string::npos) {
 		// --- Form Data Logic ---
 		// For example, parse "name=Maryna&city=Kyiv"
+		// We pretend to have processed the form data
 		if (getRequest()->getBody().empty()) {
         	fillResponse(200, "OK");
     	} else {
@@ -343,7 +344,8 @@ void	Response::generateResponsePost()
 	} else {
 		if (getRequest()->getBody().empty()) {
         	fillResponse(200, "OK");
-    	} 
+			return;
+    	}
 		// --- Unsupported Type Logic ---
 		fillResponse(415, getErrorPageContent(415));
 	}
@@ -393,7 +395,7 @@ static void	printCurrentLocation(const Location *loc) {
 
 /**
  * Helper to find the best matching location
- * 
+ *
  * Checks if request URI starts with a certain location path (proper prefix match)
  * Returns a pointer to the Location object, or NULL if none found
  * Special case: "/" matches everything starting with "/"
@@ -411,12 +413,12 @@ const Location*	Response::matchPathToLocation()
 
 	if (DEBUG_PATH) cout << GREEN << "Matching URI: [" << getRequest()->getUri() << "] against ";
 	if (DEBUG_PATH) cout << locations.size() << " locations." << RESET << endl;
-	
+
 	for (size_t i = 0; i < locations.size(); ++i) {
 		const string&	locPath = locations[i].getPath();
-		// TO DO: do we need this variable html_ext? 
+		// TO DO: do we need this variable html_ext?
 		const string	html_ext = ".html";
-		
+
 		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
 		if (DEBUG_PATH) cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << endl;
 
@@ -429,6 +431,8 @@ const Location*	Response::matchPathToLocation()
 			} else if (uri.length() == locPath.length()) { // Exact match (/about matches /about)
 				isValidPrefix = true;
 			} else if (uri[locPath.length()] == '/') { // Path continues with '/' (/about matches /about/page)
+				isValidPrefix = true;
+			} else if (uri[locPath.length() - 1] == '/') {
 				isValidPrefix = true;
 			}
 			if (isValidPrefix) {
@@ -490,7 +494,7 @@ Response::PathType Response::getPathType(string const path)
 
 void	Response::badRequest() {
 	if (DEBUG) cout << RED << "Response. Bad request" << RESET << endl;
-	
+
 	// Check if a specific status code was set during request parsing
 	short requestStatusCode = getRequest()->getStatusCode();
 	if (requestStatusCode == 400) {
@@ -511,7 +515,7 @@ void	Response::badRequest() {
 	} else if (getRequest()->getRequestLineFormatValid() == false) {
 		fillResponse(400, getErrorPageContent(400));
 	} else if (getRequest()->getHeadersFormatValid() == false) {
-		if (DEBUG) cout << RED << "Response. Bad request. Invalid headers" << RESET << endl; 
+		if (DEBUG) cout << RED << "Response. Bad request. Invalid headers" << RESET << endl;
 		fillResponse(400, getErrorPageContent(400));
 	} else {
 		fillResponse(400, getErrorPageContent(400));
@@ -520,17 +524,17 @@ void	Response::badRequest() {
 
 /**
  * @brief Performs common request validation checks.
- * 
+ *
  * This function validates the request against the server configuration.
  * It checks for:
  * 1. A matching location.
  * 2. If the request method is allowed in that location.
  * 3. If the location has a redirection configured.
- * 
+ *
  * If any of these checks result in a final response (404, 405, 3xx),
  * it fills the response and returns NULL.
- * 
- * @return A const pointer to the matched Location on success, 
+ *
+ * @return A const pointer to the matched Location on success,
  * or NULL on failure.
  */
 const Location*	Response::validateRequestAndGetLocation() {
@@ -569,157 +573,62 @@ const Location*	Response::validateRequestAndGetLocation() {
 		fillResponse(405, getErrorPageContent(405));
 		return NULL;
 	}
-	
+
 	return loc;
 }
 
 /**
  * @brief Constructs the file system path from location config and request URI.
- * 
+ *
  * Determines the root directory (location-specific or server-wide),
  * strips query strings from the URI, and combines them into a full path.
  * Returns a 500 error if no root is configured.
- * 
+ *
  * @param loc Pointer to the matched Location
  * @param uri Reference to store the cleaned URI (query string removed)
  * @return The constructed file system path, or empty string on error
  */
-/* string		Response::constructPath(const Location* loc) {
+string		Response::constructPath(const Location* loc) {
 	if (DEBUG) cout << ORANGE << "Constructing Path..." << RESET << endl;
-	// Determine root
-	string			root;
-	const string&	locationRoot = loc->getRoot();
-	if (!locationRoot.empty())
-		root = loc->getRoot();
-	else 
-		root = _server_config.getRoot();
-	// Safety check: root must be configured
-	if (root.empty()) {
-		if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
-		fillResponse(500, getErrorPageContent(500));
-		return "";
-	}
+
 	// Strip query string from URI
 	string		uri = getRequest()->getUri();
 	size_t		queryPos = uri.find('?');
 	if (queryPos != string::npos) {
 		uri = uri.substr(0, queryPos);
 	}
-	string	path = root + uri;
 
-	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
+	string	path;
+	if (!loc->getAlias().empty()) {
+		path = loc->getAlias();
+		if (DEBUG) cout << YELLOW << "Using alias: " << path << RESET << endl;
+		if (uri.compare(0, loc->getPath().length(), loc->getPath()) == 0) {
+
+			path += uri.substr(loc->getPath().length());
+		}
+	}
+	else {
+		// Determine root
+		string			root;
+		const string&	locationRoot = loc->getRoot();
+		if (!locationRoot.empty())
+			root = loc->getRoot();
+		else
+			root = _server_config.getRoot();
+		// Safety check: root must be configured
+		if (root.empty()) {
+			if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
+			fillResponse(500, getErrorPageContent(500));
+			return "";
+		}
+		if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
+		path = root + uri;
+	}
+
 	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
 	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
-	
+
 	return path;
-} */
-
-/* string Response::constructPath(const Location* loc) {
-    if (DEBUG) cout << ORANGE << "Constructing Path..." << RESET << endl;
-
-    // 1) Determine root
-    string root;
-    if (!loc->getRoot().empty())
-        root = loc->getRoot();
-    else
-        root = _server_config.getRoot();
-
-    if (root.empty()) {
-        if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
-        fillResponse(500, getErrorPageContent(500));
-        return "";
-    }
-
-    // 2) Strip query string from URI
-    string uri = getRequest()->getUri();
-    size_t q = uri.find('?');
-    if (q != string::npos)
-        uri = uri.substr(0, q);
-
-    // 3) Replace the matched location prefix with its root
-    const string locPath = loc->getPath();
-    string rel;
-    if (locPath == "/") {
-        rel = uri; // root location uses full URI
-    } else if (uri.compare(0, locPath.length(), locPath) == 0) {
-        rel = uri.substr(locPath.length()); // strip location prefix
-    } else {
-        // Fallback (shouldn't happen if matchPathToLocation() is correct)
-        rel = uri;
-    }
-
-    // Normalize joining
-    if (!rel.empty() && rel[0] == '/')
-        rel.erase(0, 1);
-
-    string path = root;
-    if (!path.empty() && path[path.size() - 1] != '/')
-        path += '/';
-    path += rel;
-
-    // 4) If no file part requested (e.g., "/directory"), point to the directory itself
-    // generateResponseGet() will then serve index or autoindex
-    if (rel.empty() && (path.empty() || path[path.size() - 1] != '/'))
-        path += '/';
-
-    if (DEBUG) {
-        cout << YELLOW << "Using root: " << root << RESET << endl;
-        cout << YELLOW << "Using URI: " << uri << RESET << endl;
-        cout << GREEN  << "Resolved path: " << path << RESET << endl;
-    }
-    return path;
-} */
-
-// 3d version
-string Response::constructPath(const Location* loc) {
-    if (DEBUG) cout << ORANGE << "Constructing Path..." << RESET << endl;
-
-    // Determine roots
-    string locRoot = loc->getRoot();
-    string srvRoot = _server_config.getRoot();
-    string root = !locRoot.empty() ? locRoot : srvRoot;
-
-    if (root.empty()) {
-        if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
-        fillResponse(500, getErrorPageContent(500));
-        return "";
-    }
-
-    // Strip query string
-    string uri = getRequest()->getUri();
-    size_t q = uri.find('?');
-    if (q != string::npos) uri = uri.substr(0, q);
-
-    const string	locPath = loc->getPath();
-    string			rel;
-
-    // Only strip the location prefix if the location provides its own root.
-	// It's instead of alias directive
-    // If it uses the server root, keep the full URI to preserve subdirectories.
-    if (!locRoot.empty() && locPath != "/" && uri.compare(0, locPath.size(), locPath) == 0) {
-		if (DEBUG) cout << "strip the location prefix" << endl;
-        rel = uri.substr(locPath.size());
-    } else {
-        rel = uri;
-    }
-    //if (!rel.empty() && rel[0] == '/') rel.erase(0, 1);
-
-	//cout << "rel: " << rel << endl;
-
-    // Join root + rel
-    string	path = root;
-    //if (!path.empty() && path[path.size() - 1] != '/') path += '/';
-    path += rel;
-
-    // If requesting the location itself (no file part), point to directory
-    if (rel.empty() && (path.empty() || path[path.size() - 1] != '/')) path += '/';
-
-    if (DEBUG) {
-        cout << YELLOW << "Using root: " << root << RESET << endl;
-        cout << YELLOW << "Using URI: " << uri << RESET << endl;
-        cout << GREEN  << "Resolved path: " << path << RESET << endl;
-    }
-    return path;
 }
 
 const Request*	Response::getRequest() { return _request; }
@@ -764,7 +673,7 @@ string			Response::getErrorPageContent(int code)
 		if (file.is_open())
 		{
 			std::ostringstream	ss;
-			
+
 			ss << file.rdbuf();
 			_headers["Content-Type"] = "text/html";
 			return ss.str();
@@ -814,7 +723,7 @@ string			Response::getMimeType(const string &filePath)
 /**
  * Returns true if the request was handled by CGI (success or error response set)
  * Returns false if not a CGI request or script not found (caller should proceed)
- * 
+ *
  * - Extract extension from request path
  * - Look up the interpreter for this extension
  * - Calls CgiHandler constructor
@@ -835,7 +744,7 @@ bool		Response::tryServeCgi()
 	if (it == cgiMap.end())
 		return false;
 
-	// Allow CGI even if the target file doesn’t exist 
+	// Allow CGI even if the target file doesn’t exist
 	// if (getPathType(_path) != FILE_PATH) return false;
 
 	if (DEBUG) cout << GREEN << "Executing CGI: " << _path << RESET << endl;
@@ -878,7 +787,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
 
 	string	headers = output.substr(0, headerEnd);
 	string	body = output.substr(headerEnd + sep_len);
-	
+
 	// 2) Parse headers
 	if (DEBUG) cout << "CGI. Output raw headers:\n" << headers << endl;
 	int					statusCode = 200;
@@ -886,7 +795,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
 	std::string			contentType;
 	size_t				contentLengthHeader = static_cast<size_t>(-1);
 	std::map<std::string, std::string>	cgiHdrs;
-	
+
 	std::istringstream	hs(headers);
 	std::string			line;
 	while (std::getline(hs, line)) {
@@ -902,7 +811,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
 		// Trim leading whitespace
 		while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
 			value.erase(0, 1);
-		
+
 		// Lowercase a copy for comparisons
         std::string	lkey = key;
         for (size_t i = 0; i < lkey.size(); ++i)

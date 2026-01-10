@@ -30,8 +30,13 @@ void	Location::setClientMaxBodySize(const std::string& size) {
 	_client_max_body_size = size;
 }
 
+void	Location::setAlias(const std::string& alias) {
+	_alias = alias;
+}
+
 const std::string&	Location::getPath() const { return _path; }
 const std::string&	Location::getRoot() const { return _root; }
+const std::string&	Location::getAlias() const { return _alias; }
 const std::string&	Location::getIndex() const { return _index; }
 bool				Location::getAutoindex() const { return _autoindex; }
 int					Location::getReturnCode() const { return _return_code; }
@@ -44,7 +49,7 @@ const std::vector<std::string>&	Location::getAllowedMethods() const {
 // returns a map of file extensions to interpreter paths
 // Key: File extension (without the dot)
 // Value: Path to the interpreter for that file type
-const std::map<std::string, std::string>&	Location::getCgi() const { 
+const std::map<std::string, std::string>&	Location::getCgi() const {
 	return _cgi;
 }
 
@@ -60,6 +65,7 @@ const std::string&				Location::getClientMaxBodySize() const {
 void Location::print() const {
     std::cout << "    Location: " << _path << std::endl;
     if (!_root.empty()) std::cout << "      root: " << _root << std::endl;
+    if (!_alias.empty()) std::cout << "      alias: " << _alias << std::endl;
     if (!_allowed_methods.empty()) {
         std::cout << "      methods: ";
         for (size_t i = 0; i < _allowed_methods.size(); i++) {
