@@ -4,6 +4,7 @@
 # include "../request/Request.hpp"
 # include "../response/Response.hpp"
 # include "../../inc/Webserv.hpp"
+# include "signal.h"
 
 # define CGI_DEBUG 0
 # define CGI_TIMEOUT 10 // 10 seconds
