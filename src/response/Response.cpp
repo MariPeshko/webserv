@@ -190,7 +190,54 @@ void	Response::generateResponsePost()
 {	
 	if (tryServeCgi())
 		return;
+	if (D_POST) cout << BLUE << "generateResponsePost()" << RESET << endl;
 
+	PathType	pathType = getPathType(_path);
+
+	if (pathType == NOT_EXIST) {
+		if (DEBUG) cout << RED << "Path not found: " << _path << RESET << endl;
+		fillResponse(404, getErrorPageContent(404));
+		return;
+	}
+
+	// nginx treats POST to a static location as:
+	// “I received a body, but I don’t know what to do with it.”
+
+	// here I should check if _path is directory before content parsing
+	if (pathType == DIRECTORY_PATH) {
+		// consider that it can be without / in the end - www/web/about
+		if (D_POST) cout << BLUE << _path << " is a directory" << RESET << endl;
+
+		// 1. Якщо є index файл, і ми хочемо його "обробити"
+        // (Але зазвичай POST на індекс без CGI повертає 405)
+
+		// Якщо тіло порожнє: Просто повернути about.html, 
+		// ніби це GET, але зі статусом 200 (або 204).
+		if (getRequest()->getBody().empty()) {
+        	fillResponse(200, "OK");
+			return;
+    	} else {
+			fillResponse(200, "OK");
+			return;
+		}
+
+		// 2. Якщо ми хочемо дозволити завантаження файлів у цю директорію, 
+        // нам потрібне ім'я файлу. В Multipart воно є в заголовках, 
+        // а в text/plain — його НЕМАЄ в URI.
+		const string&	contentType = getRequest()->getHeaderValue("content-type");
+		if (contentType.find("text/plain") != string::npos) {
+            // Без імені файлу в URI ми не знаємо, як його назвати.
+            // Можна генерувати ім'я (наприклад, "upload_123"), 
+            // але зазвичай це 400 Bad Request або 409 Conflict.
+            fillResponse(400, getErrorPageContent(400));
+            return;
+        }
+	} else if (pathType == FILE_PATH) {
+		if (D_POST) cout << BLUE << _path << " is a file" << RESET << endl;
+	}
+
+	// In this case - curl -X POST http://localhost:8080/about --data-binary @/dev/null -
+	// there is no name of the file
 	size_t	path_separator = _path.find_last_of('/');
 	if (path_separator != string::npos) {
 		string	dirPath = _path.substr(0, path_separator);
@@ -201,6 +248,8 @@ void	Response::generateResponsePost()
 		}
 	}
 
+	// Is it valid? This case has no contentType
+	// curl -X POST http://localhost:8080/about --data-binary @/dev/null
 	const string&	contentType = getRequest()->getHeaderValue("content-type");
 	if (contentType.empty()) {
 		fillResponse(400, getErrorPageContent(400));
@@ -647,13 +696,12 @@ string Response::constructPath(const Location* loc) {
     // Only strip the location prefix if the location provides its own root.
 	// It's instead of alias directive
     // If it uses the server root, keep the full URI to preserve subdirectories.
-    if (!locRoot.empty() && locPath != "/" && uri.compare(0, locPath.length(), locPath) == 0) {
-        rel = uri.substr(locPath.length());
+    if (!locRoot.empty() && locPath != "/" && uri.compare(0, locPath.size(), locPath) == 0) {
+		if (DEBUG) cout << "strip the location prefix" << endl;
+        rel = uri.substr(locPath.size());
     } else {
         rel = uri;
     }
-	cout << "rel: " << rel << endl;
-
     //if (!rel.empty() && rel[0] == '/') rel.erase(0, 1);
 
 	//cout << "rel: " << rel << endl;
@@ -775,7 +823,7 @@ bool		Response::tryServeCgi()
 {
 	const std::map<string, string>&	cgiMap = _loc->getCgi();
 	if (cgiMap.empty()) {
-		if (DEBUG) cout << "No cgi for location path: " << _loc->getPath() << endl;
+		if (DEBUG) cout << BLUE << "No cgi for location path: " << _loc->getPath() << RESET << endl;
 		return false;
 	}
 	size_t	dotPos = _path.find_last_of('.');

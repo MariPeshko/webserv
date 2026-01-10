@@ -405,6 +405,7 @@ void	HttpContext::resetState() {
 	_expectedBodyLen = 0;
 	_chunkState = READING_CHUNK_SIZE;
 	_chunkSize = 0;
+	_accumulatedBodySize = 0;
 	_responseBuffer = "";
 	_bytesSent = 0;
 }

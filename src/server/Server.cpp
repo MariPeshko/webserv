@@ -63,7 +63,7 @@ int	Server::setupServer() {
 		_listen_fd = -1;
 		return -1;
 	}
-	if (listen(_listen_fd, 10) == -1) {
+	if (listen(_listen_fd, 512) == -1) {
 		Logger::logErrno(LOG_ERROR, "Failed to listen on socket");
 		return -1;
 	}
