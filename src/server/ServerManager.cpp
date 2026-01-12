@@ -167,10 +167,9 @@ void	ServerManager::handleNewConnection(int listener) {
  * If the socket is in "drain" state:
  * - recv() into a small buffer in a loop until socket would block or 
  * closes; discard data (no parsing).
- * TO DO: when is it EOF? When n == 0?
+ * 
  * - if recv() returns 0 (peer closed) - close(fd) and remove client
  * - if draining timeout reached (1 s) - close(fd) and remove client
- * - 
  */
 void	ServerManager::handleClientData(size_t i)
 {
@@ -248,7 +247,7 @@ void	ServerManager::handleClientData(size_t i)
  * Note about raining: After fully send the error response (with Connection: close), 
  * the webserver does not close(fd) immediately. Instead it switchs this
  * connection to a "drain" state. 
- * 1. TO DO: describe _pfds[i].events = POLLIN (remove POLLOUT)
+ * 1. = POLLIN - Replace everything with POLLIN (read-only mode)
  * 2. set a ctx flag like ctx.setDraining(true) and record start time
  * 
  * We avoid closing while unread body is pending, so the kernel doesn’t 
@@ -268,9 +267,6 @@ void	ServerManager::handleClientWrite(size_t i) {
 	const string& buffer = ctx.getResponseBuffer();
 	size_t already_sent = ctx.getBytesSent();
 	if (buffer.size() <= already_sent) {
-		//TO DO: describe: stop POLLOUT
-		_pfds[i].events &= ~POLLOUT;
-		//TO DO: describe: keep POLLIN
 		_pfds[i].events = POLLIN;
 		ctx.resetState();
 		return;
@@ -295,10 +291,7 @@ void	ServerManager::handleClientWrite(size_t i) {
 	if (ctx.isResponseComplete()) {
 		short	statusCode = ctx.response().getStatusCode();
 		if (statusCode == 413 || statusCode == 431) {
-			// Stop sending response data (disable POLLOUT events)
-			_pfds[i].events &= ~POLLOUT;
-			// Continue monitoring for incoming data (enable POLLIN events)
-			_pfds[i].events |= POLLIN;
+			_pfds[i].events = POLLIN;
 			ctx.startDraining();
 			Logger::log(LOG_INFO, "Begin draining after 413 error response: " + toString(statusCode));
 			return;

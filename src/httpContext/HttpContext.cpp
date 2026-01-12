@@ -525,11 +525,6 @@ bool	HttpContext::checkHeaderBlockSize(const std::string &buf)
 		sizeToCheck = headerEnd;
 	} else {
 		sizeToCheck = buf.size();
-		// TO DO: why multiplying by two?
-		if (sizeToCheck > MAX_HEADER_BLOCK_SIZE * 2) {
-			if (CTX_DEBUG) cerr << RED << "Potential attack: huge buffer without header termination" << RESET << endl;
-			return false;
-		}
 	}
 	if (sizeToCheck > MAX_HEADER_BLOCK_SIZE) {
 		if (CTX_DEBUG) cerr << RED << "Header block exceeds maximum size: " 
@@ -565,8 +560,6 @@ bool	HttpContext::checkBodySizeLimit(size_t contentLength)
 	return contentLength <= maxBodySize;
 }
 
-// TO DO: mpeshko: to compare it to matchPathToLocation(). Can we use
-// one method in two places?
 const Location* HttpContext::findMatchingLocation()
 {
 	const std::vector<Location>&	locations = _server_config.getLocations();
