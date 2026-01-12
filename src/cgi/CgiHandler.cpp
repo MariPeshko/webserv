@@ -8,10 +8,11 @@ using std::string;
 using std::map;
 
 CgiHandler::CgiHandler(Response& resp, const string& scriptPath, 
-						const string& interpreterPath) :
+						const string& interPath, const std::string& ext) :
 	_resp(resp),
 	_scriptPath(scriptPath),
-	_interpreterPath(interpreterPath)
+	_interpreterPath(interPath),
+	_extention(ext)
 {
 	setupEnv();
 }
@@ -28,9 +29,16 @@ CgiHandler::~CgiHandler() {}
  * 
  * HTTP Headers Conversion because CGI standard requires HTTP headers to be prefixed 
  * with HTTP_ and use underscores.
+ * 
+ * PATH_INFO: empty unless there is extra path after the script name.
+ * For .bla scripts, treat the script as the last path segment.
+ * /directory/youpi.bla - PATH_INFO = ""
+ * /directory/youpi.bla/foo/bar - PATH_INFO = "/foo/bar"
  * */
 void	CgiHandler::setupEnv() {
 	const Request*	req = _resp.getRequest();
+	string			uri = req->getUri();
+	string			uriNoQuery = uri;
 
 	_env["REQUEST_METHOD"] = req->getMethod();
 	_env["SCRIPT_FILENAME"] = _scriptPath;
@@ -40,55 +48,36 @@ void	CgiHandler::setupEnv() {
 	_env["SERVER_SOFTWARE"] = "webserv/1.0";
 	_env["SERVER_NAME"] = _resp.getServerConfig().getFirstServerName();
 	_env["SERVER_PORT"] = toString(_resp.getServerConfig().getPort());
+	_env["REQUEST_URI"] = uri;
 
 	// Parse Query String
-	string		uri = req->getUri();
-	string		uriNoQuery = uri;
-	
-	size_t		queryPos = uri.find('?');
+	size_t	queryPos = uri.find('?');
 	if (queryPos != string::npos) {
 		_env["QUERY_STRING"] = uri.substr(queryPos + 1);
 		uriNoQuery = uri.substr(0, queryPos);
-		// To DO delete
-		//_env["PATH_INFO"] = uri.substr(0, queryPos);
-	} else {
+	} else
 		_env["QUERY_STRING"] = "";
-		// To DO delete
-		//_env["PATH_INFO"] = uri;
-	}
 	_env["SCRIPT_NAME"] = uriNoQuery;
 
-	// PATH_INFO: empty unless there is extra path after the script name.
-	// For .bla scripts, treat the script as the last path segment.
-	//   /directory/youpi.bla - PATH_INFO = ""
-	//   /directory/youpi.bla/foo/bar - PATH_INFO = "/foo/bar"
+	// Parse PATH_INFO
 	string	pathInfo = "";
-	size_t	dot = uriNoQuery.rfind(".bla");
-	if (CGI_DEBUG) std::cout << "WARNING: CGI correct pathInfo only for .bla (42 tester)" << std::endl;
-	// Find the position of the script name inside the URI (no query)
-	// Use last occurrence of ".bla" and include that segment as script.
+	size_t	dot = uriNoQuery.rfind(_extention);
 	if (dot != std::string::npos) {
-		// end of script segment
-		size_t	scriptEnd = dot + 4; // ".bla" length
+		size_t	scriptEnd = dot + _extention.size(); // ".bla" or ".py" length
 		if (scriptEnd < uriNoQuery.size() && uriNoQuery[scriptEnd] == '/') {
-			// extra path follows the script
-			pathInfo = uriNoQuery.substr(scriptEnd); // starts with '/'
+			// extra path follows the script and starts with '/'
+			pathInfo = uriNoQuery.substr(scriptEnd);
 		} else {
-			// No extra path — keep PATH_INFO equal to the script URI (expected by tester)
-			// note: PATH_INFO = SCRIPT_NAME (42 tester-compat fallback).
+			// note: 42 tester-compat fallback: keep PATH_INFO equal to the script URI (noQuery)
 			pathInfo = uriNoQuery;
 		}
-	} else {
-		// Fallback: no .bla found; keep it as SCRIPT_NAME
+	} else
 		pathInfo = uriNoQuery;
-	}
 	_env["PATH_INFO"] = pathInfo;
-	_env["REQUEST_URI"] = uri;
 
 	// Handle Body / Content-Type
 	if (!req->getBody().empty()) {
 		std::ostringstream	ss;
-
 		ss << req->getBody().length();
 		_env["CONTENT_LENGTH"] = ss.str();
 		_env["CONTENT_TYPE"] = req->getHeaderValue("content-type");

@@ -14,7 +14,8 @@ class Response;
 class CgiHandler {
 	public:
 		// Pass the request, the full path to the script, and the path to the python interpreter
-		CgiHandler(Response& resp, const std::string& scriptPath, const std::string& interpreterPath);
+		CgiHandler(Response& resp, const std::string& scriptPath, 
+					const std::string& interPath, const std::string& ext);
 		~CgiHandler();
 
 		// Executes the script and returns the full output (headers + body)
@@ -25,6 +26,7 @@ class CgiHandler {
 		std::string							_scriptPath;
 		std::string							_interpreterPath;
 		std::map<std::string, std::string>	_env;
+		std::string							_extention; /// with dot .py
 
 		void	setupEnv();
 		char**	getEnvArray();

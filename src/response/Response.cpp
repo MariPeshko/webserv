@@ -4,6 +4,7 @@ using std::cerr;
 using std::cout;
 using std::endl;
 using std::string;
+using std::map;
 
 // Parametric constructor
 Response::Response(Server &server)
@@ -637,7 +638,7 @@ Server&			Response::getServerConfig() {
 	return _server_config;
 }
 
-const std::map<string, string>&	Response::getHeaders() const {
+const map<string, string>&	Response::getHeaders() const {
 	return _headers;
 }
 
@@ -653,8 +654,8 @@ void			Response::reset()
 
 string			Response::getErrorPageContent(int code)
 {
-	const std::map<int, string>&			errorPages = _server_config.getErrorPages();
-	std::map<int, string>::const_iterator	it = errorPages.find(code);
+	const map<int, string>&				errorPages = _server_config.getErrorPages();
+	map<int, string>::const_iterator	it = errorPages.find(code);
 
 	if (it != errorPages.end()) {
 		std::ifstream	file(it->second.c_str());
@@ -712,32 +713,61 @@ string			Response::getMimeType(const string &filePath)
  * Returns true if the request was handled by CGI (success or error response set)
  * Returns false if not a CGI request or script not found (caller should proceed)
  *
- * - Extract extension from request path
+ * - match against all registered CGI extensions
+ *   a.) (considering extra path info after the script name: /cgi-bin/script.py/extra/path)
+ *        For example: www/web/cgi-bin/script.py/extra/path/info.txt
  * - Look up the interpreter for this extension
  * - Calls CgiHandler constructor
  */
 bool		Response::tryServeCgi()
 {
-	const std::map<string, string>&	cgiMap = _loc->getCgi();
+	const map<string, string>&	cgiMap = _loc->getCgi();
 	if (cgiMap.empty()) {
 		if (DEBUG) cout << BLUE << "No cgi for location path: " << _loc->getPath() << RESET << endl;
 		return false;
 	}
+
+	cout << "response _path: " << _path << endl;
+
+	string	scriptPath;
+    string	interpreter;
+	string	ext;
+
+	for (map<string, string>::const_iterator it = cgiMap.begin(); 
+			it != cgiMap.end(); ++it) {
+		string	extWithDot = "." + it->first;
+		size_t	pos = _path.find(extWithDot);
+
+		while (pos != string::npos) {
+			size_t	endOfExt = pos + extWithDot.length();
+			// Check if this is a valid script boundary (end of path or followed by /)
+            if (endOfExt == _path.length() || _path[endOfExt] == '/') {
+				scriptPath = _path.substr(0, endOfExt);
+				interpreter = it->second;
+				ext = extWithDot;
+				goto found_cgi;
+			}
+			pos = _path.find(extWithDot, pos + 1);
+		}
+	}
+	return false; // No CGI script found
+
+	/*
 	size_t	dotPos = _path.find_last_of('.');
 	if (dotPos == string::npos)
 		return false;
 	string	ext = _path.substr(dotPos + 1);
 
-	std::map<string, string>::const_iterator	it = cgiMap.find(ext);
+	map<string, string>::const_iterator	it = cgiMap.find(ext);
 	if (it == cgiMap.end())
-		return false;
+		return false; */
 
 	// Allow CGI even if the target file doesn’t exist
-	// if (getPathType(_path) != FILE_PATH) return false;
 
+	found_cgi:
 	if (DEBUG) cout << GREEN << "Executing CGI: " << _path << RESET << endl;
 	try {
-		CgiHandler	cgi(*this, _path, it->second);
+		CgiHandler	cgi(*this, scriptPath, interpreter, ext);
 		string		output = cgi.executeCgi();
 		if (DEBUG) cout << "cgi output: 200 bytes:\n" << output.substr(0, 199) << endl;
 		if (!applyCgiOutput(output)) {
@@ -747,7 +777,7 @@ bool		Response::tryServeCgi()
 	} catch (std::exception &e) {
 		if (DEBUG) cout << RED << "CGI execution failed: " << e.what() << RESET << endl;
 		fillResponse(500, getErrorPageContent(500));
-		return true; // Request handled (with 500)
+		return true;
 	}
 }
 
@@ -784,7 +814,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
 	std::string			statusReason;
 	std::string			contentType;
 	size_t				contentLengthHeader = static_cast<size_t>(-1);
-	std::map<std::string, std::string>	cgiHdrs;
+	map<std::string, std::string>	cgiHdrs;
 
 	std::istringstream	hs(headers);
 	std::string			line;
@@ -857,7 +887,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
 	fillResponse(statusCode, body);
 
 	// keep CGI-provided headers
-	for (std::map<std::string, std::string>::const_iterator it = cgiHdrs.begin(); it != cgiHdrs.end(); ++it) {
+	for (map<std::string, std::string>::const_iterator it = cgiHdrs.begin(); it != cgiHdrs.end(); ++it) {
 		_headers[it->first] = it->second;
 	}
 
