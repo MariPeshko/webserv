@@ -727,8 +727,6 @@ bool		Response::tryServeCgi()
 		return false;
 	}
 
-	cout << "response _path: " << _path << endl;
-
 	string	scriptPath;
     string	interpreter;
 	string	ext;
@@ -752,19 +750,8 @@ bool		Response::tryServeCgi()
 	}
 	return false; // No CGI script found
 
-	/*
-	size_t	dotPos = _path.find_last_of('.');
-	if (dotPos == string::npos)
-		return false;
-	string	ext = _path.substr(dotPos + 1);
-
-	map<string, string>::const_iterator	it = cgiMap.find(ext);
-	if (it == cgiMap.end())
-		return false; */
-
-	// Allow CGI even if the target file doesn’t exist
-
 	found_cgi:
+	// Allow CGI even if the target file doesn’t exist
 	if (DEBUG) cout << GREEN << "Executing CGI: " << _path << RESET << endl;
 	try {
 		CgiHandler	cgi(*this, scriptPath, interpreter, ext);
