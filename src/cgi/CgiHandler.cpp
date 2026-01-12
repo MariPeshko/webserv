@@ -8,7 +8,7 @@ using std::string;
 using std::map;
 
 CgiHandler::CgiHandler(Response& resp, const string& scriptPath, 
-						const string& interPath, const std::string& ext) :
+						const string& interPath, const string& ext) :
 	_resp(resp),
 	_scriptPath(scriptPath),
 	_interpreterPath(interPath),
@@ -62,7 +62,7 @@ void	CgiHandler::setupEnv() {
 	// Parse PATH_INFO
 	string	pathInfo = "";
 	size_t	dot = uriNoQuery.rfind(_extention);
-	if (dot != std::string::npos) {
+	if (dot != string::npos) {
 		size_t	scriptEnd = dot + _extention.size(); // ".bla" or ".py" length
 		if (scriptEnd < uriNoQuery.size() && uriNoQuery[scriptEnd] == '/') {
 			// extra path follows the script and starts with '/'
@@ -118,16 +118,20 @@ void	CgiHandler::setupEnv() {
  *    - Redirects stdin/stdout to the pipes
  *    - Closes unused file descriptors to prevent leakage
  *    - Executes the script using execve() with environment variables
- * 4. Parent process:
+ * - Parent process:
  *    - Writes request body to script's stdin
  *    - Reads script's output from stdout
  *    - Waits for child process to complete
  * 
- *  Timeout handling: 
- * - Set both pipe fds (pipeIn[1], pipeOut[0]) to O_NONBLOCK.
- * - Record start = time(NULL); enforce a hard limit CGI_TIMEOUT_SEC.
- * - In a read phase: After each iteration check child state with waitpid with
- *   a flag WNOHANG.
+ * Why do we need O_NONBLOCK - it prevents deadlock
+ * Deadlock note: pipe buffer is only 64KB, so after 64KB, write() BLOCKS (waits).
+ * Meanwhile, the CGI script fills its output pipe (64KB) - BLOCKS (pipe full)
+ * Deadlock: Parent waiting for child to read, child waiting for parent to read
+ * 
+ * Once child has exited: Switch to blocking. No more deadlock risk because
+ * child can't block anymore and reading from a closed pipe will reach EOF.
+ * 
+ * - Timeout handling
  * 
  * @return The complete output from the CGI script (headers + body),
  *         or an error message string if execution fails
@@ -135,9 +139,8 @@ void	CgiHandler::setupEnv() {
 string	CgiHandler::executeCgi()
 {
 	const Request*	req = _resp.getRequest();
-
-	int		pipeIn[2];  // To send Body to script
-	int		pipeOut[2]; // To read Output from script
+	int				pipeIn[2];  // To send Body to script
+	int				pipeOut[2]; // To read Output from script
 
 	if (pipe(pipeIn) == -1 || pipe(pipeOut) == -1)
 		throw std::runtime_error("CGI: pipe() failed");
@@ -178,151 +181,145 @@ string	CgiHandler::executeCgi()
 		// For a a CGI timeout: Non-blocking I/O on pipes
 		fcntl(pipeIn[1], F_SETFL, O_NONBLOCK);
 		fcntl(pipeOut[0], F_SETFL, O_NONBLOCK);
-		const time_t	CGI_TIMEOUT_SEC = CGI_TIMEOUT;
-		const time_t	start = time(NULL);
 
-		// For a a CGI timeout: Write request body (best-effort, 
-		// non-blocking, with timeout).
+		// For a a CGI timeout: Write request body (best-effort, non-blocking, with timeout).
 		// write() system call is not guaranteed to send all your data in one go;
-		// written - a counter to keep track of how many bytes have been sent
+		// We need it for a 42_test POST http://localhost:8080/directory/youpi.bla with a size of 100000000
 		const string&	body = req->getBody();
-		size_t			written = 0;
 		string			preResult;
-		time_t			lastProgress = start;
 
-		// TO DO I need it for a test Test POST http://localhost:8080/directory/youpi.bla with a size of 100000000
-		while (written < body.size()) {
-			if (g_server_manager && g_server_manager->isShutdownRequested()) {
-				killAndCleanupCgi(pid, pipeIn[1], pipeOut[0]);
-				return "Status: 503\r\n\r\nServer Shutting Down";
-			}
-			// Timeout if no progress for CGI_TIMEOUT_SEC
-			if (time(NULL) - lastProgress >= CGI_TIMEOUT_SEC) {
-				killAndCleanupCgi(pid, pipeIn[1], pipeOut[0]);
-				if (CGI_DEBUG) std::cout << "CGI Script Timeout (write, no progress)" << std::endl;
-				return "Status: 504\r\n\r\nCGI Script Timeout (write)";
-			}
-
-			ssize_t n = write(pipeIn[1], body.c_str() + written, body.size() - written);
-			if (n > 0) {
-				written += static_cast<size_t>(n);
-				lastProgress = time(NULL); continue;
-			}
-
-			if (n < 0) {
-				// TO DO is it possible to avoid it?
-				if (errno == EAGAIN || errno == EWOULDBLOCK) {
-					// Pipe to child stdin is full. Try to drain child's stdout to let it make progress.
-					char	drainBuf[4096];
-					ssize_t r = read(pipeOut[0], drainBuf, sizeof(drainBuf));
-					if (r > 0) {
-						preResult.append(drainBuf, static_cast<size_t>(r));
-						// We made progress by draining output
-						lastProgress = time(NULL);
-					}
-
-					// Check if child already exited
-					int status = 0;
-					pid_t rv = waitpid(pid, &status, WNOHANG);
-					if (rv == pid) {
-						// Child exited, stop writing
-						break;
-					}
-					continue; // Retry write on next loop iteration
-				}
-				// Other write error
-				killAndCleanupCgi(pid, pipeIn[1], pipeOut[0]);
-				return "Status: 500\r\n\r\nCGI Write Error";
-			}
-
-			// n == 0 (no bytes written). Give the child a chance by draining output.
-			char	drainBuf[4096];
-			ssize_t r = read(pipeOut[0], drainBuf, sizeof(drainBuf));
-			if (r > 0) {
-				lastProgress = time(NULL);
-				preResult.append(drainBuf, static_cast<size_t>(r));
-			}
-
-			// Check child exit
-			int		status = 0;
-			pid_t	rv = waitpid(pid, &status, WNOHANG);
-			if (rv == pid) break;
-
-			// Loop again; lastProgress guards the timeout.
+		string	writeError = writeRequestBodyToCgi(pid, pipeIn[1], pipeOut[0], body, preResult);
+		if (!writeError.empty()) {
+			return writeError;
 		}
-
-		close(pipeIn[1]); // Done writing (or child closed early)
-		if (CGI_DEBUG) std::cout << "request body is sent to cgi. written counter: " << written << std::endl;
-
-		// Read script's stdout
-		// For a a CGI timeout: read until child exits or timeout
-		char		buffer[65536];
-		// Read script's stdout (start with any bytes drained earlier)
-		std::string	result = preResult;
-
-		while (true) {
-			if (g_server_manager && g_server_manager->isShutdownRequested()) {
-				killAndCleanupCgi(pid, -1, pipeOut[0]);
-				return "Status: 503\r\n\r\nServer Shutting Down";
-			}
-			// Timeout if no progress for CGI_TIMEOUT_SEC
-			if (time(NULL) - lastProgress >= CGI_TIMEOUT_SEC) {
-				killAndCleanupCgi(pid, -1, pipeOut[0]);
-				if (CGI_DEBUG) std::cout << "CGI Script Timeout (read)" << std::endl;
-				return "Status: 504\r\n\r\nCGI Script Timeout";
-			}
-
-			//if (CGI_DEBUG) std::cout << "parent reads CGI output" << std::endl;
-			ssize_t	n = read(pipeOut[0], buffer, sizeof(buffer));
-			if (n > 0) {
-				result.append(buffer, static_cast<size_t>(n));
-				lastProgress = time(NULL); continue;
-			}
-
-			// Check if child has exited
-			int		status;
-			// WNOHANG - return immediately if no child has exited.
-			// If a child died, its pid will be returned by waitpid() and process 
-			// can act on that. If nothing died, then the returned pid is 0.
-			pid_t	r = waitpid(pid, &status, WNOHANG);
-			if (r == pid) {
-				// Child exited: switch to blocking and fully drain remaining data
-				int flags = fcntl(pipeOut[0], F_GETFL, 0);
-				if (flags != -1) {
-					if (CGI_DEBUG) std::cout << "fcntl(pipeOut[0], F_SETFL, flags & ~O_NONBLOCK)" << std::endl;
-					fcntl(pipeOut[0], F_SETFL, flags & ~O_NONBLOCK);
-				}
-				while (true) {
-					ssize_t	n2 = read(pipeOut[0], buffer, sizeof(buffer));
-					if (n2 > 0) {
-						result.append(buffer, static_cast<size_t>(n2));
-					} else if (n2 == 0) { // EOF: fully drained
-						break;
-					} else {
-						// n2 < 0: if interrupted, retry; otherwise stop
-						if (errno == EINTR) continue;
-						if (errno == EAGAIN || errno == EWOULDBLOCK) continue; // unlikely now
-						break;
-					}
-				}
-				close(pipeOut[0]);
-				if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-					if (CGI_DEBUG) std::cout << "executeCgi(): Child process failed" << std::endl;
-					return "Status: 500\r\n\r\nCGI Script Error";
-				}
-				if (WIFSIGNALED(status)) {
-					if (CGI_DEBUG) std::cout << "executeCgi(): Child process terminated by signal" << std::endl;
-					return "Status: 500\r\n\r\nCGI Script Terminated";
-				}
-				if (CGI_DEBUG) std::cout << "r == pid\nparent has read CGI output. result size: " << result.size() << std::endl;
-				return result;
-				
-			}
-		}
-		if (CGI_DEBUG) std::cout << "parent has read CGI output. result size: " << result.size() << std::endl;
 		
+		close(pipeIn[1]); // Done writing (or child closed early)
+		
+		string	result = readCgiOutput(pid, pipeOut[0], preResult);
+		if (CGI_DEBUG) std::cout << "CGI output size: " << result.size() << std::endl;
 		return result;
 	}
+}
+
+/** Write request body to CGI stdin with timeout and deadlock prevention */
+string  	CgiHandler::writeRequestBodyToCgi(pid_t pid, int pipeInFd, int pipeOutFd, 
+								   const string& body, string& preResult) {
+	size_t			written = 0;
+	time_t			lastProgress = time(NULL);
+	const time_t	CGI_TIMEOUT_SEC = CGI_TIMEOUT;
+
+	while (written < body.size()) {
+		if (g_server_manager && g_server_manager->isShutdownRequested()) {
+			killAndCleanupCgi(pid, pipeInFd, pipeOutFd);
+			return "Status: 503\r\n\r\nServer Shutting Down";
+		}
+
+		if (time(NULL) - lastProgress >= CGI_TIMEOUT_SEC) {
+			killAndCleanupCgi(pid, pipeInFd, pipeOutFd);
+			if (CGI_DEBUG) std::cout << "CGI Script Timeout (write)" << std::endl;
+			return "Status: 504\r\n\r\nCGI Script Timeout (write)";
+		}
+
+		ssize_t n = write(pipeInFd, body.c_str() + written, body.size() - written);
+		if (n > 0) {
+			written += static_cast<size_t>(n);
+			lastProgress = time(NULL);
+			continue;
+		}
+
+		if (n < 0) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				ssize_t r = drainCgiOutput(pipeOutFd, preResult);
+				if (r > 0) lastProgress = time(NULL);
+				if (hasChildExited(pid)) break;
+				continue;
+			}
+			killAndCleanupCgi(pid, pipeInFd, pipeOutFd);
+			return "Status: 500\r\n\r\nCGI Write Error";
+		}
+
+		// n == 0
+		ssize_t r = drainCgiOutput(pipeOutFd, preResult);
+		if (r > 0)
+			lastProgress = time(NULL);
+		if (hasChildExited(pid))
+			break;
+	}
+	if (CGI_DEBUG) std::cout << "request body is sent to cgi. written counter: " << written << std::endl;
+	return ""; // Success, no error
+}
+
+/** Read CGI output with timeout */
+std::string	CgiHandler::readCgiOutput(pid_t pid, int pipeOutFd, const string& preResult) {
+	char			buffer[65536];
+	string			result = preResult;
+	time_t			lastProgress = time(NULL);
+	const time_t	CGI_TIMEOUT_SEC = CGI_TIMEOUT;
+
+	while (true) {
+		if (g_server_manager && g_server_manager->isShutdownRequested()) {
+			killAndCleanupCgi(pid, -1, pipeOutFd);
+			return "Status: 503\r\n\r\nServer Shutting Down";
+		}
+
+		if (time(NULL) - lastProgress >= CGI_TIMEOUT_SEC) {
+			killAndCleanupCgi(pid, -1, pipeOutFd);
+			if (CGI_DEBUG) std::cout << "CGI Script Timeout (read)" << std::endl;
+			return "Status: 504\r\n\r\nCGI Script Timeout";
+		}
+
+		ssize_t	n = read(pipeOutFd, buffer, sizeof(buffer));
+		if (n > 0) {
+			result.append(buffer, static_cast<size_t>(n));
+			lastProgress = time(NULL);
+			continue;
+		}
+
+		int	status;
+		if (hasChildExited(pid, &status)) {
+			// Switch to blocking and drain remaining
+			int flags = fcntl(pipeOutFd, F_GETFL, 0);
+			if (flags != -1) {
+				fcntl(pipeOutFd, F_SETFL, flags & ~O_NONBLOCK);
+			}
+
+			string	remaining = drainRemainingOutput(pipeOutFd, buffer, sizeof(buffer));
+			result.append(remaining);
+
+			close(pipeOutFd);
+
+			if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+				if (CGI_DEBUG) std::cout << "executeCgi(): Child process failed" << std::endl;
+				return "Status: 500\r\n\r\nCGI Script Error";
+			}
+			if (WIFSIGNALED(status)) {
+				if (CGI_DEBUG) std::cout << "executeCgi(): Child terminated by signal" << std::endl;
+				return "Status: 500\r\n\r\nCGI Script Terminated";
+			}
+
+			if (CGI_DEBUG) std::cout << "CGI output size: " << result.size() << std::endl;
+			return result;
+		}
+	}
+}
+
+/** Drain remaining output from CGI after child exits (blocking mode) */
+string	CgiHandler::drainRemainingOutput(int pipeOutFd, char* buffer, size_t bufSize)
+{
+	string	remaining;
+	while (true) {
+		ssize_t n2 = read(pipeOutFd, buffer, bufSize);
+		if (n2 > 0) {
+			remaining.append(buffer, static_cast<size_t>(n2));
+		} else if (n2 == 0) {
+			break; // EOF: fully drained
+		} else { // n2 < 0: if interrupted, retry; otherwise stop
+			if (errno == EINTR) continue;
+			if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+			break;
+		}
+	}
+	return remaining;
 }
 
 char**	CgiHandler::getEnvArray()
@@ -360,3 +357,29 @@ void	CgiHandler::killAndCleanupCgi(pid_t pid, int pipeIn, int pipeOut) {
 	int	status;
 	waitpid(pid, &status, 0);
 }
+
+ssize_t	CgiHandler::drainCgiOutput(int pipeOutFd, string& preResult) {
+	char	drainBuf[4096];
+	ssize_t	r = read(pipeOutFd, drainBuf, sizeof(drainBuf));
+	if (r > 0) {
+		preResult.append(drainBuf, static_cast<size_t>(r));
+	}
+	return r;
+}
+
+// Check if child already exited
+// WNOHANG - return immediately if no child has exited.
+// If a child died, its pid will be returned by waitpid().
+// If nothing died, then the returned pid is 0.
+bool	CgiHandler::hasChildExited(pid_t pid) {
+	int		status = 0;
+	pid_t	rv = waitpid(pid, &status, WNOHANG);
+	return (rv == pid);
+}
+
+// Similar method with a pointer to a status
+bool	CgiHandler::hasChildExited(pid_t pid, int *status) {
+	pid_t	rv = waitpid(pid, status, WNOHANG);
+	return (rv == pid);
+}
+

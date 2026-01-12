@@ -31,7 +31,16 @@ class CgiHandler {
 		void	setupEnv();
 		char**	getEnvArray();
 		void	freeEnvArray(char** envArray);
-		void	killAndCleanupCgi(pid_t pid, int pipeIn, int pipeOut);
+
+		// executeCgi() helpers
+		std::string	writeRequestBodyToCgi(pid_t pid, int pipeInFd, int pipeOutFd, 
+									const std::string& body, std::string& preResult);
+		std::string	readCgiOutput(pid_t pid, int pipeOutFd, const std::string& preResult);
+		std::string	drainRemainingOutput(int pipeOutFd, char* buffer, size_t bufSize);
+		void		killAndCleanupCgi(pid_t pid, int pipeIn, int pipeOut);
+		ssize_t		drainCgiOutput(int pipeOutFd, std::string& preResult);
+		bool		hasChildExited(pid_t pid);
+		bool		hasChildExited(pid_t pid, int *status);
 };
 
 #endif
