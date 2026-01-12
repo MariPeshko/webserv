@@ -61,7 +61,8 @@ void Logger::logErrno(LogLevel level, const std::string &message)
 	}
 }
 
-void Logger::logRequest(const std::string &clientIp, const std::string &method, const std::string &uri, int statusCode, size_t bytesSent)
+void	Logger::logRequest(const std::string &clientIp, int port,
+	const std::string &method, const std::string &uri, int statusCode, size_t bytesSent)
 {
 	if (!IS_LOGGER_ENABLED)
 		return;
@@ -75,7 +76,7 @@ void Logger::logRequest(const std::string &clientIp, const std::string &method, 
 	std::string timestamp = getTimestamp();
 	std::stringstream ss;
 	ss << "[" << timestamp << "] [REQUEST] "
-	   << clientIp << " - "
+	   << clientIp << ":" << port << " "
 	   << "\"" << method << " " << uri << "\" "
 	   << statusCodeColor << statusCode << RESET << " "
 	   << "- " << bytesSent << " bytes sent";

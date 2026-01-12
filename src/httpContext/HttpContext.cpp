@@ -234,9 +234,7 @@ bool	HttpContext::findAndParseHeaders(string &buf)
 		if (pos == string::npos) {
         	return false;
     	}
-		if (CTX_DEBUG) cout << "Headers separator nn found" << endl;
 	}
-	if (CTX_DEBUG) cout << "Headers separator rnrn found" << endl;
 	string	rawHeaders = buf.substr(0, pos);
 	buf.erase(0, pos + sep_len);
 	if (HttpParser::parseHeaders(rawHeaders, request()) == false) {
