@@ -100,6 +100,7 @@ void	HttpContext::requestParsingStateMachine()
 				}
 				if (!findAndParseHeaders(buf)) {
 					request().ifConnNotPresent();
+					if (REQ_DEBUG && _state == REQUEST_ERROR) PrintUtils::printRequestHeaders(request());
 					can_parse = false; break;
 				}
 				if (REQ_DEBUG) PrintUtils::printRequestHeaders(request());
@@ -226,12 +227,16 @@ bool	HttpContext::findAndParseReqLine(std::string &buf)
 bool	HttpContext::findAndParseHeaders(string &buf)
 {
 	size_t	pos = buf.find("\r\n\r\n");
+	size_t	sep_len = 4;
 	if (pos == string::npos) {
-		return false;
+		pos = buf.find("\n\n");  // Fallback to LF-only
+		sep_len = 2;
+		if (pos == string::npos) {
+        	return false;
+    	}
 	}
-
 	string	rawHeaders = buf.substr(0, pos);
-	buf.erase(0, pos + 4);
+	buf.erase(0, pos + sep_len);
 	if (HttpParser::parseHeaders(rawHeaders, request()) == false) {
 		_state = REQUEST_ERROR;
 		return false;
@@ -520,11 +525,6 @@ bool	HttpContext::checkHeaderBlockSize(const std::string &buf)
 		sizeToCheck = headerEnd;
 	} else {
 		sizeToCheck = buf.size();
-		// TO DO: why multiplying by two?
-		if (sizeToCheck > MAX_HEADER_BLOCK_SIZE * 2) {
-			if (CTX_DEBUG) cerr << RED << "Potential attack: huge buffer without header termination" << RESET << endl;
-			return false;
-		}
 	}
 	if (sizeToCheck > MAX_HEADER_BLOCK_SIZE) {
 		if (CTX_DEBUG) cerr << RED << "Header block exceeds maximum size: " 
@@ -560,8 +560,6 @@ bool	HttpContext::checkBodySizeLimit(size_t contentLength)
 	return contentLength <= maxBodySize;
 }
 
-// TO DO: mpeshko: to compare it to matchPathToLocation(). Can we use
-// one method in two places?
 const Location* HttpContext::findMatchingLocation()
 {
 	const std::vector<Location>&	locations = _server_config.getLocations();

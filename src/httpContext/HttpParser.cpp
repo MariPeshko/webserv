@@ -4,16 +4,18 @@ using std::cout;
 using std::cerr;
 using std::endl;
 using std::string;
+using std::istringstream;
+using std::stringstream;
 
 HttpParser::HttpParser() { }
 
 HttpParser::~HttpParser() { }
 
-void	HttpParser::appendToBody(const std::string & buffer, const size_t n, Request& req) {
+void	HttpParser::appendToBody(const string & buffer, const size_t n, Request& req) {
 	if (n == 0 || buffer.empty()) {
 		return;
 	}
-	 // Assumes Request::getBody() returns a non-const std::string&
+	 // Assumes Request::getBody() returns a non-const string&
 	req.getBody().append(buffer, 0, n);
 }
 
@@ -26,11 +28,11 @@ void	HttpParser::appendToBody(const std::string & buffer, const size_t n, Reques
  * like passwd to try and access sensitive files outside of the 
  * web server's intended root directory.
  */
-bool HttpParser::parseRequestLine(const std::string& line, 
+bool	HttpParser::parseRequestLine(const string& line, 
 									Request& req) {
 
-	std::istringstream	iss(line); 
-	std::string			method, uri, version;
+	istringstream	iss(line); 
+	string			method, uri, version;
 
 	// false if the stream iss fails to extract all three strings.
 	if (!(iss >> method >> uri >> version) || !iss.eof()) {
@@ -52,14 +54,14 @@ bool HttpParser::parseRequestLine(const std::string& line,
 		size_t	host_start = 7; // "http://" is 7 chars
 		size_t	path_start = uri.find("/", host_start);
 		
-		if (path_start != std::string::npos) {
-			std::string host = uri.substr(host_start, path_start - host_start);
+		if (path_start != string::npos) {
+			string host = uri.substr(host_start, path_start - host_start);
 			req.setHost(host);
 			if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine. host: " << host << RESET << endl;
 			uri = uri.substr(path_start);
 		} else {
 			// Case: GET http://localhost:8080 HTTP/1.0 (no trailing slash)
-			std::string host = uri.substr(host_start);
+			string host = uri.substr(host_start);
 			req.setHost(host);
 			if (DEBUG_HTTP_PARSER) cout << BLUE << "parseRequestLine. host: " << host << RESET << endl;
 			uri = "/";
@@ -81,7 +83,7 @@ bool HttpParser::parseRequestLine(const std::string& line,
 		return false;
 	}
 	// Rudimentary URI check
-	if (uri.empty() || uri[0] != '/' || uri.find("..") != std::string::npos) {
+	if (uri.empty() || uri[0] != '/' || uri.find("..") != string::npos) {
 		if (DEBUG_HTTP_PARSER) cout << "parseRequestLine. URI check: invalid" << endl;
 		req.setRequestLineFormatValid(false);
 		return false;
@@ -103,15 +105,20 @@ bool HttpParser::parseRequestLine(const std::string& line,
  * @param req The Request object to populate with headers.
  * @return true if all headers were parsed successfully, false otherwise.
  */
-bool	HttpParser::parseHeaders(const std::string& headersBlock,
+bool	HttpParser::parseHeaders(const string& headersBlock,
 									Request& req) {
 	if (DEBUG_HTTP_PARSER) cout << "HttpParser::parseHeaders" << endl;
 	if (headersBlock.empty()) {
-		return true; // no headers, it's ok for GET. TODO for POST?
+		if (req.getMethod() == "POST") {
+			req.setHeadersFormatValid(false);
+			req.setStatusCode(400);
+			return false;
+		}
+		return true; // no headers, it's ok for GET, DELETE
 	}
 
-	std::istringstream	iss(headersBlock);
-	std::string 		line;
+	istringstream	iss(headersBlock);
+	string 			line;
 
 	while(std::getline(iss, line)) {
 
@@ -123,7 +130,7 @@ bool	HttpParser::parseHeaders(const std::string& headersBlock,
 		if(line.empty()) continue;
 
 		size_t	pos_colon = line.find(':');
-		if(pos_colon == std::string::npos) {
+		if(pos_colon == string::npos) {
 			req.setHeadersFormatValid(false);
 			return false; // Malformed header line
 		}
@@ -131,13 +138,13 @@ bool	HttpParser::parseHeaders(const std::string& headersBlock,
 		string	value = line.substr(pos_colon +1);
 
 		//Trim leading whitespace from name
-		size_t start = name.find_first_not_of(" \t");
-		if (start != std::string::npos) {
+		size_t	start = name.find_first_not_of(" \t");
+		if (start != string::npos) {
 			name = name.substr(start);
 		}
 		//Trim trailing whitespace from name
-		size_t end = name.find_last_not_of(" \t");
-		if (end != std::string::npos) {
+		size_t	end = name.find_last_not_of(" \t");
+		if (end != string::npos) {
 			name = name.substr(0, end + 1);
 		}
 		// Normalize header name to lowercase
@@ -146,7 +153,7 @@ bool	HttpParser::parseHeaders(const std::string& headersBlock,
 		}
 		// Trim leading whitespace from value
 		start = value.find_first_not_of(" \t");
-		if (start != std::string::npos) {
+		if (start != string::npos) {
 			value = value.substr(start);
 		}
 		if (name.empty()) {
@@ -165,7 +172,7 @@ bool	HttpParser::parseHeaders(const std::string& headersBlock,
 // 
 // updating the 'value' in each loop iteration.
 // '10u' is the unsigned integer literal 10.
-bool	HttpParser::cpp98_hexaStrToInt(const std::string& s, size_t& out) {
+bool	HttpParser::cpp98_hexaStrToInt(const string& s, size_t& out) {
 	if (s.empty())
 		return false;
 
@@ -201,11 +208,11 @@ bool	HttpParser::cpp98_hexaStrToInt(const std::string& s, size_t& out) {
 }
 
 // Generate Timestamp for a filename
-static string generateTimestamp() {
+static string	generateTimestamp() {
 	
-	time_t				now = time(0);
-	struct tm*			tstruct = localtime(&now);
-	std::stringstream	timestamp_ss;
+	time_t			now = time(0);
+	struct tm*		tstruct = localtime(&now);
+	stringstream	timestamp_ss;
 	timestamp_ss << (1900 + tstruct->tm_year)
 				<< (tstruct->tm_mon + 1 < 10 ? "0" : "") << (tstruct->tm_mon + 1) // a zero-based index; 0 = January
 				<< (tstruct->tm_mday < 10 ? "0" : "") << tstruct->tm_mday
@@ -223,20 +230,20 @@ bool	HttpParser::parseMultiHeadersName(string& multipart_headers, string& filena
 	string	sanitized_filename;
 
 	size_t	filename_header = headers.find("filename=\"");
-	if (filename_header == std::string::npos) {
+	if (filename_header == string::npos) {
 		cerr << "Error: malformed multipart header; no \"filename=\"\" found" << endl;
 		return false;
 	}
 	headers.erase(0, filename_header + 10);
 	size_t	char_after_name = headers.find("\"");
-	if (char_after_name == std::string::npos) {
+	if (char_after_name == string::npos) {
 		cerr << "Error: malformed multipart header; no closure \" found" << endl;
 		return false;
 	}
 	original_filename = headers.substr(0, char_after_name);
 	// Sanitize filename
 	for (size_t i = 0; i < original_filename.length(); ++i) {
-		unsigned char c = original_filename[i];
+		unsigned char	c = original_filename[i];
 		if (c < 128) {
 			if (c == ' ' || c == '\t') {
 				sanitized_filename += '_';
@@ -266,13 +273,13 @@ bool	HttpParser::parseMultipartData(const string& reqBody,
 		return false;
 	}
 
-	string buf = reqBody;
+	string	buf = reqBody;
 	// Multipart boundaries are prefixed with "--" in the body
-	string startBoundary = "--" + boundary;
-	string endBoundary = "--" + boundary + "--";
+	string	startBoundary = "--" + boundary;
+	string	endBoundary = "--" + boundary + "--";
 	
 	size_t	pos_start_headers = reqBody.find(startBoundary);
-	if (pos_start_headers == std::string::npos) {
+	if (pos_start_headers == string::npos) {
 		cerr << "Error: malformed multipart request; no start boundary found" << endl;
 		return false;
 	}
@@ -289,7 +296,7 @@ bool	HttpParser::parseMultipartData(const string& reqBody,
 	}
 	buf.erase(0, pos_end_headers + 4);
 	// The actual file data starts after \r\n\r\n
-	size_t pos_body_start = 0;
+	size_t	pos_body_start = 0;
 
 	// .find() - string Search Operation
 	// s2, pos Look for the string s2 starting at position pos
@@ -302,58 +309,35 @@ bool	HttpParser::parseMultipartData(const string& reqBody,
 	// Extract file data (subtract 2 for the \r\n before end boundary)
 	size_t	file_data_length = pos_end_boundary - 2;
 	fileData = buf.substr(0, file_data_length);
-	
 	string	picture = fileData.substr(0, 10);
 
-	// TO DO
-	// TO DELETE Expected JPEG structure:
-	// Start: FF D8 FF (JPEG header)
-	// End: FF D9 (JPEG end marker) + possible metadata
-	// %02x is a formatting specifier used with the string formatting 
-	// operator % to represent an integer as a two-digit hexadecimal (base-16) number.
-	/* cout << "First 10 bytes (JPEG header): ";
-	for (size_t i = 0; i < 10 && i < fileData.size(); ++i) {
-		printf("%02X ", (unsigned char)fileData[i]);
-	}
-	cout << endl; */
-	/* size_t jpegEnd = fileData.find("\xFF\xD9");
-	// Include the FF D9 bytes (add 2)
-	string cleanJpeg = fileData.substr(0, jpegEnd + 2);
-	cout << "Clean JPEG size: " << cleanJpeg.size() << " bytes" << endl;
-
-	// Verify it ends with FF D9
-	cout << "Last 2 bytes should be FF D9: ";
-	for (size_t i = std::max(0, (int)cleanJpeg.size() - 2); i < cleanJpeg.size(); ++i) {
-		printf("%02X ", (unsigned char)cleanJpeg[i]);
-	}
-	cout << endl; */
 	return true;
 }
 
-std::string	HttpParser::extractBoundary(const std::string& contentType) {
+string	HttpParser::extractBoundary(const string& contentType) {
 	
-	size_t	boundaryPos = contentType.find("boundary=");
-	if (boundaryPos == std::string::npos) {
+	size_t		boundaryPos = contentType.find("boundary=");
+	if (boundaryPos == string::npos) {
 		return ""; // Error: no boundary found
 	}
 	// Skip "boundary="
-	std::string boundary = contentType.substr(boundaryPos + 9); 
+	string	boundary = contentType.substr(boundaryPos + 9); 
 	
 	// Remove any trailing semicolon or whitespace
 	size_t	semicolon = boundary.find(';');
-	if (semicolon != std::string::npos) {
+	if (semicolon != string::npos) {
 		boundary = boundary.substr(0, semicolon);
 	}
 	
 	return boundary;
 }
 
-string HttpParser::getExtensionStr(const std::string& filename) {
-	size_t dot_pos = filename.find_last_of(".");
-	if (dot_pos == std::string::npos) {
+string	HttpParser::getExtensionStr(const string& filename) {
+	size_t	dot_pos = filename.find_last_of(".");
+	if (dot_pos == string::npos) {
 		return ".no_extention";
 	}
-	std::string	ext = filename.substr(dot_pos);
+	string	ext = filename.substr(dot_pos);
 	for (size_t i = 0; i < ext.length(); ++i) {
 		ext[i] = std::tolower(ext[i]);
 	}
@@ -361,13 +345,13 @@ string HttpParser::getExtensionStr(const std::string& filename) {
 }
 
 // Conceptual function to sanitize and validate a filename's extension
-bool	HttpParser::isExtensionAllowed(const std::string& filename) {
+bool	HttpParser::isExtensionAllowed(const string& filename) {
 	// 1. Isolate the extension
-	size_t dot_pos = filename.find_last_of(".");
-	if (dot_pos == std::string::npos) {
+	size_t	dot_pos = filename.find_last_of(".");
+	if (dot_pos == string::npos) {
 		return false;
 	}
-	std::string	ext = filename.substr(dot_pos);
+	string	ext = filename.substr(dot_pos);
 	// 2. Normalize to lowercase
 	for (size_t i = 0; i < ext.length(); ++i) {
 		ext[i] = std::tolower(ext[i]);
@@ -420,7 +404,7 @@ size_t	HttpParser::parseSizeString(const string& sizeStr) {
 // - reject leading '+'/'-' and empty strings
 //
 // contentLength = contentLength * 10 + static_cast<size_t>(c - '0');
-bool	HttpParser::safeParseContentLength(const std::string &cl, size_t &contentLength)
+bool	HttpParser::safeParseContentLength(const string &cl, size_t &contentLength)
 {
 	if (cl.empty())
 		return false;

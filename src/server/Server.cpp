@@ -42,7 +42,7 @@ int	Server::setupServer() {
 	if (lflags != -1)
 		fcntl(_listen_fd, F_SETFL, lflags | O_NONBLOCK);
 
-	int yes = 1;
+	int	yes = 1;
 	if (setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
 	{
 		Logger::logErrno(LOG_ERROR, "Failed to set SO_REUSEADDR");
@@ -56,7 +56,7 @@ int	Server::setupServer() {
 
 	if (bind(_listen_fd, (struct sockaddr *)&_server_address, sizeof(_server_address)) == -1)
 	{
-		std::stringstream ss;
+		std::stringstream	ss;
 		ss << _port;
 		Logger::logErrno(LOG_ERROR, "Failed to bind socket to " + _host + ":" + ss.str());
 		close(_listen_fd);
@@ -67,7 +67,7 @@ int	Server::setupServer() {
 		Logger::logErrno(LOG_ERROR, "Failed to listen on socket");
 		return -1;
 	}
-	Logger::log(LOG_INFO, "Server listening on " + _host + ":" + toString(_port));
+	Logger::log(LOG_INFO, "Server listening on fd " + toString(_listen_fd) + " IP/Port: " + _host + ":" + toString(_port));
 	return 0;
 }
 
