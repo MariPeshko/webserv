@@ -5,7 +5,7 @@
 
 #include <signal.h>
 
-static ServerManager*	g_server_manager = NULL;
+ServerManager*	g_server_manager = NULL;
 
 /**
  * Note: Same scenario for all three signals. It' a fall-through 
