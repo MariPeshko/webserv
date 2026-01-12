@@ -1,5 +1,8 @@
 #include "CgiHandler.hpp"
+#include "../server/ServerManager.hpp"
 
+// Forward declaration to access the global ServerManager
+extern ServerManager*	g_server_manager;
 
 using std::string;
 using std::map;
@@ -40,7 +43,7 @@ void	CgiHandler::setupEnv() {
 
 	// Parse Query String
 	string		uri = req->getUri();
-	string	uriNoQuery = uri;
+	string		uriNoQuery = uri;
 	
 	size_t		queryPos = uri.find('?');
 	if (queryPos != string::npos) {
@@ -60,7 +63,7 @@ void	CgiHandler::setupEnv() {
 	//   /directory/youpi.bla - PATH_INFO = ""
 	//   /directory/youpi.bla/foo/bar - PATH_INFO = "/foo/bar"
 	string	pathInfo = "";
-	size_t dot = uriNoQuery.rfind(".bla");
+	size_t	dot = uriNoQuery.rfind(".bla");
 	if (CGI_DEBUG) std::cout << "WARNING: CGI correct pathInfo only for .bla (42 tester)" << std::endl;
 	// Find the position of the script name inside the URI (no query)
 	// Use last occurrence of ".bla" and include that segment as script.
@@ -106,7 +109,6 @@ void	CgiHandler::setupEnv() {
 		}
 		_env[envKey] = value;
 	}
-
 	if (CGI_DEBUG) {
 		std::cout << "SCRIPT_FILENAME: " << _env["SCRIPT_FILENAME"] << std::endl;
 		std::cout << "SCRIPT_NAME:     " << _env["SCRIPT_NAME"] << std::endl;
@@ -148,14 +150,12 @@ string	CgiHandler::executeCgi()
 	int		pipeIn[2];  // To send Body to script
 	int		pipeOut[2]; // To read Output from script
 
-	if (pipe(pipeIn) == -1 || pipe(pipeOut) == -1) {
-		return "Status: 500\r\n\r\nInternal Server Error (Pipe)";
-	}
+	if (pipe(pipeIn) == -1 || pipe(pipeOut) == -1)
+		throw std::runtime_error("CGI: pipe() failed");
 
 	pid_t	pid = fork();
-	if (pid == -1) {
-		return "Status: 500\r\n\r\nInternal Server Error (Fork)";
-	}
+	if (pid == -1)
+		throw std::runtime_error("CGI: pipe() failed");
 
 	if (pid == 0) { // Child Process
 		close(pipeIn[1]);
@@ -168,9 +168,8 @@ string	CgiHandler::executeCgi()
 		// Close all other file descriptors to prevent leakage
 		int	max_fd = sysconf(_SC_OPEN_MAX);
 		if (max_fd == -1) max_fd = 1024; // Fallback if sysconf fails
-		for (int i = 3; i < max_fd; ++i) {
+		for (int i = 3; i < max_fd; ++i)
 			close(i);
-		}
 
 		char**	env = getEnvArray();
 		char*	argv[] = {
@@ -203,20 +202,18 @@ string	CgiHandler::executeCgi()
 		time_t			lastProgress = start;
 
 		// TO DO I need it for a test Test POST http://localhost:8080/directory/youpi.bla with a size of 100000000
-		// read this loop again
 		while (written < body.size()) {
+			if (g_server_manager && g_server_manager->isShutdownRequested()) {
+				killAndCleanupCgi(pid, pipeIn[1], pipeOut[0]);
+				return "Status: 503\r\n\r\nServer Shutting Down";
+			}
 			// Timeout if no progress for CGI_TIMEOUT_SEC
 			if (time(NULL) - lastProgress >= CGI_TIMEOUT_SEC) {
-				kill(pid, SIGKILL);
-				close(pipeIn[1]);
-				close(pipeOut[0]);
-				int	status; waitpid(pid, &status, 0);
+				killAndCleanupCgi(pid, pipeIn[1], pipeOut[0]);
 				if (CGI_DEBUG) std::cout << "CGI Script Timeout (write, no progress)" << std::endl;
 				return "Status: 504\r\n\r\nCGI Script Timeout (write)";
 			}
 
-			//if (CGI_DEBUG) std::cout << "parent write request body\nwritten counter: " << written << std::endl;
-		   
 			ssize_t n = write(pipeIn[1], body.c_str() + written, body.size() - written);
 			if (n > 0) {
 				written += static_cast<size_t>(n);
@@ -227,7 +224,7 @@ string	CgiHandler::executeCgi()
 				// TO DO is it possible to avoid it?
 				if (errno == EAGAIN || errno == EWOULDBLOCK) {
 					// Pipe to child stdin is full. Try to drain child's stdout to let it make progress.
-					char drainBuf[4096];
+					char	drainBuf[4096];
 					ssize_t r = read(pipeOut[0], drainBuf, sizeof(drainBuf));
 					if (r > 0) {
 						preResult.append(drainBuf, static_cast<size_t>(r));
@@ -245,10 +242,7 @@ string	CgiHandler::executeCgi()
 					continue; // Retry write on next loop iteration
 				}
 				// Other write error
-				kill(pid, SIGKILL);
-				close(pipeIn[1]);
-				close(pipeOut[0]);
-				int status; waitpid(pid, &status, 0);
+				killAndCleanupCgi(pid, pipeIn[1], pipeOut[0]);
 				return "Status: 500\r\n\r\nCGI Write Error";
 			}
 
@@ -275,15 +269,16 @@ string	CgiHandler::executeCgi()
 		// For a a CGI timeout: read until child exits or timeout
 		char		buffer[65536];
 		// Read script's stdout (start with any bytes drained earlier)
-        std::string	result = preResult;
+		std::string	result = preResult;
 
 		while (true) {
+			if (g_server_manager && g_server_manager->isShutdownRequested()) {
+				killAndCleanupCgi(pid, -1, pipeOut[0]);
+				return "Status: 503\r\n\r\nServer Shutting Down";
+			}
 			// Timeout if no progress for CGI_TIMEOUT_SEC
 			if (time(NULL) - lastProgress >= CGI_TIMEOUT_SEC) {
-				kill(pid, SIGKILL);
-				close(pipeIn[1]);
-				close(pipeOut[0]);
-				int	status; waitpid(pid, &status, 0);
+				killAndCleanupCgi(pid, -1, pipeOut[0]);
 				if (CGI_DEBUG) std::cout << "CGI Script Timeout (read)" << std::endl;
 				return "Status: 504\r\n\r\nCGI Script Timeout";
 			}
@@ -294,11 +289,6 @@ string	CgiHandler::executeCgi()
 				result.append(buffer, static_cast<size_t>(n));
 				lastProgress = time(NULL); continue;
 			}
-			/* if (n < 0) {
-				if (errno == EAGAIN || errno == EWOULDBLOCK) {
-					if (CGI_DEBUG) std:: cout << "parent reads CGI output: EAGAIN and EWOULDBLOCK" << std::endl;
-				}
-			} */
 
 			// Check if child has exited
 			int		status;
@@ -308,24 +298,23 @@ string	CgiHandler::executeCgi()
 			pid_t	r = waitpid(pid, &status, WNOHANG);
 			if (r == pid) {
 				// Child exited: switch to blocking and fully drain remaining data
-                int flags = fcntl(pipeOut[0], F_GETFL, 0);
-                if (flags != -1) {
+				int flags = fcntl(pipeOut[0], F_GETFL, 0);
+				if (flags != -1) {
 					if (CGI_DEBUG) std::cout << "fcntl(pipeOut[0], F_SETFL, flags & ~O_NONBLOCK)" << std::endl;
 					fcntl(pipeOut[0], F_SETFL, flags & ~O_NONBLOCK);
 				}
-
 				while (true) {
 					ssize_t	n2 = read(pipeOut[0], buffer, sizeof(buffer));
-                    if (n2 > 0) {
-                        result.append(buffer, static_cast<size_t>(n2));
-                    } else if (n2 == 0) { // EOF: fully drained
-                        break;
-                    } else {
-                        // n2 < 0: if interrupted, retry; otherwise stop
-                        if (errno == EINTR) continue;
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) continue; // unlikely now
-                        break;
-                    }
+					if (n2 > 0) {
+						result.append(buffer, static_cast<size_t>(n2));
+					} else if (n2 == 0) { // EOF: fully drained
+						break;
+					} else {
+						// n2 < 0: if interrupted, retry; otherwise stop
+						if (errno == EINTR) continue;
+						if (errno == EAGAIN || errno == EWOULDBLOCK) continue; // unlikely now
+						break;
+					}
 				}
 				close(pipeOut[0]);
 				if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
@@ -370,4 +359,15 @@ void	CgiHandler::freeEnvArray(char** envArray)
 		delete[] envArray[i];
 	}
 	delete[] envArray;
+}
+
+void	CgiHandler::killAndCleanupCgi(pid_t pid, int pipeIn, int pipeOut) {
+	kill(pid, SIGKILL);
+	if (pipeIn != -1)
+		close(pipeIn);
+	if (pipeOut != -1)
+		close(pipeOut);
+
+	int	status;
+	waitpid(pid, &status, 0);
 }

@@ -29,6 +29,7 @@ class CgiHandler {
 		void	setupEnv();
 		char**	getEnvArray();
 		void	freeEnvArray(char** envArray);
+		void	killAndCleanupCgi(pid_t pid, int pipeIn, int pipeOut);
 };
 
 #endif

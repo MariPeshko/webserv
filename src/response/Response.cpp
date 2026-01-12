@@ -131,13 +131,8 @@ void	Response::generateResponseGet()
 				fillResponse(500, getErrorPageContent(500));
 				return;
 			}
-			// TO DO
-/* 			if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off)" << RESET << endl;
 			fillResponse(403, getErrorPageContent(403));
-			return; */
-			// No index and autoindex off then 404 (not 403)
-        	fillResponse(403, getErrorPageContent(403));
-        	return;
+			return;
 		}
 	}
 	if (tryServeCgi())
@@ -204,20 +199,20 @@ void	Response::generateResponsePost()
 		if (D_POST) cout << BLUE << _path << " is a directory" << RESET << endl;
 
 		// Ensure trailing slash for directory
-        if (_path[_path.length() - 1] != '/')
-            _path += "/";
+		if (_path[_path.length() - 1] != '/')
+			_path += "/";
 
 		// multipart/form-data: filename will be extracted
-        if (contentType.find("multipart/form-data") != string::npos) {
-            if (D_POST) cout << BLUE << "Multipart upload to directory: " << _path << RESET << endl;
-        }
+		if (contentType.find("multipart/form-data") != string::npos) {
+			if (D_POST) cout << BLUE << "Multipart upload to directory: " << _path << RESET << endl;
+		}
 		/// text/plain or image to directory: no filename available
 		else if (contentType.find("text/plain") != string::npos ||
 					contentType.find("image/png") != string::npos ||
 					contentType.find("image/jpeg") != string::npos ||
 					contentType.find("image/jpg") != string::npos) {
-            fillResponse(400, getErrorPageContent(400));
-            return;
+			fillResponse(400, getErrorPageContent(400));
+			return;
 		} else if (getRequest()->getBody().empty()) { // Empty body
 			fillResponse(200, "OK");
 			return;
@@ -282,7 +277,7 @@ void	Response::generateResponsePost()
 			string	uploadPath = _path;
 			// Ensure trailing slash for directory
 			if (!uploadPath.empty() && uploadPath[uploadPath.length() - 1] != '/')
-                uploadPath += "/";
+				uploadPath += "/";
 			uploadPath += filename;
 			if (D_POST) cout << ORANGE << "uploadPath: " << uploadPath << RESET << endl;
 
@@ -333,15 +328,15 @@ void	Response::generateResponsePost()
 		// --- Form Data Logic --- For example, parse "name=Maryna&city=Kyiv"
 		// We pretend to have processed the form data
 		if (getRequest()->getBody().empty()) {
-        	fillResponse(200, "OK");
-    	} else {
+			fillResponse(200, "OK");
+		} else {
 			fillResponse(501, getErrorPageContent(501)); // Not Implemented yet
 		}
 	} else {
 		if (getRequest()->getBody().empty()) {
-        	fillResponse(200, "OK");
+			fillResponse(200, "OK");
 			return;
-    	}
+		}
 		// --- Unsupported Type Logic ---
 		fillResponse(415, getErrorPageContent(415));
 	}
@@ -412,8 +407,6 @@ const Location*	Response::matchPathToLocation()
 
 	for (size_t i = 0; i < locations.size(); ++i) {
 		const string&	locPath = locations[i].getPath();
-		// TO DO: do we need this variable html_ext?
-		const string	html_ext = ".html";
 
 		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
 		if (DEBUG_PATH) cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << endl;
@@ -762,9 +755,13 @@ bool		Response::tryServeCgi()
 /**
  * Prevents sending mismatched Content-Length vs actual body
  * Surfaces truncation (502) instead of silently forwarding a short body.
+ * 
+ * Note: the Status: header is a CGI-specific header that tells the web server 
+ * what HTTP status code to send. It's not a real HTTP header that should be 
+ * forwarded to the client.
  */
 bool		Response::applyCgiOutput(const std::string &output) {
-	if (output.empty()) return false; // invalid CGI response
+	if (output.empty()) return false;
 
 	// Separate Headers and Body from CGI output
 	size_t	headerEnd = output.find("\r\n\r\n");
@@ -776,9 +773,7 @@ bool		Response::applyCgiOutput(const std::string &output) {
 	}
 	if (headerEnd == string::npos) {
 		if (DEBUG) cout << RED << "CGI: header/body separator not found" << RESET << endl;
-		fillResponse(502, getErrorPageContent(502));
-		// To DO to delete fillResponse(200, output);
-		return true;
+		return false;
 	}
 
 	string	headers = output.substr(0, headerEnd);
@@ -794,12 +789,13 @@ bool		Response::applyCgiOutput(const std::string &output) {
 
 	std::istringstream	hs(headers);
 	std::string			line;
+
 	while (std::getline(hs, line)) {
 		if (!line.empty() && line[line.size() - 1] == '\r')
 			line.erase(line.size() - 1);
 		if (line.empty()) continue;
 
-		size_t colon = line.find(':');
+		size_t	colon = line.find(':');
 		if (colon == std::string::npos) continue; // skip malformed
 		string	key = line.substr(0, colon);
 		string	value = line.substr(colon + 1);
@@ -809,8 +805,8 @@ bool		Response::applyCgiOutput(const std::string &output) {
 			value.erase(0, 1);
 
 		// Lowercase a copy for comparisons
-        std::string	lkey = key;
-        for (size_t i = 0; i < lkey.size(); ++i)
+		std::string	lkey = key;
+		for (size_t i = 0; i < lkey.size(); ++i)
 			lkey[i] = static_cast<char>(std::tolower(lkey[i]));
 
 		if (lkey == "status") {
@@ -819,66 +815,62 @@ bool		Response::applyCgiOutput(const std::string &output) {
 			if (statusIss >> tempCode) {
 				statusCode = tempCode;
 				std::string	rest;
-                std::getline(statusIss, rest);
-                if (!rest.empty()) {
-                    if (rest[0] == ' ') rest.erase(0,1);
-                    statusReason = rest;
-                }
+				std::getline(statusIss, rest);
+				if (!rest.empty()) {
+					if (rest[0] == ' ') rest.erase(0,1);
+					statusReason = rest;
+				}
 			}
-			continue; // do not forward Status header
+			continue;
 		}
 		if (lkey == "content-type") {
-            contentType = value;
-        } else if (lkey == "content-length") {
-            // store but recompute/validate against body we read
-            unsigned long long	n = std::strtoull(value.c_str(), NULL, 10);
-            contentLengthHeader = static_cast<size_t>(n);
-        } else if (lkey == "connection" || lkey == "transfer-encoding" ||
-                   lkey == "keep-alive" || lkey == "proxy-connection" ||
-                   lkey == "trailer" || lkey == "upgrade") {
-            // TO DO. What is ? drop hop-by-hop headers
-            continue;
-        } else {
-            cgiHdrs[key] = value; // keep original casing for unknown headers
-        }
+			contentType = value;
+		} else if (lkey == "content-length") {
+			// store but recompute/validate against body we read
+			unsigned long long	n = std::strtoull(value.c_str(), NULL, 10);
+			contentLengthHeader = static_cast<size_t>(n);
+		} else if (lkey == "connection" || lkey == "transfer-encoding" ||
+				   lkey == "keep-alive" || lkey == "proxy-connection" ||
+				   lkey == "trailer" || lkey == "upgrade") {
+			// drop hop-by-hop headers per RFC 2616 §13.5.1
+			continue;
+		} else if (lkey == "location") {
+			cgiHdrs[key] = value;
+		} else {
+			cgiHdrs[key] = value;
+		}
+	}
+	// Validate body length
+	if (contentLengthHeader != static_cast<size_t>(-1)) {
+		if (body.size() < contentLengthHeader) {
+			if (DEBUG) {
+				cout << RED << "CGI body truncated. Have " << body.size()
+					 << ", expected " << contentLengthHeader << RESET << endl;
+			}
+			return false;
+		} else if (body.size() > contentLengthHeader) // Body larger than declared: truncate to Content-Length
+			body.resize(contentLengthHeader);
+	}
+	// Apply headers to response
+	if (contentType.empty())
+		_headers["Content-Type"] = "text/html";  // default per RFC 3875
+	_headers["Content-Type"] = contentType;
+	fillResponse(statusCode, body);
+
+	// keep CGI-provided headers
+	for (std::map<std::string, std::string>::const_iterator it = cgiHdrs.begin(); it != cgiHdrs.end(); ++it) {
+		_headers[it->first] = it->second;
 	}
 
-	// 3) Validate/normalize body length w.r.t. CGI Content-Length
-    if (contentLengthHeader != static_cast<size_t>(-1)) {
-        if (body.size() < contentLengthHeader) {
-            if (DEBUG) {
-                cout << RED << "CGI body truncated. Have " << body.size()
-                     << ", expected " << contentLengthHeader << RESET << endl;
-            }
-            fillResponse(502, getErrorPageContent(502)); // Bad Gateway
-            return true;
-        } else if (body.size() > contentLengthHeader) {
-            // TO DO what? Truncate surplus bytes if any
-            body.resize(contentLengthHeader);
-        }
-    }
-
-	// 4) Apply headers to response
-    if (!contentType.empty())
-		_headers["Content-Type"] = contentType;
-    // TO DO. What? Recompute Content-Length from the body we will send
-    _headers.erase("Content-Length");
-    fillResponse(statusCode, body);
-
-	// 5) Optional: keep CGI-provided headers (except the ones we filtered)
-    for (std::map<std::string, std::string>::const_iterator it = cgiHdrs.begin(); it != cgiHdrs.end(); ++it) {
-        _headers[it->first] = it->second;
-    }
-
-	// Prefer CGI reason phrase if provided in "Status:"
-    if (!statusReason.empty()) _reasonPhrase = statusReason;
+	if (!statusReason.empty()) _reasonPhrase = statusReason;
+	else _reasonPhrase = generateStatusMessage(statusCode); 
 
 	if (DEBUG) {
-        cout << "CGI. Parsed Status: " << statusCode
-             << " Body bytes: " << body.size();
-        if (contentLengthHeader != static_cast<size_t>(-1))
-            cout << " (CGI Content-Length: " << contentLengthHeader << ")";
-        cout << endl;
-    }
-    return true;
+		cout << "CGI. Parsed Status: " << statusCode
+			 << " Body bytes: " << body.size();
+		if (contentLengthHeader != static_cast<size_t>(-1))
+			cout << " (CGI Content-Length: " << contentLengthHeader << ")";
+		cout << endl;
+	}
+	return true;
 }
