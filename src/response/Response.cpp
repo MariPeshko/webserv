@@ -487,7 +487,6 @@ void	Response::badRequest() {
 	// Check if a specific status code was set during request parsing
 	short requestStatusCode = getRequest()->getStatusCode();
 	if (requestStatusCode == 400) {
-		if (DEBUG) cout << RED << "Response. Bad Request" << RESET << endl;
 		fillResponse(400, getErrorPageContent(400));
 	} else if (requestStatusCode == 405) {
 		if (DEBUG) cout << RED << "Response. Not Allowed" << RESET << endl;

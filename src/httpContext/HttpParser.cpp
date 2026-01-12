@@ -109,7 +109,12 @@ bool	HttpParser::parseHeaders(const string& headersBlock,
 									Request& req) {
 	if (DEBUG_HTTP_PARSER) cout << "HttpParser::parseHeaders" << endl;
 	if (headersBlock.empty()) {
-		return true; // no headers, it's ok for GET. TODO for POST?
+		if (req.getMethod() == "POST") {
+			req.setHeadersFormatValid(false);
+			req.setStatusCode(400);
+			return false;
+		}
+		return true; // no headers, it's ok for GET, DELETE
 	}
 
 	istringstream	iss(headersBlock);

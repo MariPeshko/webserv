@@ -100,6 +100,7 @@ void	HttpContext::requestParsingStateMachine()
 				}
 				if (!findAndParseHeaders(buf)) {
 					request().ifConnNotPresent();
+					if (REQ_DEBUG && _state == REQUEST_ERROR) PrintUtils::printRequestHeaders(request());
 					can_parse = false; break;
 				}
 				if (REQ_DEBUG) PrintUtils::printRequestHeaders(request());
@@ -226,12 +227,18 @@ bool	HttpContext::findAndParseReqLine(std::string &buf)
 bool	HttpContext::findAndParseHeaders(string &buf)
 {
 	size_t	pos = buf.find("\r\n\r\n");
+	size_t	sep_len = 4;
 	if (pos == string::npos) {
-		return false;
+		pos = buf.find("\n\n");  // Fallback to LF-only
+		sep_len = 2;
+		if (pos == string::npos) {
+        	return false;
+    	}
+		if (CTX_DEBUG) cout << "Headers separator nn found" << endl;
 	}
-
+	if (CTX_DEBUG) cout << "Headers separator rnrn found" << endl;
 	string	rawHeaders = buf.substr(0, pos);
-	buf.erase(0, pos + 4);
+	buf.erase(0, pos + sep_len);
 	if (HttpParser::parseHeaders(rawHeaders, request()) == false) {
 		_state = REQUEST_ERROR;
 		return false;
