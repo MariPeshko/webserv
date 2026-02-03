@@ -203,3 +203,14 @@ Error cases:
 `http://localhost:8080/cgi-bin/runtime_error.py`
 `http://localhost:8080/cgi-bin/syntax_error.py`
 `http://localhost:8080/cgi-bin/timeout.py`
+
+-------
+
+## Non-blocking
+
+fcntl(newfd, F_SETFL, flags | O_NONBLOCK);
+
+We added it for safety and robustness, not because poll requires it.
+
+In theory: poll makes blocking fds safe.
+In practice: O_NONBLOCK makes safe code survivable.
