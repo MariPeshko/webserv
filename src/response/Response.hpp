@@ -32,7 +32,7 @@ class	Response
 		void			generateResponseGet();
 		void			generateResponsePost();
 		void			generateResponseDelete();
-		
+
 		const Location*	matchPathToLocation();
 		void			fillResponse(short statusCode, const std::string &bodyContent);
 		std::string		getErrorPageContent(int code);

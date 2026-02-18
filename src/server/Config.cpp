@@ -256,6 +256,14 @@ void	Config::parseLocation(Location &location, std::vector<std::string> &tokens,
 			std::string path = tokens.back(); // Correct: second arg is path
 			tokens.pop_back();
 			location.addCgi(ext, path);
+		} else if (directive == "alias") {
+ 		  // Alias might be empty in mac.conf (just 'alias'?) or have a path
+		if (!tokens.empty() && !isDirective(tokens.back()) && tokens.back() != "}")  {
+			location.setAlias(tokens.back());
+			tokens.pop_back();
+		} else {
+			location.setAlias("on"); // Treat as flag if no value?
+		}
 		} else if (directive == "client_max_body_size" || directive == "client_body_buffer_size") {
 			location.setClientMaxBodySize(tokens.back());
 			tokens.pop_back();

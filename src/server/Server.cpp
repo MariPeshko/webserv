@@ -8,7 +8,7 @@ Server::Server() {
 	_root = "www/web";
 	_index = "index.html";
 	_error_pages[404] = "/var/www/errors/404.html";
-	_client_max_body_size = "1m";
+	_client_max_body_size = "";
 	_listen_fd = -1;
 }
 
@@ -42,7 +42,7 @@ int	Server::setupServer() {
 	if (lflags != -1)
 		fcntl(_listen_fd, F_SETFL, lflags | O_NONBLOCK);
 
-	int yes = 1;
+	int	yes = 1;
 	if (setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
 	{
 		Logger::logErrno(LOG_ERROR, "Failed to set SO_REUSEADDR");
@@ -56,18 +56,18 @@ int	Server::setupServer() {
 
 	if (bind(_listen_fd, (struct sockaddr *)&_server_address, sizeof(_server_address)) == -1)
 	{
-		std::stringstream ss;
+		std::stringstream	ss;
 		ss << _port;
 		Logger::logErrno(LOG_ERROR, "Failed to bind socket to " + _host + ":" + ss.str());
 		close(_listen_fd);
 		_listen_fd = -1;
 		return -1;
 	}
-	if (listen(_listen_fd, 10) == -1) {
+	if (listen(_listen_fd, 512) == -1) {
 		Logger::logErrno(LOG_ERROR, "Failed to listen on socket");
 		return -1;
 	}
-	Logger::log(LOG_INFO, "Server listening on " + _host + ":" + toString(_port));
+	Logger::log(LOG_INFO, "Server listening on fd " + toString(_listen_fd) + " IP/Port: " + _host + ":" + toString(_port));
 	return 0;
 }
 
@@ -85,6 +85,9 @@ void	Server::setRoot(const std::string& root) {
 }
 void	Server::setIndex(const std::string& index) {
 	_index = index;
+}
+void	Server::setAlias(const std::string& alias) {
+	_root = alias;
 }
 void	Server::addErrorPage(int code, const std::string& page) {
 	_error_pages[code] = page;
@@ -109,6 +112,10 @@ const std::string& Server::getHost() const {
 
 size_t	Server::getLocationCount() const {
 	return _locations.size();
+}
+
+const std::string& Server::getAlias() const {
+	return _root;
 }
 const std::vector<Location>&		Server::getLocations() const {
 	return _locations;

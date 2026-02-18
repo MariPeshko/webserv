@@ -4,6 +4,7 @@ using std::cerr;
 using std::cout;
 using std::endl;
 using std::string;
+using std::map;
 
 // Parametric constructor
 Response::Response(Server &server)
@@ -43,7 +44,7 @@ void	Response::fillResponse(short statusCode, const string &bodyContent)
 
 /**
  * @brief Main entry point for generating HTTP responses.
- * 
+ *
  * Validates the request, constructs the file system path, and dispatches
  * to the appropriate method handler (GET, POST, DELETE) based on the HTTP method.
  * Returns early if validation or path construction fails (response already set).
@@ -59,7 +60,7 @@ void	Response::generateResponse() {
 	_path = constructPath(_loc);
 	if (_path.empty())
 		return;
-	
+
 	if (getRequest()->getEnumMethod() == Request::GET) {
 		generateResponseGet();
 	} else if (getRequest()->getEnumMethod() == Request::POST) {
@@ -75,13 +76,13 @@ void	Response::generateResponse() {
 
 /**
  * @brief Generates HTTP response for GET requests.
- * 
+ *
  * Handles three types of resources:
  * - **Files**: Reads and serves with correct MIME type
  * - **Directories**: Serves index file if present, generates autoindex if enabled,
  *   otherwise returns 403 Forbidden
  * - **CGI scripts**: Executes script and returns dynamic output
- * 
+ *
  * Returns 404 if the path doesn't exist on disk.
  */
 void	Response::generateResponseGet()
@@ -93,7 +94,7 @@ void	Response::generateResponseGet()
 		return;
 	}
 	if (pathType == DIRECTORY_PATH) {
-		if (DEBUG) cout << BLUE << "Path is a directory.1" << RESET << endl;
+		if (DEBUG) cout << BLUE << "Path is a directory" << RESET << endl;
 		if (_path[_path.length() - 1] != '/')
 			_path += "/";
 		// if autoindex true
@@ -104,7 +105,7 @@ void	Response::generateResponseGet()
 		// string targetPath = path + indexFile;
 		string	targetPath = indexFile.empty() ? isAutoindexPresent ? _path : "" : _path + indexFile;
 
-		if (DEBUG) cout << BLUE << "Checking targetPath file1: " << targetPath << RESET << endl;
+		if (DEBUG) cout << BLUE << "Checking target Path file: " << targetPath << RESET << endl;
 		if (DEBUG) cout << YELLOW << "Index to use: " << indexFile << RESET << endl;
 
 		if (getPathType(targetPath) == FILE_PATH) {
@@ -112,6 +113,11 @@ void	Response::generateResponseGet()
 			if (DEBUG) cout << GREEN << "Index file exists: " << _path << RESET << endl;
 		} else {
 			if (DEBUG) cout << BLUE << "Index file not found." << RESET << endl;
+			if (isIndexPresent) {
+				if (DEBUG) cout << BLUE << "Index is present, but file not found: 404" << RESET << endl;
+				fillResponse(404, getErrorPageContent(404));
+				return;
+			}
 			if (_loc->getAutoindex()) {
 				if (DEBUG) cout << BLUE << "Autoindex is ON. Generating listing for: " << _path << RESET << endl;
 				string	body;
@@ -125,11 +131,9 @@ void	Response::generateResponseGet()
 				if (DEBUG) cout << RED << "Autoindex generation failed." << RESET << endl;
 				fillResponse(500, getErrorPageContent(500));
 				return;
-			} else {
-				if (DEBUG) cout << RED << "Directory access forbidden (no index, autoindex off2)" << RESET << endl;
-				fillResponse(403, getErrorPageContent(403));
-				return;
 			}
+			fillResponse(403, getErrorPageContent(403));
+			return;
 		}
 	}
 	if (tryServeCgi())
@@ -168,7 +172,7 @@ string	Response::buildCreatedResponse(const string& uri, const string &filename)
 
 /**
  * @brief Generates HTTP response for POST requests - handles file uploads and form submissions.
- * 
+ *
  * Logic flow:
  * 1. Tries CGI execution first (for form processing scripts)
  * 2. Validates parent directory exists → 409 if missing
@@ -179,26 +183,65 @@ string	Response::buildCreatedResponse(const string& uri, const string &filename)
  * 4. Returns 415 for unsupported content types
  */
 void	Response::generateResponsePost()
-{	
+{
 	if (tryServeCgi())
 		return;
+	if (D_POST) cout << BLUE << "generateResponsePost()" << RESET << endl;
 
-	size_t	path_separator = _path.find_last_of('/');
-	if (path_separator != string::npos) {
-		string	dirPath = _path.substr(0, path_separator);
-		if (!isDirectory(dirPath)) {
-			if (D_POST) cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
-			fillResponse(409, getErrorPageContent(409));
-			return;
-		}
-	}
+	PathType	pathType = getPathType(_path);
 
 	const string&	contentType = getRequest()->getHeaderValue("content-type");
 	if (contentType.empty()) {
 		fillResponse(400, getErrorPageContent(400));
 		return;
 	}
-	
+
+	if (pathType == DIRECTORY_PATH) {
+		if (D_POST) cout << BLUE << _path << " is a directory" << RESET << endl;
+
+		// Ensure trailing slash for directory
+		if (_path[_path.length() - 1] != '/')
+			_path += "/";
+
+		// multipart/form-data: filename will be extracted
+		if (contentType.find("multipart/form-data") != string::npos) {
+			if (D_POST) cout << BLUE << "Multipart upload to directory: " << _path << RESET << endl;
+		}
+		/// text/plain or image to directory: no filename available
+		else if (contentType.find("text/plain") != string::npos ||
+					contentType.find("image/png") != string::npos ||
+					contentType.find("image/jpeg") != string::npos ||
+					contentType.find("image/jpg") != string::npos) {
+			fillResponse(400, getErrorPageContent(400));
+			return;
+		} else if (getRequest()->getBody().empty()) { // Empty body
+			fillResponse(200, "OK");
+			return;
+		} else { // Other content types to directory with body
+			fillResponse(200, "OK");
+			return;
+		}
+	} else if (pathType == FILE_PATH) {
+		if (D_POST) cout << BLUE << _path << " is a file (overwriting)" << RESET << endl;
+	} else if (pathType == NOT_EXIST) {  // Handle NOT_EXIST (creating new file)
+		if (DEBUG) cout << BLUE << "Path not found: " << _path << RESET << endl;
+		
+		// Validate parent directory exists
+		size_t	path_separator = _path.find_last_of('/');
+		if (path_separator != string::npos) {
+			string	dirPath = _path.substr(0, path_separator);
+			if (!isDirectory(dirPath)) {
+				if (D_POST) cout << RED << "Upload directory does not exist: " << dirPath << RESET << endl;
+				fillResponse(409, getErrorPageContent(409));
+				return;
+			} else {
+				if (D_POST) cout << GREEN << "Upload directory exists: " << dirPath << RESET << endl;
+				if (_path.size() > dirPath.size() + 1)
+					if (D_POST) cout << GREEN << "Name of the file: " << _path.substr(dirPath.size() + 1) << RESET << endl;
+			}
+		}
+	}
+
 	// --- Simple File Upload Logic --- plain text, image - png, jpeg.
 	if (contentType.find("text/plain") != string::npos || contentType.find("image/png") != string::npos
 			|| contentType.find("image/jpeg") != string::npos)	{
@@ -214,7 +257,6 @@ void	Response::generateResponsePost()
 
 		if (D_POST) cout << GREEN << "File created at: " << _path << RESET << endl;
 
-		// Send a "Created" response
 		fillResponse(201, buildCreatedResponse(getRequest()->getUri(), ""));
 		_headers["Location"] = getRequest()->getUri();
 		_headers["Content-Type"] = "text/html";
@@ -232,7 +274,11 @@ void	Response::generateResponsePost()
 				fillResponse(415, getErrorPageContent(415));
 				return;
 			}
+			
 			string	uploadPath = _path;
+			// Ensure trailing slash for directory
+			if (!uploadPath.empty() && uploadPath[uploadPath.length() - 1] != '/')
+				uploadPath += "/";
 			uploadPath += filename;
 			if (D_POST) cout << ORANGE << "uploadPath: " << uploadPath << RESET << endl;
 
@@ -248,10 +294,10 @@ void	Response::generateResponsePost()
 			if (D_POST) cout << GREEN << "POST. File uploaded. Post/Redirect/Get (PRG) pattern: ";
 			if (D_POST) cout << uploadPath << RESET << endl;
 
-			// Go back to the form page (the Referer)
+			// Check for Referer header (PRG pattern) - Go back to the form page
 			string	redirectTo;
 			string	referer = getRequest()->getHeaderValue("referer");
-			if (!referer.empty()) { 		// extract of path from "http://host/path?..."
+			if (!referer.empty()) { 	// extract of path from "http://host/path?..."
 				size_t	pos = referer.find("://");
 				if (pos != string::npos)
 					pos = referer.find('/', pos + 3);
@@ -264,22 +310,34 @@ void	Response::generateResponsePost()
 			}
 			if (redirectTo.empty()) {
 				fillResponse(201, buildCreatedResponse(getRequest()->getUri(), filename));
-				_headers["Location"] = getRequest()->getUri() + filename;
+				string location = getRequest()->getUri();
+				if (!location.empty() && location[location.length() - 1] != '/')
+					location += "/";
+				location += filename;
+				_headers["Location"] = location;
 				_headers["Content-Type"] = "text/html";
+				return; 
 			}
 			fillResponse(303, ""); // 303 See Other, empty body
 			_headers["Location"] = redirectTo;
-			// TO DELETE _headers["Location"] = "/uploads/uploads.html"; // Redirect back to the form
 			return;
 		} else {
 			fillResponse(400, getErrorPageContent(400));
 			return;
 		}
 	} else if (contentType.find("application/x-www-form-urlencoded") != string::npos) {
-		// --- Form Data Logic ---
-		// For example, parse "name=Maryna&city=Kyiv"
-		fillResponse(501, getErrorPageContent(501)); // Not Implemented yet
+		// --- Form Data Logic --- For example, parse "name=Maryna&city=Kyiv"
+		// We pretend to have processed the form data
+		if (getRequest()->getBody().empty()) {
+			fillResponse(200, "OK");
+		} else {
+			fillResponse(501, getErrorPageContent(501)); // Not Implemented yet
+		}
 	} else {
+		if (getRequest()->getBody().empty()) {
+			fillResponse(200, "OK");
+			return;
+		}
 		// --- Unsupported Type Logic ---
 		fillResponse(415, getErrorPageContent(415));
 	}
@@ -329,7 +387,7 @@ static void	printCurrentLocation(const Location *loc) {
 
 /**
  * Helper to find the best matching location
- * 
+ *
  * Checks if request URI starts with a certain location path (proper prefix match)
  * Returns a pointer to the Location object, or NULL if none found
  * Special case: "/" matches everything starting with "/"
@@ -347,12 +405,10 @@ const Location*	Response::matchPathToLocation()
 
 	if (DEBUG_PATH) cout << GREEN << "Matching URI: [" << getRequest()->getUri() << "] against ";
 	if (DEBUG_PATH) cout << locations.size() << " locations." << RESET << endl;
-	
+
 	for (size_t i = 0; i < locations.size(); ++i) {
 		const string&	locPath = locations[i].getPath();
-		// TO DO: do we need this variable html_ext? 
-		const string	html_ext = ".html";
-		
+
 		if (DEBUG_PATH) cout << GREEN << "  Checking location: [" << locPath << "]" << RESET << endl;
 		if (DEBUG_PATH) cout << ORANGE << "    Comparing URI: " << uri << " with Location Path: " << locPath << RESET << endl;
 
@@ -365,6 +421,8 @@ const Location*	Response::matchPathToLocation()
 			} else if (uri.length() == locPath.length()) { // Exact match (/about matches /about)
 				isValidPrefix = true;
 			} else if (uri[locPath.length()] == '/') { // Path continues with '/' (/about matches /about/page)
+				isValidPrefix = true;
+			} else if (uri[locPath.length() - 1] == '/') {
 				isValidPrefix = true;
 			}
 			if (isValidPrefix) {
@@ -426,11 +484,10 @@ Response::PathType Response::getPathType(string const path)
 
 void	Response::badRequest() {
 	if (DEBUG) cout << RED << "Response. Bad request" << RESET << endl;
-	
+
 	// Check if a specific status code was set during request parsing
 	short requestStatusCode = getRequest()->getStatusCode();
 	if (requestStatusCode == 400) {
-		if (DEBUG) cout << RED << "Response. Bad Request" << RESET << endl;
 		fillResponse(400, getErrorPageContent(400));
 	} else if (requestStatusCode == 405) {
 		if (DEBUG) cout << RED << "Response. Not Allowed" << RESET << endl;
@@ -447,7 +504,7 @@ void	Response::badRequest() {
 	} else if (getRequest()->getRequestLineFormatValid() == false) {
 		fillResponse(400, getErrorPageContent(400));
 	} else if (getRequest()->getHeadersFormatValid() == false) {
-		if (DEBUG) cout << RED << "Response. Bad request. Invalid headers" << RESET << endl; 
+		if (DEBUG) cout << RED << "Response. Bad request. Invalid headers" << RESET << endl;
 		fillResponse(400, getErrorPageContent(400));
 	} else {
 		fillResponse(400, getErrorPageContent(400));
@@ -456,17 +513,17 @@ void	Response::badRequest() {
 
 /**
  * @brief Performs common request validation checks.
- * 
+ *
  * This function validates the request against the server configuration.
  * It checks for:
  * 1. A matching location.
  * 2. If the request method is allowed in that location.
  * 3. If the location has a redirection configured.
- * 
+ *
  * If any of these checks result in a final response (404, 405, 3xx),
  * it fills the response and returns NULL.
- * 
- * @return A const pointer to the matched Location on success, 
+ *
+ * @return A const pointer to the matched Location on success,
  * or NULL on failure.
  */
 const Location*	Response::validateRequestAndGetLocation() {
@@ -505,51 +562,63 @@ const Location*	Response::validateRequestAndGetLocation() {
 		fillResponse(405, getErrorPageContent(405));
 		return NULL;
 	}
-	
+
 	return loc;
 }
 
 /**
  * @brief Constructs the file system path from location config and request URI.
- * 
+ *
  * Determines the root directory (location-specific or server-wide),
  * strips query strings from the URI, and combines them into a full path.
  * Returns a 500 error if no root is configured.
- * 
+ *
  * @param loc Pointer to the matched Location
  * @param uri Reference to store the cleaned URI (query string removed)
  * @return The constructed file system path, or empty string on error
  */
 string		Response::constructPath(const Location* loc) {
 	if (DEBUG) cout << ORANGE << "Constructing Path..." << RESET << endl;
-	// Determine root
-	string			root;
-	const string&	locationRoot = loc->getRoot();
-	if (!locationRoot.empty())
-		root = loc->getRoot();
-	else 
-		root = _server_config.getRoot();
-	// Safety check: root must be configured
-	if (root.empty()) {
-		if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
-		fillResponse(500, getErrorPageContent(500));
-		return "";
-	}
+
 	// Strip query string from URI
 	string		uri = getRequest()->getUri();
 	size_t		queryPos = uri.find('?');
 	if (queryPos != string::npos) {
 		uri = uri.substr(0, queryPos);
 	}
-	string	path = root + uri;
-	
-	if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
+
+	string	path;
+	if (!loc->getAlias().empty()) {
+		path = loc->getAlias();
+		if (DEBUG) cout << YELLOW << "Using alias: " << path << RESET << endl;
+		if (uri.compare(0, loc->getPath().length(), loc->getPath()) == 0) {
+
+			path += uri.substr(loc->getPath().length());
+		}
+	}
+	else {
+		// Determine root
+		string			root;
+		const string&	locationRoot = loc->getRoot();
+		if (!locationRoot.empty())
+			root = loc->getRoot();
+		else
+			root = _server_config.getRoot();
+		// Safety check: root must be configured
+		if (root.empty()) {
+			if (DEBUG) cout << RED << "Configuration error: No root directive found" << RESET << endl;
+			fillResponse(500, getErrorPageContent(500));
+			return "";
+		}
+		if (DEBUG) cout << YELLOW << "Using root: " << root << RESET << endl;
+		path = root + uri;
+	}
+
 	if (DEBUG) cout << YELLOW << "Using URI: " << uri << RESET << endl;
 	if (DEBUG) cout << GREEN << "Resolved path: " << path << RESET << endl;
-	
+
 	return path;
 }
-
 
 const Request*	Response::getRequest() { return _request; }
 
@@ -569,7 +638,7 @@ Server&			Response::getServerConfig() {
 	return _server_config;
 }
 
-const std::map<string, string>&	Response::getHeaders() const {
+const map<string, string>&	Response::getHeaders() const {
 	return _headers;
 }
 
@@ -585,15 +654,15 @@ void			Response::reset()
 
 string			Response::getErrorPageContent(int code)
 {
-	const std::map<int, string>&			errorPages = _server_config.getErrorPages();
-	std::map<int, string>::const_iterator	it = errorPages.find(code);
+	const map<int, string>&				errorPages = _server_config.getErrorPages();
+	map<int, string>::const_iterator	it = errorPages.find(code);
 
 	if (it != errorPages.end()) {
 		std::ifstream	file(it->second.c_str());
 		if (file.is_open())
 		{
 			std::ostringstream	ss;
-			
+
 			ss << file.rdbuf();
 			_headers["Content-Type"] = "text/html";
 			return ss.str();
@@ -643,31 +712,51 @@ string			Response::getMimeType(const string &filePath)
 /**
  * Returns true if the request was handled by CGI (success or error response set)
  * Returns false if not a CGI request or script not found (caller should proceed)
- * 
- * - Extract extension from request path
+ *
+ * - match against all registered CGI extensions
+ *   a.) (considering extra path info after the script name: /cgi-bin/script.py/extra/path)
+ *        For example: www/web/cgi-bin/script.py/extra/path/info.txt
  * - Look up the interpreter for this extension
  * - Calls CgiHandler constructor
  */
 bool		Response::tryServeCgi()
 {
-	const std::map<string, string>&	cgiMap = _loc->getCgi();
-	if (cgiMap.empty())
+	const map<string, string>&	cgiMap = _loc->getCgi();
+	if (cgiMap.empty()) {
+		if (DEBUG) cout << BLUE << "No cgi for location path: " << _loc->getPath() << RESET << endl;
 		return false;
-	size_t	dotPos = _path.find_last_of('.');
-	if (dotPos == string::npos)
-		return false;
-	string	ext = _path.substr(dotPos + 1);
+	}
 
-	std::map<string, string>::const_iterator	it = cgiMap.find(ext);
-	if (it == cgiMap.end())
-		return false;
-	if (getPathType(_path) != FILE_PATH)
-		return false;
+	string	scriptPath;
+    string	interpreter;
+	string	ext;
+
+	for (map<string, string>::const_iterator it = cgiMap.begin(); 
+			it != cgiMap.end(); ++it) {
+		string	extWithDot = "." + it->first;
+		size_t	pos = _path.find(extWithDot);
+
+		while (pos != string::npos) {
+			size_t	endOfExt = pos + extWithDot.length();
+			// Check if this is a valid script boundary (end of path or followed by /)
+            if (endOfExt == _path.length() || _path[endOfExt] == '/') {
+				scriptPath = _path.substr(0, endOfExt);
+				interpreter = it->second;
+				ext = extWithDot;
+				goto found_cgi;
+			}
+			pos = _path.find(extWithDot, pos + 1);
+		}
+	}
+	return false; // No CGI script found
+
+	found_cgi:
+	// Allow CGI even if the target file doesn’t exist
 	if (DEBUG) cout << GREEN << "Executing CGI: " << _path << RESET << endl;
 	try {
-		CgiHandler	cgi(*this, _path, it->second);
+		CgiHandler	cgi(*this, scriptPath, interpreter, ext);
 		string		output = cgi.executeCgi();
-		cout << "cgi output: " << output << endl;
+		if (DEBUG) cout << "cgi output: 200 bytes:\n" << output.substr(0, 199) << endl;
 		if (!applyCgiOutput(output)) {
 			fillResponse(502, getErrorPageContent(502)); // 502 Bad Gateway
 		}
@@ -675,58 +764,129 @@ bool		Response::tryServeCgi()
 	} catch (std::exception &e) {
 		if (DEBUG) cout << RED << "CGI execution failed: " << e.what() << RESET << endl;
 		fillResponse(500, getErrorPageContent(500));
-		return true; // Request handled (with 500)
+		return true;
 	}
 }
 
+/**
+ * Prevents sending mismatched Content-Length vs actual body
+ * Surfaces truncation (502) instead of silently forwarding a short body.
+ * 
+ * Note: the Status: header is a CGI-specific header that tells the web server 
+ * what HTTP status code to send. It's not a real HTTP header that should be 
+ * forwarded to the client.
+ */
 bool		Response::applyCgiOutput(const std::string &output) {
-	if (output.empty())
-		return false; // invalid CGI response
+	if (output.empty()) return false;
+
 	// Separate Headers and Body from CGI output
 	size_t	headerEnd = output.find("\r\n\r\n");
-	if (headerEnd == string::npos)
+
+	size_t	sep_len = 4;
+	if (headerEnd == string::npos) {
 		headerEnd = output.find("\n\n");
-	if (headerEnd == string::npos) { // No headers found, treat entire output as body
-		fillResponse(200, output);
-		return true;
+		sep_len = 2;
+	}
+	if (headerEnd == string::npos) {
+		if (DEBUG) cout << RED << "CGI: header/body separator not found" << RESET << endl;
+		return false;
 	}
 
 	string	headers = output.substr(0, headerEnd);
-	string	body    = output.substr(headerEnd + ((output[headerEnd] == '\r') ? 4 : 2));
-	if (DEBUG) cout << "CGI. Output headers:\n" << headers << endl;
-	std::istringstream	iss(headers);
-	std::string			line;
+	string	body = output.substr(headerEnd + sep_len);
+
+	// 2) Parse headers
+	if (DEBUG) cout << "CGI. Output raw headers:\n" << headers << endl;
 	int					statusCode = 200;
-	
-	while (std::getline(iss, line)) {
-		if (!line.empty() && line[line.length() - 1] == '\r') {
-			line.erase(line.length() - 1);
-		}
+	std::string			statusReason;
+	std::string			contentType;
+	size_t				contentLengthHeader = static_cast<size_t>(-1);
+	map<std::string, std::string>	cgiHdrs;
+
+	std::istringstream	hs(headers);
+	std::string			line;
+
+	while (std::getline(hs, line)) {
+		if (!line.empty() && line[line.size() - 1] == '\r')
+			line.erase(line.size() - 1);
 		if (line.empty()) continue;
 
-		size_t colon = line.find(':');
-		if (colon != string::npos) {
-			string key = line.substr(0, colon);
-			string value = line.substr(colon + 1);
+		size_t	colon = line.find(':');
+		if (colon == std::string::npos) continue; // skip malformed
+		string	key = line.substr(0, colon);
+		string	value = line.substr(colon + 1);
 
-			// Trim whitespace
-			while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
-				value.erase(0, 1);
-			if (key == "Status" || key == "status" || key == "STATUS") {
-				std::istringstream	statusIss(value);
-				int					tempCode;
-				if (statusIss >> tempCode)
-					statusCode = tempCode;
+		// Trim leading whitespace
+		while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
+			value.erase(0, 1);
+
+		// Lowercase a copy for comparisons
+		std::string	lkey = key;
+		for (size_t i = 0; i < lkey.size(); ++i)
+			lkey[i] = static_cast<char>(std::tolower(lkey[i]));
+
+		if (lkey == "status") {
+			std::istringstream	statusIss(value);
+			int					tempCode;
+			if (statusIss >> tempCode) {
+				statusCode = tempCode;
+				std::string	rest;
+				std::getline(statusIss, rest);
+				if (!rest.empty()) {
+					if (rest[0] == ' ') rest.erase(0,1);
+					statusReason = rest;
+				}
 			}
-			else if (!key.empty()) { // Store other headers
-				_headers[key] = value;
-			}
+			continue;
+		}
+		if (lkey == "content-type") {
+			contentType = value;
+		} else if (lkey == "content-length") {
+			// store but recompute/validate against body we read
+			unsigned long long	n = std::strtoull(value.c_str(), NULL, 10);
+			contentLengthHeader = static_cast<size_t>(n);
+		} else if (lkey == "connection" || lkey == "transfer-encoding" ||
+				   lkey == "keep-alive" || lkey == "proxy-connection" ||
+				   lkey == "trailer" || lkey == "upgrade") {
+			// drop hop-by-hop headers per RFC 2616 §13.5.1
+			continue;
+		} else if (lkey == "location") {
+			cgiHdrs[key] = value;
+		} else {
+			cgiHdrs[key] = value;
 		}
 	}
-	if (statusCode >= 400) {
-		fillResponse(statusCode, getErrorPageContent(statusCode));
-		return true;
+	// Validate body length
+	if (contentLengthHeader != static_cast<size_t>(-1)) {
+		if (body.size() < contentLengthHeader) {
+			if (DEBUG) {
+				cout << RED << "CGI body truncated. Have " << body.size()
+					 << ", expected " << contentLengthHeader << RESET << endl;
+			}
+			return false;
+		} else if (body.size() > contentLengthHeader) // Body larger than declared: truncate to Content-Length
+			body.resize(contentLengthHeader);
 	}
+	// Apply headers to response
+	if (contentType.empty())
+		_headers["Content-Type"] = "text/html";  // default per RFC 3875
+	_headers["Content-Type"] = contentType;
 	fillResponse(statusCode, body);
+
+	// keep CGI-provided headers
+	for (map<std::string, std::string>::const_iterator it = cgiHdrs.begin(); it != cgiHdrs.end(); ++it) {
+		_headers[it->first] = it->second;
+	}
+
+	if (!statusReason.empty()) _reasonPhrase = statusReason;
+	else _reasonPhrase = generateStatusMessage(statusCode); 
+
+	if (DEBUG) {
+		cout << "CGI. Parsed Status: " << statusCode
+			 << " Body bytes: " << body.size();
+		if (contentLengthHeader != static_cast<size_t>(-1))
+			cout << " (CGI Content-Length: " << contentLengthHeader << ")";
+		cout << endl;
+	}
 	return true;
 }

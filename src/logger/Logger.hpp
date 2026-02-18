@@ -23,22 +23,23 @@ enum LogLevel
 
 class Logger
 {
-public:
-	static void init(const std::string &filename);
-	static void log(LogLevel level, const std::string &message);
-	static void logErrno(LogLevel level, const std::string &message);
-	static void logRequest(const std::string &clientIp, const std::string &method, const std::string &uri, int statusCode, size_t bytesSent);
+	public:
+		static void	init(const std::string &filename);
+		static void	log(LogLevel level, const std::string &message);
+		static void	logErrno(LogLevel level, const std::string &message);
+		static void	logRequest(const std::string &clientIp, int port, 
+			const std::string &method, const std::string &uri, int statusCode, size_t bytesSent);
 
-private:
-	Logger();
-	Logger(const Logger &);
-	Logger &operator=(const Logger &);
+	private:
+		Logger();
+		Logger(const Logger &);
+		Logger &operator=(const Logger &);
 
-	static std::ofstream _logFile;
-	static std::string _filename;
+		static std::ofstream	_logFile;
+		static std::string		_filename;
 
-	static std::string getTimestamp();
-	static std::string levelToString(LogLevel level);
+		static std::string		getTimestamp();
+		static std::string		levelToString(LogLevel level);
 };
 
 #endif

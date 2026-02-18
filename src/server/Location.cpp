@@ -26,12 +26,12 @@ void	Location::addLocation(const Location& location) {
 	_locations.push_back(location);
 }
 
-void	Location::setAlias(const std::string& alias) {
-	_alias = alias;
-}
-
 void	Location::setClientMaxBodySize(const std::string& size) {
 	_client_max_body_size = size;
+}
+
+void	Location::setAlias(const std::string& alias) {
+	_alias = alias;
 }
 
 const std::string&	Location::getPath() const { return _path; }
@@ -49,7 +49,7 @@ const std::vector<std::string>&	Location::getAllowedMethods() const {
 // returns a map of file extensions to interpreter paths
 // Key: File extension (without the dot)
 // Value: Path to the interpreter for that file type
-const std::map<std::string, std::string>&	Location::getCgi() const { 
+const std::map<std::string, std::string>&	Location::getCgi() const {
 	return _cgi;
 }
 

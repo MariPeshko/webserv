@@ -42,11 +42,10 @@ class HttpContext
 		HttpContext(const HttpContext &other);
 		~HttpContext();
 
-		Connection &connection();
-		Server &server();
-		// static functions of HttpParser class
-		Request &request();
-		Response &response();
+		Connection&	connection();
+		Server&		server();
+		Request&	request();
+		Response&	response();
 
 		enum e_parse_state
 		{

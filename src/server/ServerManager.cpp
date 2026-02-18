@@ -167,28 +167,25 @@ void	ServerManager::handleNewConnection(int listener) {
  * If the socket is in "drain" state:
  * - recv() into a small buffer in a loop until socket would block or 
  * closes; discard data (no parsing).
- * TO DO: when is it EOF? When n == 0?
+ * 
  * - if recv() returns 0 (peer closed) - close(fd) and remove client
  * - if draining timeout reached (1 s) - close(fd) and remove client
- * - 
  */
-void	ServerManager::handleClientData(size_t i) {
-	const int fd = _pfds[i].fd;
-	// Find HttpContext
-	map<int, HttpContext>::iterator it = _contexts.find(fd);
+void	ServerManager::handleClientData(size_t i)
+{
+	const int						fd = _pfds[i].fd;
+	map<int, HttpContext>::iterator	it = _contexts.find(fd);
 	if (it == _contexts.end()) {
 		Logger::logErrno(LOG_ERROR, "No context found for fd " + toString(fd));
 		close(fd);
 		delFromPfds(i);
 		return ;
 	}
-	HttpContext& ctx = it->second;
-	// For correct 413 Payload Too Large page
+	HttpContext&	ctx = it->second;
 	if (ctx.isDraining()) {
-		char tmp[8192];
-		// TO DO describe what is for (;;)
+		char	tmp[8192];
 		for (;;) {
-			ssize_t n = recv(fd, tmp, sizeof(tmp), 0);
+			ssize_t	n = recv(fd, tmp, sizeof(tmp), 0);
 			if (n > 0) {
 				ctx.connection().updateLastActivity();
 				continue;
@@ -207,7 +204,7 @@ void	ServerManager::handleClientData(size_t i) {
 		return;
 	}
 
-	ssize_t nbytes = ctx.connection().receiveData();
+	ssize_t	nbytes = ctx.connection().receiveData();
 	if (nbytes == 0) { handleClientHungup(fd, i); return; }
 	if (nbytes < 0) { handleClientError(fd, i); return; }
 
@@ -218,8 +215,10 @@ void	ServerManager::handleClientData(size_t i) {
 		else ctx.response().generateResponse();
 		ctx.buildResponseString();
 		_pfds[i].events |= POLLOUT;
+		
 		Logger::logRequest(
 			ipv4_to_string(ntohl(ctx.connection().getClientAddress().sin_addr.s_addr)),
+			ctx.server().getPort(),
 			ctx.request().getMethod(),
 			ctx.request().getUri(),
 			ctx.response().getStatusCode(),
@@ -248,7 +247,7 @@ void	ServerManager::handleClientData(size_t i) {
  * Note about raining: After fully send the error response (with Connection: close), 
  * the webserver does not close(fd) immediately. Instead it switchs this
  * connection to a "drain" state. 
- * 1. TO DO: describe _pfds[i].events = POLLIN (remove POLLOUT)
+ * 1. = POLLIN - Replace everything with POLLIN (read-only mode)
  * 2. set a ctx flag like ctx.setDraining(true) and record start time
  * 
  * We avoid closing while unread body is pending, so the kernel doesn’t 
@@ -268,9 +267,6 @@ void	ServerManager::handleClientWrite(size_t i) {
 	const string& buffer = ctx.getResponseBuffer();
 	size_t already_sent = ctx.getBytesSent();
 	if (buffer.size() <= already_sent) {
-		//TO DO: describe: stop POLLOUT
-		_pfds[i].events &= ~POLLOUT;
-		//TO DO: describe: keep POLLIN
 		_pfds[i].events = POLLIN;
 		ctx.resetState();
 		return;
@@ -294,13 +290,10 @@ void	ServerManager::handleClientWrite(size_t i) {
 
 	if (ctx.isResponseComplete()) {
 		short	statusCode = ctx.response().getStatusCode();
-		if (statusCode >= 400) {
-			// TO DO: describe: stop POLLOUT
-			_pfds[i].events &= ~POLLOUT;
-			// TO DO: describe: keep POLLIN
-			_pfds[i].events |= POLLIN;
+		if (statusCode == 413 || statusCode == 431) {
+			_pfds[i].events = POLLIN;
 			ctx.startDraining();
-			Logger::log(LOG_INFO, "Begin draining after error response: " + toString(statusCode));
+			Logger::log(LOG_INFO, "Begin draining after 413 error response: " + toString(statusCode));
 			return;
 		}
 		if (ctx.request().getHeaderValue("connection") == "close") {
